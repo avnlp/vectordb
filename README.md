@@ -133,3 +133,4 @@ query_response = chroma_vector_db.query(
     query_embedding=dense_question_embedding, n_results=10, where_document={"$contains": "Pete Sampras"}
 )
 ```
+Pipelines in Qdrant and Milvus will be coming soon. 
