@@ -9,7 +9,7 @@ The main goal of this repo is to compare and contrast the functionality of the v
 - Pinecone
 - Weaviate
 - Chroma
-
+- Milvus
 ## Installation
 
 ```bash
