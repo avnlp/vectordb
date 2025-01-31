@@ -10,6 +10,7 @@ The main goal of this repo is to compare and contrast the functionality of the v
 - Weaviate
 - Chroma
 - Milvus
+- Qdrant
 ## Installation
 
 ```bash
@@ -133,4 +134,3 @@ query_response = chroma_vector_db.query(
     query_embedding=dense_question_embedding, n_results=10, where_document={"$contains": "Pete Sampras"}
 )
 ```
-Pipelines in Qdrant and Milvus will be coming soon. 
