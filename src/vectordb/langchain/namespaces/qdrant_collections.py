@@ -9,7 +9,6 @@ from ast import literal_eval
 
 from dataloaders import TriviaQADataloader
 from dataloaders.llms import ChatGroqGenerator
-from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from qdrant_client import QdrantClient
 
 from vectordb import QdrantDocumentConverter

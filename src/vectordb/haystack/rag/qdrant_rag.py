@@ -23,14 +23,6 @@ from vectordb import QdrantDocumentConverter
 
 
 def main():
-    """Run RAG pipeline using Qdrant vector database.
-
-    This function initializes Qdrant, loads data, creates a RAG pipeline,
-    and answers questions using retrieved documents with metadata filtering.
-
-    Returns:
-        None
-    """
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Qdrant and TriviaQA"
     )

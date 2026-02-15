@@ -19,15 +19,6 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB, PineconeVectorDB
 
 
 def main():
-    """Run the Chroma RAG pipeline.
-
-    This function:
-    - Parses command line arguments
-    - Initializes Chroma VectorDB and LLM generator
-    - Loads the TriviaQA dataset
-    - Builds a RAG pipeline with Haystack components
-    - Processes questions and generates answers
-    """
     parser = argparse.ArgumentParser(
         description="Run Chroma RAG Pipeline with Dense Embedding Search."
     )

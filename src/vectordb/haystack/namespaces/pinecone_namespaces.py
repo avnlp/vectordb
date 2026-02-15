@@ -22,14 +22,6 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
-    """Manage Pinecone namespaces with hybrid embeddings.
-
-    This function loads data, generates dense and sparse embeddings,
-    upserts them into separate namespaces, and queries both.
-
-    Returns:
-        None
-    """
     parser = argparse.ArgumentParser(
         description="Hybrid embedding upsert and retrieval using Pinecone."
     )

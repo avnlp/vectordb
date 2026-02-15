@@ -12,12 +12,10 @@ coverage:
     patch:
       default:
         target: 80%
-        informational: true
     project:
       default:
         target: 80%
         threshold: 2%
-        informational: true
 
 comment:
   layout: "reach, diff, flags, tree"

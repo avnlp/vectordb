@@ -1,20 +1,7 @@
-"""Qdrant vector database interface.
-
-This module provides an interface for interacting with Qdrant vector databases,
-including collection management, vector upserts, and similarity search queries.
-"""
-
-import logging
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, PointStruct, ScoredPoint, VectorParams
-
-from vectordb.utils.logging import LoggerFactory
-
-
-logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
-logger = logger_factory.get_logger()
 
 
 class QdrantVectorDB:

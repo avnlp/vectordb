@@ -71,16 +71,6 @@ def main():
         default=10,
         help="Number of results to retrieve from the database.",
     )
-    parser.add_argument(
-        "--tracing_project_name",
-        default="chroma",
-        help="Name of the Weave project for tracing.",
-    )
-    parser.add_argument(
-        "--weave_params",
-        type=str,
-        help="JSON string of parameters for initializing Weave.",
-    )
 
     args = parser.parse_args()
 

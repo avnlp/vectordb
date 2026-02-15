@@ -20,14 +20,6 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
-    """Run RAG pipeline using Weaviate vector database.
-
-    This function initializes Weaviate, loads data, creates a RAG pipeline,
-    and answers questions using retrieved documents.
-
-    Returns:
-        None
-    """
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Weaviate and TriviaQA"
     )
@@ -87,17 +79,6 @@ def main():
     # Prompt template
     parser.add_argument(
         "--prompt_template", type=str, help="Prompt template for the LLM."
-    )
-    parser.add_argument(
-        "--headers", type=str, help="JSON string of headers for the Weaviate API."
-    )
-    parser.add_argument(
-        "--tracing_project_name",
-        default="weaviate",
-        help="Name of the Weave project for tracing.",
-    )
-    parser.add_argument(
-        "--weave_params", type=str, help="JSON string of additional Weave parameters."
     )
 
     args = parser.parse_args()

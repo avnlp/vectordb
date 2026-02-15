@@ -1,20 +1,6 @@
-"""Metadata filtering script for Weaviate vector database.
-
-This module provides functionality to query Weaviate vector database
-with metadata filtering using Haystack components.
-"""
-
 import argparse
 from ast import literal_eval
 
-from dataloaders import (
-    ARCDataloader,
-    EdgarDataloader,
-    FactScoreDataloader,
-    PopQADataloader,
-    TriviaQADataloader,
-)
-from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 from weaviate.classes.query import Filter
 
@@ -107,13 +93,6 @@ def main():
     parser.add_argument(
         "--weave_params", type=str, help="JSON string of additional Weave parameters."
     )
-    parser.add_argument(
-        "--question", required=True, help="Question to query the Weaviate database."
-    )
-    parser.add_argument(
-        "--filter_property", required=True, help="Property name to filter on."
-    )
-    parser.add_argument("--filter_value", required=True, help="Value to filter by.")
 
     args = parser.parse_args()
 
@@ -124,7 +103,7 @@ def main():
     generator_params = (
         literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
     )
-    (literal_eval(args.embedding_model_params) if args.embedding_model_params else {})
+    literal_eval(args.embedding_model_params) if args.embedding_model_params else {}
     headers = literal_eval(args.headers) if args.headers else {}
     weave_params = literal_eval(args.weave_params) if args.weave_params else {}
 
@@ -167,7 +146,7 @@ def main():
     filters = Filter.by_property(args.filter_property).like(args.filter_value)
 
     # Initialize Weaviate VectorDB
-    weaviate_vector_db = WeaviateVectorDB(
+    WeaviateVectorDB(
         cluster_url=args.weaviate_cluster_url,
         api_key=args.weaviate_api_key,
         headers=headers,

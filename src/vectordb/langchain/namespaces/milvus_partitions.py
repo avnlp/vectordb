@@ -100,7 +100,7 @@ def main():
     generator_params = (
         literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
     )
-    (literal_eval(args.embedding_model_params) if args.embedding_model_params else {})
+    literal_eval(args.embedding_model_params) if args.embedding_model_params else {}
 
     # Initialize generator if model and API key are provided
     generator = None

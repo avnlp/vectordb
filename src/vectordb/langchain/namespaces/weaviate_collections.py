@@ -14,11 +14,6 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def parse_args():
-    """Parse command line arguments for Weaviate collections example.
-
-    Returns:
-        argparse.Namespace: Parsed command line arguments.
-    """
     parser = argparse.ArgumentParser(
         description="Upsert documents to Weaviate and query the database."
     )

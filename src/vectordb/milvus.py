@@ -1,9 +1,3 @@
-"""Milvus vector database interface.
-
-This module provides an interface for interacting with Milvus vector databases,
-with Weave tracking support.
-"""
-
 from typing import Any, List, Optional
 
 import weave
@@ -12,10 +6,8 @@ from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connec
 
 @weave.model
 class MilvusVectorDB:
-    """Interface for interacting with Milvus vector databases with Weave tracking.
-
-    Provides functionalities for creating collections, inserting vectors, querying
-    vectors, and deleting collections.
+    """Implements an interface for interacting with Milvus vector databases, with Weave tracking.
+    Provides functionalities for creating collections, inserting vectors, querying vectors, and deleting collections.
     """
 
     def __init__(
@@ -101,9 +93,8 @@ class MilvusVectorDB:
             "vector": vectors,
         }
         self.collection.insert([entities])
-        msg = f"Inserted {len(vectors)} vectors into collection"
         weave.track(
-            f"{msg} '{self.collection_name}'.",
+            f"Inserted {len(vectors)} vectors into collection '{self.collection_name}'.",
             name="insertion_status",
         )
 

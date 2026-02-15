@@ -28,6 +28,7 @@ from weave import Model  # noqa: E402
 from vectordb.utils.logging import LoggerFactory  # noqa: E402
 
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
@@ -109,7 +110,9 @@ class ChromaVectorDB(Model):
         name: str,
         configuration: Optional[CollectionConfiguration] = None,
         metadata: Optional[CollectionMetadata] = None,
-        embedding_function: Optional[EmbeddingFunction[Embeddable]] = None,
+        embedding_function: Optional[
+            EmbeddingFunction[Embeddable]
+        ] = embedding_functions.DefaultEmbeddingFunction(),
         **kwargs: Any,
     ) -> None:
         """Create a new collection.

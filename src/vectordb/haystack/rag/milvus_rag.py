@@ -18,14 +18,6 @@ from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connec
 
 
 def main():
-    """Run RAG pipeline using Milvus vector database.
-
-    This function sets up Milvus collection, loads data, creates a RAG pipeline,
-    and answers questions using retrieved documents.
-
-    Returns:
-        None
-    """
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Milvus and TriviaQA"
     )

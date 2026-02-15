@@ -13,11 +13,6 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def parse_args():
-    """Parse command line arguments for Weaviate semantic search.
-
-    Returns:
-        argparse.Namespace: Parsed command line arguments.
-    """
     parser = argparse.ArgumentParser(
         description="Run a query using Weaviate VectorDB and HuggingFace embeddings."
     )

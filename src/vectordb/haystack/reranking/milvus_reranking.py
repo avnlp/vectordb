@@ -11,14 +11,6 @@ from pymilvus import AnnSearchRequest, DataType, MilvusClient, RRFRanker, Weight
 
 
 def main():
-    """Perform hybrid search with reranking in Milvus.
-
-    This function creates a Milvus collection, performs hybrid search
-    with dense and sparse vectors, and applies reranking to results.
-
-    Returns:
-        None
-    """
     parser = argparse.ArgumentParser(
         description="Hybrid Search in Milvus with Argparse"
     )

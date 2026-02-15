@@ -9,7 +9,6 @@ from ast import literal_eval
 
 from dataloaders import (
     ARCDataloader,
-    EdgarDataloader,
     FactScoreDataloader,
     PopQADataloader,
     TriviaQADataloader,

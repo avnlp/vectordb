@@ -12,15 +12,6 @@ from pymilvus import AnnSearchRequest, DataType, MilvusClient, RRFRanker, Weight
 
 
 def main():
-    """Run the Milvus reranking example.
-
-    This function:
-    - Parses command line arguments
-    - Connects to Milvus and creates a collection with schema
-    - Loads and inserts data from TriviaQA dataset
-    - Performs hybrid search with configurable reranking
-    - Prints the reranked results as LangChain documents
-    """
     parser = argparse.ArgumentParser(
         description="Hybrid Search in Milvus with Argparse"
     )

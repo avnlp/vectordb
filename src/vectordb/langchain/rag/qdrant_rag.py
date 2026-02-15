@@ -14,20 +14,8 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
 from qdrant_client import QdrantClient
 
-from vectordb import PineconeDocumentConverter, PineconeVectorDB
-
 
 def main():
-    """Run the Qdrant RAG pipeline.
-
-    This function:
-    - Parses command line arguments
-    - Initializes Qdrant client and Pinecone VectorDB
-    - Initializes the data loader and generator
-    - Loads the TriviaQA dataset
-    - Processes questions through the RAG pipeline
-    - Generates answers using retrieved context
-    """
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Qdrant and TriviaQA"
     )
@@ -66,14 +54,9 @@ def main():
 
     # Embedding model parameters
     parser.add_argument(
-        "--dense_model",
+        "--embedding_model",
         default="sentence-transformers/all-mpnet-base-v2",
-        help="Dense embedding model.",
-    )
-    parser.add_argument(
-        "--sparse_model",
-        default="prithivida/Splade_PP_en_v1",
-        help="Sparse embedding model.",
+        help="Embedding model.",
     )
 
     # LLM parameters
@@ -84,27 +67,6 @@ def main():
     parser.add_argument(
         "--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response."
     )
-    parser.add_argument(
-        "--llm_params",
-        type=str,
-        default='{"temperature": 0, "max_tokens": 1024, "timeout": 360, "max_retries": 100}',
-        help="JSON string of LLM parameters.",
-    )
-
-    # Pinecone parameters
-    parser.add_argument("--pinecone_api_key", required=True, help="Pinecone API key.")
-    parser.add_argument(
-        "--index_name", default="test-index-hybrid", help="Pinecone index name."
-    )
-    parser.add_argument(
-        "--namespace", default="test_namespace1", help="Namespace for Pinecone queries."
-    )
-    parser.add_argument(
-        "--top_k",
-        type=int,
-        default=10,
-        help="Number of top results to retrieve from Pinecone.",
-    )
 
     # Prompt template
     parser.add_argument(
@@ -113,7 +75,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Initialize Qdrant client (for potential future use)
+    # Initialize Qdrant VectorDB
     QdrantClient(url=args.qdrant_host, api_key=args.qdrant_api_key)
 
     # Initialize Pinecone VectorDB

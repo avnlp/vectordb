@@ -7,17 +7,6 @@ in Pinecone vector database using Haystack components.
 import argparse
 from ast import literal_eval
 
-from dataloaders import (
-    ARCDataloader,
-    EdgarDataloader,
-    FactScoreDataloader,
-    PopQADataloader,
-    TriviaQADataloader,
-)
-from dataloaders.llms import ChatGroqGenerator
-from haystack.components.embedders import SentenceTransformersDocumentEmbedder
-from pinecone import ServerlessSpec
-
 from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
@@ -154,21 +143,6 @@ def main():
         "--weave_params",
         type=str,
         help="JSON string of parameters for configuring Weave.",
-    )
-    parser.add_argument(
-        "--question", required=True, help="Question to query the Pinecone database."
-    )
-    parser.add_argument(
-        "--rerank_model", default="bge-reranker-v2-m3", help="Rerank model to use."
-    )
-    parser.add_argument(
-        "--rerank_top_n", type=int, default=5, help="Number of top results to rerank."
-    )
-    parser.add_argument(
-        "--rerank_params",
-        type=str,
-        default="{}",
-        help="JSON string of rerank parameters.",
     )
 
     args = parser.parse_args()

@@ -72,7 +72,7 @@ def main():
 
     generator = ChatGroqGenerator(
         model="llama-3.1-8b-instant",
-        api_key="GROQ_API_KEY",
+        api_key="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",
         llm_params={
             "temperature": 0,
             "max_tokens": 1024,

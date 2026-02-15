@@ -7,14 +7,6 @@ with metadata filtering using Haystack components.
 import argparse
 from ast import literal_eval
 
-from dataloaders import (
-    ARCDataloader,
-    EdgarDataloader,
-    FactScoreDataloader,
-    PopQADataloader,
-    TriviaQADataloader,
-)
-from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 
 from vectordb import MilvusVectorDB
@@ -104,7 +96,7 @@ def main():
     generator_params = (
         literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
     )
-    (literal_eval(args.embedding_model_params) if args.embedding_model_params else {})
+    literal_eval(args.embedding_model_params) if args.embedding_model_params else {}
 
     # Instantiate generator if model and API key are provided
     generator = None
