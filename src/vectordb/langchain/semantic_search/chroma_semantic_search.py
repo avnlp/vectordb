@@ -9,10 +9,11 @@ import argparse
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
 
-from vectordb import PineconeVectorDB
+from vectordb import ChromaVectorDB, PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run semantic search on Chroma or Pinecone VectorDB."""
     parser = argparse.ArgumentParser(
         description="Run Dense and Sparse Query on Pinecone or Chroma VectorDB."
     )

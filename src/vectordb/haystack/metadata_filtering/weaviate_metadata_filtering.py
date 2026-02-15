@@ -1,6 +1,20 @@
+"""Metadata filtering script for Weaviate vector database.
+
+This module provides functionality to query Weaviate vector database
+with metadata filtering using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
+from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 from weaviate.classes.query import Filter
 
@@ -146,7 +160,7 @@ def main():
     filters = Filter.by_property(args.filter_property).like(args.filter_value)
 
     # Initialize Weaviate VectorDB
-    WeaviateVectorDB(
+    weaviate_vector_db = WeaviateVectorDB(
         cluster_url=args.weaviate_cluster_url,
         api_key=args.weaviate_api_key,
         headers=headers,

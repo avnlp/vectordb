@@ -22,6 +22,7 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Manage Pinecone namespaces with hybrid embeddings."""
     parser = argparse.ArgumentParser(
         description="Hybrid embedding upsert and retrieval using Pinecone."
     )

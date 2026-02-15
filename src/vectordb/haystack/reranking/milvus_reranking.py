@@ -11,6 +11,7 @@ from pymilvus import AnnSearchRequest, DataType, MilvusClient, RRFRanker, Weight
 
 
 def main():
+    """Perform hybrid search with reranking in Milvus."""
     parser = argparse.ArgumentParser(
         description="Hybrid Search in Milvus with Argparse"
     )

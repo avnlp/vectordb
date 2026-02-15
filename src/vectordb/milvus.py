@@ -1,13 +1,21 @@
+"""Milvus vector database interface.
+
+This module provides an interface for interacting with Milvus vector databases,
+including collection management, vector upserts, and similarity search queries.
+"""
+
 from typing import Any, List, Optional
 
-import weave
+import weave  # type: ignore[attr-defined]
 from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections
 
 
 @weave.model
 class MilvusVectorDB:
-    """Implements an interface for interacting with Milvus vector databases, with Weave tracking.
-    Provides functionalities for creating collections, inserting vectors, querying vectors, and deleting collections.
+    """Interface for interacting with Milvus vector databases with Weave tracking.
+
+    Provides functionalities for creating collections, inserting vectors,
+    querying vectors, and deleting collections.
     """
 
     def __init__(
@@ -32,7 +40,7 @@ class MilvusVectorDB:
             f"Connected to Milvus at {host}:{port}", name="milvus_connection_status"
         )
 
-    def _initialize_weave(self, **weave_params) -> None:
+    def _initialize_weave(self, **weave_params: Any) -> None:
         """Initialize Weave with the specified tracing project name.
 
         Sets up the Weave environment and creates a tracer for monitoring pipeline
@@ -43,14 +51,14 @@ class MilvusVectorDB:
         """
         weave.init("milvus", **weave_params)
 
-    @weave.op()
-    def create_collection(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def create_collection(  # type: ignore[no-untyped-def]
         self,
         collection_name: str,
         dimension: int,
         metric_type: str = "L2",
         description: str = "",
-    ):
+    ) -> None:
         """Create a Milvus collection with the specified configuration.
 
         :param collection_name: Name of the new collection.
@@ -74,10 +82,10 @@ class MilvusVectorDB:
             name="collection_creation_status",
         )
 
-    @weave.op()
-    def insert_vectors(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def insert_vectors(  # type: ignore[no-untyped-def]
         self, vectors: List[List[float]], ids: Optional[List[int]] = None
-    ):
+    ) -> None:
         """Insert vectors into the selected Milvus collection.
 
         :param vectors: List of vectors to insert.
@@ -98,8 +106,8 @@ class MilvusVectorDB:
             name="insertion_status",
         )
 
-    @weave.op()
-    def query_vectors(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def query_vectors(  # type: ignore[no-untyped-def]
         self,
         vector: List[float],
         top_k: int = 5,
@@ -129,13 +137,13 @@ class MilvusVectorDB:
         )
         return results
 
-    @weave.op()
-    def delete_collection(self):
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def delete_collection(self) -> None:  # type: ignore[no-untyped-def]
         """Delete the current Milvus collection."""
         if not self.collection_name:
             raise ValueError("No collection specified for deletion.")
 
-        self.collection.drop()
+        self.collection.drop()  # type: ignore[union-attr]
         weave.track(
             f"Collection '{self.collection_name}' deleted.", name="deletion_status"
         )

@@ -23,6 +23,7 @@ from vectordb import QdrantDocumentConverter
 
 
 def main():
+    """Run RAG pipeline with Qdrant and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Qdrant and TriviaQA"
     )

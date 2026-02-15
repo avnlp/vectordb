@@ -109,7 +109,7 @@ class ChromaDocumentConverter:
     @staticmethod
     def prepare_langchain_documents_for_upsert(
         documents: list[LangchainDocument], embeddings: list[list[float]]
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """Prepare LangChain Document objects for upserting into a vector store.
 
         Args:
@@ -119,8 +119,7 @@ class ChromaDocumentConverter:
                 to the documents.
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries formatted for vector
-                store upsertion.
+            Dict[str, Any]: A dictionary formatted for vector store upsertion.
         """
         if not documents:
             msg = "The document list is empty. Please provide valid documents."

@@ -13,6 +13,7 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 
 def main():
+    """Perform Metadata Filtering using Chroma."""
     parser = argparse.ArgumentParser(
         description="Query Chroma vector database with a dense embedding."
     )

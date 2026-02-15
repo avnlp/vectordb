@@ -9,11 +9,13 @@ from ast import literal_eval
 
 from dataloaders import (
     ARCDataloader,
+    EdgarDataloader,
     FactScoreDataloader,
     PopQADataloader,
     TriviaQADataloader,
 )
 from dataloaders.llms import ChatGroqGenerator
+from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 
 from vectordb import MilvusVectorDB
 

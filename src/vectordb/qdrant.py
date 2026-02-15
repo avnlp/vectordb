@@ -1,7 +1,17 @@
+"""Qdrant vector database interface.
+
+This module provides an interface for interacting with Qdrant vector databases,
+including collection management, vector upserts, and similarity search queries.
+"""
+
+import logging
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, PointStruct, ScoredPoint, VectorParams
+
+
+logger = logging.getLogger(__name__)
 
 
 class QdrantVectorDB:
@@ -44,7 +54,7 @@ class QdrantVectorDB:
         collection_name: str,
         vector_size: int,
         distance: str = "Cosine",
-    ):
+    ) -> None:
         """Create a Qdrant collection with the specified configuration.
 
         Args:
@@ -68,7 +78,7 @@ class QdrantVectorDB:
     def upsert_vectors(
         self,
         vectors: List[Dict[str, Any]],
-    ):
+    ) -> None:
         """Insert or update vectors in the specified Qdrant collection.
 
         Args:
@@ -128,7 +138,7 @@ class QdrantVectorDB:
         logger.info(f"Query returned {len(results)} results.")
         return results
 
-    def delete_collection(self):
+    def delete_collection(self) -> None:
         """Delete the current Qdrant collection."""
         if not self.collection_name:
             raise ValueError("No collection selected for deletion.")

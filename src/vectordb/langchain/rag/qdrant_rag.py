@@ -12,10 +12,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
+from pinecone import PineconeVectorDB
 from qdrant_client import QdrantClient
+
+from vectordb import PineconeDocumentConverter
 
 
 def main():
+    """Run RAG pipeline with Qdrant and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Qdrant and TriviaQA"
     )

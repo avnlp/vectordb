@@ -18,6 +18,7 @@ from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connec
 
 
 def main():
+    """Run RAG pipeline with Milvus and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Milvus and TriviaQA"
     )

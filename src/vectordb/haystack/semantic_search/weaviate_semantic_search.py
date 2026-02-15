@@ -9,7 +9,7 @@ import argparse
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 from pinecone import ServerlessSpec
 
-from vectordb import WeaviateDocumentConverter
+from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():

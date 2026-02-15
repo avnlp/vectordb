@@ -20,6 +20,7 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
+    """Run RAG pipeline with Weaviate and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Weaviate and TriviaQA"
     )

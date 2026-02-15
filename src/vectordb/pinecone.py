@@ -123,7 +123,7 @@ class PineconeVectorDB(Model):
 
         self._initialize_weave(**(weave_params or {}))
 
-    def _initialize_weave(self, **weave_params) -> None:
+    def _initialize_weave(self, **weave_params: Any) -> None:
         """Initialize Weave with the specified tracing project name.
 
         Sets up the Weave environment and creates a tracer for monitoring pipeline
@@ -134,7 +134,7 @@ class PineconeVectorDB(Model):
         """
         weave.init(self.tracing_project_name, **weave_params)
 
-    def _initialize_client(self):
+    def _initialize_client(self) -> None:
         """Initialize the Pinecone client."""
         self.client = Pinecone(
             api_key=self.api_key,
@@ -167,15 +167,15 @@ class PineconeVectorDB(Model):
         logger.warning(f"Index {index_name} does not exist.")
         return False
 
-    @weave.op()
-    def create_index(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def create_index(  # type: ignore[no-untyped-def]
         self,
         index_name: str,
         dimension: int,
         metric: str = "cosine",
         spec: Optional[ServerlessSpec] = None,
         deletion_protection: str = "disabled",
-    ):
+    ) -> None:
         """Create a Pinecone index with the specified configuration.
 
         Args:
@@ -214,14 +214,14 @@ class PineconeVectorDB(Model):
         self._select_index(index_name)
         logger.info(f"New index '{index_name}' created and selected.")
 
-    @weave.op()
-    def upsert(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def upsert(  # type: ignore[no-untyped-def]
         self,
         data: list[dict[str, Any]],
         namespace: Optional[str] = None,
         batch_size: Optional[int] = None,
         show_progress: bool = True,
-    ):
+    ) -> None:
         """Upsert vectors into the selected Pinecone index.
 
         Args:
@@ -246,8 +246,8 @@ class PineconeVectorDB(Model):
             show_progress=show_progress,
         )
 
-    @weave.op()
-    def query(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def query(  # type: ignore[no-untyped-def]
         self,
         namespace: str,
         vector: list[float],
@@ -290,8 +290,8 @@ class PineconeVectorDB(Model):
             include_metadata=include_metadata,
         )
 
-    @weave.op()
-    def delete_index(self):
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def delete_index(self) -> None:  # type: ignore[no-untyped-def]
         """Delete the currently selected Pinecone index.
 
         Raises:

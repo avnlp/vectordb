@@ -8,9 +8,9 @@ querying capabilities with Weave tracing integration.
 import logging
 from typing import Any, Optional, Union
 
-import weave
-import weaviate
-from weave import Model
+import weave  # type: ignore[attr-defined]
+import weaviate  # type: ignore[attr-defined]
+from weave import Model  # type: ignore[misc, attr-defined]
 from weaviate import WeaviateClient
 from weaviate.classes.config import Configure, Property
 from weaviate.classes.init import Auth
@@ -95,7 +95,7 @@ class WeaviateVectorDB(Model):
 
         self._initialize_weave(**(weave_params or {}))
 
-    def _initialize_weave(self, **weave_params) -> None:
+    def _initialize_weave(self, **weave_params: Any) -> None:
         """Initialize Weave with the specified tracing project name.
 
         Sets up the Weave environment and creates a tracer for monitoring
@@ -136,8 +136,8 @@ class WeaviateVectorDB(Model):
         logger.warning(f"Collection {collection_name} does not exist.")
         return False
 
-    @weave.op()
-    def create_collection(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def create_collection(  # type: ignore[no-untyped-def]
         self,
         collection_name: str,
         properties: Optional[list[Property]] = None,
@@ -177,8 +177,8 @@ class WeaviateVectorDB(Model):
         self._select_collection(collection_name)
         logger.info(f"Collection {collection_name} created and selected.")
 
-    @weave.op()
-    def upsert(self, data: list[dict[str, Any]]) -> None:
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def upsert(self, data: list[dict[str, Any]]) -> None:  # type: ignore[no-untyped-def]
         """Upsert vectors into the selected Weaviate collection.
 
         Args:
@@ -201,8 +201,8 @@ class WeaviateVectorDB(Model):
             logger.error(msg)
             raise RuntimeError(msg)
 
-    @weave.op()
-    def query(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def query(  # type: ignore[no-untyped-def]
         self,
         vector: list[float],
         limit: int = 10,

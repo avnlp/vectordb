@@ -19,6 +19,7 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB, PineconeVectorDB
 
 
 def main():
+    """Run Chroma RAG Pipeline with Dense Embedding Search."""
     parser = argparse.ArgumentParser(
         description="Run Chroma RAG Pipeline with Dense Embedding Search."
     )
