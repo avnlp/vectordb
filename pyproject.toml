@@ -99,7 +99,6 @@ disable_error_code = ["operator"]
 
 [[tool.mypy.overrides]]
 module = [
-  "vectordb.*",
   "pytest.*",
   "numpy.*",
   "datasets",
@@ -138,7 +137,7 @@ ignore_missing_imports = true
 ignore_errors = true
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 88
 include = ["*.py", "pyproject.toml", "*.ipynb"]
 
@@ -192,6 +191,7 @@ ignore = [
 ignore-names = ["X*", "setUp"]
 
 [tool.ruff.lint.isort]
+known-first-party = ["vectordb"]
 lines-after-imports = 2
 
 [tool.ruff.lint.pydocstyle]
