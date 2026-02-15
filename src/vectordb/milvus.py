@@ -136,4 +136,3 @@ class MilvusVectorDB:
         """
         collections = weave.track(connections.list_collections(), name="list_collections")
         return collections
-

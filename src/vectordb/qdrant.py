@@ -122,4 +122,3 @@ class QdrantVectorDB:
         """
         collections = self.client.get_collections().collections
         return [collection.name for collection in collections]
-
