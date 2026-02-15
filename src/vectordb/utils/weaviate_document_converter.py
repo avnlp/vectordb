@@ -29,6 +29,7 @@ from weaviate.util import generate_uuid5
 
 from vectordb.utils.logging import LoggerFactory
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
@@ -37,7 +38,9 @@ class WeaviateDocumentConverter:
     """Utility class for preparing and converting documents for vector store operations."""
 
     @staticmethod
-    def prepare_haystack_documents_for_upsert(documents: list[HaystackDocument]) -> list[dict[str, Any]]:
+    def prepare_haystack_documents_for_upsert(
+        documents: list[HaystackDocument],
+    ) -> list[dict[str, Any]]:
         """Convert Haystack documents to Pinecone upsert format.
 
         This method takes a list of Haystack Document objects and prepares them for upsertion into a vector store.
@@ -87,7 +90,9 @@ class WeaviateDocumentConverter:
             upsert_data.append(prepared_doc)
             logger.info(f"Prepared document for upsert: {document.id}")
 
-        logger.info(f"Prepared {len(upsert_data)} documents for vector store upsertion.")
+        logger.info(
+            f"Prepared {len(upsert_data)} documents for vector store upsertion."
+        )
         return upsert_data
 
     @staticmethod
@@ -136,11 +141,15 @@ class WeaviateDocumentConverter:
 
             upsert_data.append(prepared_doc)
 
-        logger.info(f"Prepared {len(upsert_data)} documents for vector store upsertion.")
+        logger.info(
+            f"Prepared {len(upsert_data)} documents for vector store upsertion."
+        )
         return upsert_data
 
     @staticmethod
-    def convert_query_results_to_haystack_documents(query_results: QueryReturn) -> list[HaystackDocument]:
+    def convert_query_results_to_haystack_documents(
+        query_results: QueryReturn,
+    ) -> list[HaystackDocument]:
         """Convert query results into a list of Haystack Document objects.
 
         This method extracts relevant information from the query results and constructs Haystack Document objects.
@@ -171,11 +180,15 @@ class WeaviateDocumentConverter:
             haystack_docs.append(document)
             logger.info(f"Converted query result to HaystackDocument: {document.id}")
 
-        logger.info(f"Converted {len(haystack_docs)} query results into HaystackDocument objects.")
+        logger.info(
+            f"Converted {len(haystack_docs)} query results into HaystackDocument objects."
+        )
         return haystack_docs
 
     @staticmethod
-    def convert_query_results_to_langchain_documents(query_results: QueryReturn) -> list[LangchainDocument]:
+    def convert_query_results_to_langchain_documents(
+        query_results: QueryReturn,
+    ) -> list[LangchainDocument]:
         """Convert query results into a list of LangChain Document objects.
 
         This method extracts relevant information from the query results and constructs LangChain Document objects.
@@ -204,5 +217,7 @@ class WeaviateDocumentConverter:
 
             langchain_docs.append(document)
 
-        logger.info(f"Converted {len(langchain_docs)} query results into HaystackDocument objects.")
+        logger.info(
+            f"Converted {len(langchain_docs)} query results into HaystackDocument objects."
+        )
         return langchain_docs

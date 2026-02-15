@@ -1,7 +1,8 @@
-import logging
-from typing import Any, List, Optional, Dict, Union
+from typing import Any, Dict, List, Optional
+
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import VectorParams, Filter, PointStruct, ScoredPoint
+from qdrant_client.http.models import Filter, PointStruct, ScoredPoint, VectorParams
+
 
 class QdrantVectorDB:
     """Interface for interacting with Qdrant vector databases.
@@ -27,9 +28,10 @@ class QdrantVectorDB:
             timeout (Optional[float]): Timeout for client requests in seconds (default: 60.0).
             retries (Optional[int]): Number of retries for failed requests (default: 3).
         """
-        self.client = QdrantClient(host=host, port=port, api_key=api_key, timeout=timeout)
+        self.client = QdrantClient(
+            host=host, port=port, api_key=api_key, timeout=timeout
+        )
         self.collection_name = collection_name
-
 
     def create_collection(
         self,
@@ -46,7 +48,9 @@ class QdrantVectorDB:
         """
         self.collection_name = collection_name
         if self.client.get_collection(collection_name, raise_on_not_found=False):
-            logger.info(f"Collection '{collection_name}' already exists. Skipping creation.")
+            logger.info(
+                f"Collection '{collection_name}' already exists. Skipping creation."
+            )
             return
 
         self.client.create_collection(
@@ -65,14 +69,20 @@ class QdrantVectorDB:
             vectors (List[Dict[str, Any]]): List of vectors to upsert, where each vector contains `id`, `vector`, and optional `payload`.
         """
         if not self.collection_name:
-            raise ValueError("No collection selected. Create or specify a collection first.")
+            raise ValueError(
+                "No collection selected. Create or specify a collection first."
+            )
 
         points = [
-            PointStruct(id=vector["id"], vector=vector["vector"], payload=vector.get("payload"))
+            PointStruct(
+                id=vector["id"], vector=vector["vector"], payload=vector.get("payload")
+            )
             for vector in vectors
         ]
         self.client.upsert(collection_name=self.collection_name, points=points)
-        logger.info(f"Upserted {len(vectors)} vectors into collection '{self.collection_name}'.")
+        logger.info(
+            f"Upserted {len(vectors)} vectors into collection '{self.collection_name}'."
+        )
 
     def query_vectors(
         self,
@@ -93,7 +103,9 @@ class QdrantVectorDB:
             List[ScoredPoint]: List of points with their similarity scores.
         """
         if not self.collection_name:
-            raise ValueError("No collection selected. Create or specify a collection first.")
+            raise ValueError(
+                "No collection selected. Create or specify a collection first."
+            )
 
         results = self.client.search(
             collection_name=self.collection_name,
@@ -122,4 +134,3 @@ class QdrantVectorDB:
         """
         collections = self.client.get_collections().collections
         return [collection.name for collection in collections]
-

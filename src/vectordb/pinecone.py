@@ -26,6 +26,7 @@ from weave import Model
 
 from vectordb.utils.logging import LoggerFactory
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
@@ -150,7 +151,9 @@ class PineconeVectorDB(Model):
         Returns:
             bool: True if the index exists and is selected, False otherwise.
         """
-        existing_indexes = [index_info["name"] for index_info in self.client.list_indexes()]
+        existing_indexes = [
+            index_info["name"] for index_info in self.client.list_indexes()
+        ]
         if index_name in existing_indexes:
             self.index = self.client.Index(index_name)
             logger.info(f"Selected existing index: {index_name}")
@@ -264,7 +267,7 @@ class PineconeVectorDB(Model):
 
         logger.info(f"Querying index {self.index_name} with top_k={top_k}.")
 
-        query_response = self.index.query(
+        return self.index.query(
             vector=vector,
             top_k=top_k,
             namespace=namespace,
@@ -273,7 +276,6 @@ class PineconeVectorDB(Model):
             include_values=include_values,
             include_metadata=include_metadata,
         )
-        return query_response
 
     @weave.op()
     def delete_index(self):

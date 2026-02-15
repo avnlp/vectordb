@@ -1,7 +1,8 @@
 import argparse
-from ast import literal_eval
 
-from dataloaders.haystack import ARCDataloader,EdgarDataloader, FactScoreDataloader, PopQADataloader, TriviaQADataloader
+from dataloaders.haystack import (
+    TriviaQADataloader,
+)
 from dataloaders.haystack.llms import ChatGroqGenerator
 from haystack import Pipeline
 from haystack.components.builders import AnswerBuilder
@@ -9,40 +10,69 @@ from haystack.components.builders.prompt_builder import PromptBuilder
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack.components.generators import OpenAIGenerator
 from haystack.utils import Secret
-
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter
 
-from vectordb import QdrantDocumentConverter, QdrantVectorDB
+from vectordb import QdrantDocumentConverter
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RAG pipeline with Qdrant and TriviaQA")
+    parser = argparse.ArgumentParser(
+        description="RAG pipeline with Qdrant and TriviaQA"
+    )
 
     # Qdrant parameters
     parser.add_argument("--qdrant_host", required=True, help="Qdrant host URL.")
     parser.add_argument("--qdrant_api_key", required=True, help="API key for Qdrant.")
-    parser.add_argument("--collection_name", default="test_collection_dense1", help="Qdrant collection name.")
+    parser.add_argument(
+        "--collection_name",
+        default="test_collection_dense1",
+        help="Qdrant collection name.",
+    )
 
     # Generator parameters
-    parser.add_argument("--generator_model", default="llama-3.1-8b-instant", help="Model for the ChatGroqGenerator.")
-    parser.add_argument("--generator_api_key", required=True, help="API key for the generator.")
-    parser.add_argument("--generator_params", default="{}", help="JSON string of additional LLM parameters.")
+    parser.add_argument(
+        "--generator_model",
+        default="llama-3.1-8b-instant",
+        help="Model for the ChatGroqGenerator.",
+    )
+    parser.add_argument(
+        "--generator_api_key", required=True, help="API key for the generator."
+    )
+    parser.add_argument(
+        "--generator_params",
+        default="{}",
+        help="JSON string of additional LLM parameters.",
+    )
 
     # Dataloader parameters
-    parser.add_argument("--dataset_name", required=True, help="Name of the TriviaQA dataset.")
-    parser.add_argument("--split", default="test[:5]", help="Split of the dataset to use.")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Name of the TriviaQA dataset."
+    )
+    parser.add_argument(
+        "--split", default="test[:5]", help="Split of the dataset to use."
+    )
 
     # Embedding model parameters
-    parser.add_argument("--embedding_model", default="sentence-transformers/all-mpnet-base-v2", help="Embedding model.")
+    parser.add_argument(
+        "--embedding_model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Embedding model.",
+    )
 
     # LLM parameters
     parser.add_argument("--llm_api_key", required=True, help="API key for the LLM.")
-    parser.add_argument("--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM.")
-    parser.add_argument("--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response.")
+    parser.add_argument(
+        "--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM."
+    )
+    parser.add_argument(
+        "--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response."
+    )
 
     # Prompt template
-    parser.add_argument("--prompt_template", type=str, help="Prompt template for the LLM.")
+    parser.add_argument(
+        "--prompt_template", type=str, help="Prompt template for the LLM."
+    )
 
     args = parser.parse_args()
 
@@ -93,20 +123,29 @@ def main():
     # Query Qdrant and process questions
     for question in questions:
         question_embedding = text_embedder.run(text=question)["embedding"]
-        
+
         # Query Qdrant for relevant documents based on the question embedding
         query_response = qdrant_client.search(
             collection_name=args.collection_name,
             query_vector=question_embedding,
             limit=10,
-            filter=Filter().must([{"key": "text", "match": {"any": ["Chipmunks"]}}]),  # Example filter on metadata
+            filter=Filter().must(
+                [{"key": "text", "match": {"any": ["Chipmunks"]}}]
+            ),  # Example filter on metadata
         )
 
-        retrieval_results = QdrantDocumentConverter.convert_query_results_to_haystack_documents(query_response)
+        retrieval_results = (
+            QdrantDocumentConverter.convert_query_results_to_haystack_documents(
+                query_response
+            )
+        )
 
         result = rag_pipeline.run(
             data={
-                "prompt_builder": {"question": question, "documents": retrieval_results},
+                "prompt_builder": {
+                    "question": question,
+                    "documents": retrieval_results,
+                },
                 "answer_builder": {"query": question, "documents": retrieval_results},
             }
         )
@@ -115,4 +154,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

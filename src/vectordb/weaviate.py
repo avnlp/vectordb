@@ -12,6 +12,7 @@ from weaviate.collections import Collection
 
 from vectordb.utils.logging import LoggerFactory
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
@@ -118,8 +119,7 @@ class WeaviateVectorDB(Model):
             self.collection = self.client.collections.get(collection_name)
             logger.info(f"Selected existing collection: {collection_name}")
             return True
-        else:
-            logger.warning(f"Collection {collection_name} does not exist.")
+        logger.warning(f"Collection {collection_name} does not exist.")
         return False
 
     @weave.op()

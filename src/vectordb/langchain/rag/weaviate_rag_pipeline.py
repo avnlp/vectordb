@@ -12,15 +12,29 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 def main():
     # Set up argparse
-    parser = argparse.ArgumentParser(description="RAG pipeline for question answering using Pinecone and ChatGroq.")
+    parser = argparse.ArgumentParser(
+        description="RAG pipeline for question answering using Pinecone and ChatGroq."
+    )
 
     # Dataloader arguments
-    parser.add_argument("--dataset_name", required=True, help="Dataset name for TriviaQA dataloader.")
-    parser.add_argument("--split", default="test[:5]", help="Dataset split to use (default: 'test[:5]').")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Dataset name for TriviaQA dataloader."
+    )
+    parser.add_argument(
+        "--split",
+        default="test[:5]",
+        help="Dataset split to use (default: 'test[:5]').",
+    )
 
     # LLM generator arguments
-    parser.add_argument("--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM generator.")
-    parser.add_argument("--llm_api_key", required=True, help="API key for the LLM service.")
+    parser.add_argument(
+        "--llm_model",
+        default="llama-3.1-8b-instant",
+        help="Model name for the LLM generator.",
+    )
+    parser.add_argument(
+        "--llm_api_key", required=True, help="API key for the LLM service."
+    )
     parser.add_argument(
         "--llm_params",
         type=str,
@@ -30,15 +44,30 @@ def main():
 
     # Embedding arguments
     parser.add_argument(
-        "--dense_model", default="sentence-transformers/all-mpnet-base-v2", help="Dense embedding model name."
+        "--dense_model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Dense embedding model name.",
     )
-    parser.add_argument("--sparse_model", default="prithivida/Splade_PP_en_v1", help="Sparse embedding model name.")
+    parser.add_argument(
+        "--sparse_model",
+        default="prithivida/Splade_PP_en_v1",
+        help="Sparse embedding model name.",
+    )
 
     # Pinecone arguments
     parser.add_argument("--pinecone_api_key", required=True, help="Pinecone API key.")
-    parser.add_argument("--index_name", default="test-index-hybrid", help="Pinecone index name.")
-    parser.add_argument("--namespace", default="test_namespace1", help="Namespace for Pinecone queries.")
-    parser.add_argument("--top_k", type=int, default=10, help="Number of top results to retrieve from Pinecone.")
+    parser.add_argument(
+        "--index_name", default="test-index-hybrid", help="Pinecone index name."
+    )
+    parser.add_argument(
+        "--namespace", default="test_namespace1", help="Namespace for Pinecone queries."
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=10,
+        help="Number of top results to retrieve from Pinecone.",
+    )
 
     args = parser.parse_args()
 
@@ -94,11 +123,18 @@ Answer:""",
         sparse_question_embedding = sparse_embedder.embed_query(question)
         query_response = pinecone_vector_db.query(
             vector=dense_question_embedding,
-            sparse_vector={"indices": sparse_question_embedding.indices, "values": sparse_question_embedding.values},
+            sparse_vector={
+                "indices": sparse_question_embedding.indices,
+                "values": sparse_question_embedding.values,
+            },
             top_k=args.top_k,
             namespace=args.namespace,
         )
-        retrieval_results = PineconeDocumentConverter.convert_query_results_to_langchain_documents(query_response)
+        retrieval_results = (
+            PineconeDocumentConverter.convert_query_results_to_langchain_documents(
+                query_response
+            )
+        )
         docs_content = "\n\n".join(doc.page_content for doc in retrieval_results)
         messages = prompt.invoke({"question": question, "context": docs_content})
         response = llm.invoke(messages)

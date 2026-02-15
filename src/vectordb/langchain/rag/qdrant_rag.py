@@ -1,5 +1,4 @@
 import argparse
-from ast import literal_eval
 
 from dataloaders import TriviaQADataloader
 from dataloaders.llms import ChatGroqGenerator
@@ -7,45 +6,71 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
-
 from qdrant_client import QdrantClient
-from qdrant_client.models import Filter
-
-from vectordb import QdrantDocumentConverter, QdrantVectorDB
 
 
 def main():
-    parser = argparse.ArgumentParser(description="RAG pipeline with Qdrant and TriviaQA")
+    parser = argparse.ArgumentParser(
+        description="RAG pipeline with Qdrant and TriviaQA"
+    )
 
     # Qdrant parameters
     parser.add_argument("--qdrant_host", required=True, help="Qdrant host URL.")
     parser.add_argument("--qdrant_api_key", required=True, help="API key for Qdrant.")
-    parser.add_argument("--collection_name", default="test_collection_dense1", help="Qdrant collection name.")
+    parser.add_argument(
+        "--collection_name",
+        default="test_collection_dense1",
+        help="Qdrant collection name.",
+    )
 
     # Generator parameters
-    parser.add_argument("--generator_model", default="llama-3.1-8b-instant", help="Model for the ChatGroqGenerator.")
-    parser.add_argument("--generator_api_key", required=True, help="API key for the generator.")
-    parser.add_argument("--generator_params", default="{}", help="JSON string of additional LLM parameters.")
+    parser.add_argument(
+        "--generator_model",
+        default="llama-3.1-8b-instant",
+        help="Model for the ChatGroqGenerator.",
+    )
+    parser.add_argument(
+        "--generator_api_key", required=True, help="API key for the generator."
+    )
+    parser.add_argument(
+        "--generator_params",
+        default="{}",
+        help="JSON string of additional LLM parameters.",
+    )
 
     # Dataloader parameters
-    parser.add_argument("--dataset_name", required=True, help="Name of the TriviaQA dataset.")
-    parser.add_argument("--split", default="test[:5]", help="Split of the dataset to use.")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Name of the TriviaQA dataset."
+    )
+    parser.add_argument(
+        "--split", default="test[:5]", help="Split of the dataset to use."
+    )
 
     # Embedding model parameters
-    parser.add_argument("--embedding_model", default="sentence-transformers/all-mpnet-base-v2", help="Embedding model.")
+    parser.add_argument(
+        "--embedding_model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Embedding model.",
+    )
 
     # LLM parameters
     parser.add_argument("--llm_api_key", required=True, help="API key for the LLM.")
-    parser.add_argument("--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM.")
-    parser.add_argument("--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response.")
+    parser.add_argument(
+        "--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM."
+    )
+    parser.add_argument(
+        "--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response."
+    )
 
     # Prompt template
-    parser.add_argument("--prompt_template", type=str, help="Prompt template for the LLM.")
+    parser.add_argument(
+        "--prompt_template", type=str, help="Prompt template for the LLM."
+    )
 
     args = parser.parse_args()
 
     # Initialize Qdrant VectorDB
-    qdrant_client = QdrantClient(url=args.qdrant_host, api_key=args.qdrant_api_key)
+    QdrantClient(url=args.qdrant_host, api_key=args.qdrant_api_key)
 
     # Initialize the generator
     generator = ChatGroqGenerator(
@@ -100,11 +125,18 @@ Answer:""",
         sparse_question_embedding = sparse_embedder.embed_query(question)
         query_response = pinecone_vector_db.query(
             vector=dense_question_embedding,
-            sparse_vector={"indices": sparse_question_embedding.indices, "values": sparse_question_embedding.values},
+            sparse_vector={
+                "indices": sparse_question_embedding.indices,
+                "values": sparse_question_embedding.values,
+            },
             top_k=args.top_k,
             namespace=args.namespace,
         )
-        retrieval_results = PineconeDocumentConverter.convert_query_results_to_langchain_documents(query_response)
+        retrieval_results = (
+            PineconeDocumentConverter.convert_query_results_to_langchain_documents(
+                query_response
+            )
+        )
         docs_content = "\n\n".join(doc.page_content for doc in retrieval_results)
         messages = prompt.invoke({"question": question, "context": docs_content})
         response = llm.invoke(messages)
@@ -114,4 +146,3 @@ Answer:""",
 
 if __name__ == "__main__":
     main()
-

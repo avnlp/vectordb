@@ -16,20 +16,46 @@ def main():
     parser = argparse.ArgumentParser(description="Run Chroma RAG Pipeline")
 
     # Chroma VectorDB arguments
-    parser.add_argument("--chroma_path", default="./chroma_database_files", help="Path for Chroma database files.")
-    parser.add_argument("--chroma_collection", default="test_collection_dense1", help="Name of the Chroma collection.")
+    parser.add_argument(
+        "--chroma_path",
+        default="./chroma_database_files",
+        help="Path for Chroma database files.",
+    )
+    parser.add_argument(
+        "--chroma_collection",
+        default="test_collection_dense1",
+        help="Name of the Chroma collection.",
+    )
     parser.add_argument("--vector_db_path", required=True, help="Path to Chroma .")
-    
+
     # Dataloader Arguments
 
     # Generator arguments
-    parser.add_argument("--generator_model", type=str, required=True, help="Model name for the dataloader's generator.")
-    parser.add_argument("--generator_api_key", required=True, help="API key for the dataloader generator.")
-    parser.add_argument("--generator_llm_params", type=str, help="JSON string of parameters for the generator LLM.")
+    parser.add_argument(
+        "--generator_model",
+        type=str,
+        required=True,
+        help="Model name for the dataloader's generator.",
+    )
+    parser.add_argument(
+        "--generator_api_key",
+        required=True,
+        help="API key for the dataloader generator.",
+    )
+    parser.add_argument(
+        "--generator_llm_params",
+        type=str,
+        help="JSON string of parameters for the generator LLM.",
+    )
 
     # Query arguments
     parser.add_argument("--dataset_name", required=True, help="Dataset Name")
-    parser.add_argument("--n_results", type=int, default=10, help="Number of results to retrieve from the database.")
+    parser.add_argument(
+        "--n_results",
+        type=int,
+        default=10,
+        help="Number of results to retrieve from the database.",
+    )
 
     args = parser.parse_args()
 
@@ -48,7 +74,12 @@ def main():
     generator = ChatGroqGenerator(
         model=args.model_name,
         api_key=args.api_key,
-        llm_params={"temperature": 0, "max_tokens": 1024, "timeout": 360, "max_retries": 100},
+        llm_params={
+            "temperature": 0,
+            "max_tokens": 1024,
+            "timeout": 360,
+            "max_retries": 100,
+        },
     )
 
     # Load dataset
@@ -61,7 +92,9 @@ def main():
     questions = dataloader.get_questions()
 
     # Initialize text embedder
-    text_embedder = SentenceTransformersTextEmbedder(model="sentence-transformers/all-mpnet-base-v2")
+    text_embedder = SentenceTransformersTextEmbedder(
+        model="sentence-transformers/all-mpnet-base-v2"
+    )
     text_embedder.warm_up()
 
     # Build a LLM Pipeline to answer questions based on Semantic Search Results
@@ -98,12 +131,21 @@ def main():
         # Generate dense embedding for the query
         question_embedding = text_embedder.run(text=question)["embedding"]
 
-        query_response = chroma_vector_db.query(vector=question_embedding, n_results=args.n_results)
-        retrieval_results = ChromaDocumentConverter.convert_query_results_to_haystack_documents(query_response)
+        query_response = chroma_vector_db.query(
+            vector=question_embedding, n_results=args.n_results
+        )
+        retrieval_results = (
+            ChromaDocumentConverter.convert_query_results_to_haystack_documents(
+                query_response
+            )
+        )
 
         result = rag_pipeline.run(
             data={
-                "prompt_builder": {"question": question, "documents": retrieval_results},
+                "prompt_builder": {
+                    "question": question,
+                    "documents": retrieval_results,
+                },
                 "answer_builder": {"query": question, "documents": retrieval_results},
             }
         )

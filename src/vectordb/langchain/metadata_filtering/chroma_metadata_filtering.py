@@ -7,17 +7,34 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 def main():
     # Argument parsing
-    parser = argparse.ArgumentParser(description="Query Chroma VectorDB with a question")
+    parser = argparse.ArgumentParser(
+        description="Query Chroma VectorDB with a question"
+    )
 
     # Arguments for the Chroma database
-    parser.add_argument("--chroma_path", type=str, required=True, help="Path to Chroma database files")
-    parser.add_argument("--collection_name", type=str, required=True, help="Name of the Chroma collection")
+    parser.add_argument(
+        "--chroma_path", type=str, required=True, help="Path to Chroma database files"
+    )
+    parser.add_argument(
+        "--collection_name",
+        type=str,
+        required=True,
+        help="Name of the Chroma collection",
+    )
 
     # Arguments for embeddings and querying
     parser.add_argument(
-        "--model_name", type=str, default="sentence-transformers/all-mpnet-base-v2", help="Model name for embeddings"
+        "--model_name",
+        type=str,
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Model name for embeddings",
     )
-    parser.add_argument("--question", type=str, required=True, help="The question to query the Chroma database with")
+    parser.add_argument(
+        "--question",
+        type=str,
+        required=True,
+        help="The question to query the Chroma database with",
+    )
 
     args = parser.parse_args()
 
@@ -37,7 +54,9 @@ def main():
         n_results=10,
         filter={
             "$and": [
-                {"$contains": {"field_name": "sampras"}},  # Adjust field_name based on your metadata
+                {
+                    "$contains": {"field_name": "sampras"}
+                },  # Adjust field_name based on your metadata
                 {"$contains": {"field_name": "tennis"}},
             ]
         },
@@ -46,7 +65,11 @@ def main():
     print(query_response)
 
     # Convert query results to Langchain documents
-    retrieval_results = ChromaDocumentConverter.convert_query_results_to_langchain_documents(query_response)
+    retrieval_results = (
+        ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+            query_response
+        )
+    )
     print(retrieval_results)
 
 
