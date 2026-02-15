@@ -1,3 +1,10 @@
+"""Weaviate vector database integration module.
+
+This module provides a WeaviateVectorDB class for interacting with Weaviate
+vector databases, including collection management, vector operations, and
+querying capabilities with Weave tracing integration.
+"""
+
 import logging
 from typing import Any, Optional, Union
 
@@ -12,6 +19,7 @@ from weaviate.collections import Collection
 
 from vectordb.utils.logging import LoggerFactory
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
@@ -19,8 +27,8 @@ logger = logger_factory.get_logger()
 class WeaviateVectorDB(Model):
     """Interface for interacting with Weaviate vector databases.
 
-    Provides functionalities for creating collections, upserting vectors, querying vectors,
-    and managing collections.
+    Provides functionalities for creating collections, upserting vectors,
+    querying vectors, and managing collections.
     """
 
     cluster_url: str
@@ -45,11 +53,16 @@ class WeaviateVectorDB(Model):
 
         Args:
             cluster_url (str): URL of the Weaviate cluster.
-            api_key (Optional[AuthCredentials]): Authentication credentials for Weaviate.
-            headers (Optional[dict[str, str]]): Additional headers for the HTTP requests.
-            collection_name (Optional[str]): Name of the collection to interact with.
-            tracing_project_name (str): The name of the Weave project for tracing. Defaults to "weaviate".
-            weave_params (Optional[dict[str, Any]]): Additional parameters for initializing Weave.
+            api_key (Optional[AuthCredentials]): Authentication credentials
+                for Weaviate.
+            headers (Optional[dict[str, str]]): Additional headers for the
+                HTTP requests.
+            collection_name (Optional[str]): Name of the collection to
+                interact with.
+            tracing_project_name (str): The name of the Weave project for
+                tracing. Defaults to "weaviate".
+            weave_params (Optional[dict[str, Any]]): Additional parameters
+                for initializing Weave.
         """
         super().__init__(
             cluster_url=cluster_url,
@@ -85,10 +98,12 @@ class WeaviateVectorDB(Model):
     def _initialize_weave(self, **weave_params) -> None:
         """Initialize Weave with the specified tracing project name.
 
-        Sets up the Weave environment and creates a tracer for monitoring pipeline execution.
+        Sets up the Weave environment and creates a tracer for monitoring
+        pipeline execution.
 
         Args:
-            weave_params (dict[str, Any]): Additional parameters for configuring Weave.
+            weave_params (dict[str, Any]): Additional parameters for
+                configuring Weave.
         """
         weave.init(self.tracing_project_name, **weave_params)
 
@@ -118,8 +133,7 @@ class WeaviateVectorDB(Model):
             self.collection = self.client.collections.get(collection_name)
             logger.info(f"Selected existing collection: {collection_name}")
             return True
-        else:
-            logger.warning(f"Collection {collection_name} does not exist.")
+        logger.warning(f"Collection {collection_name} does not exist.")
         return False
 
     @weave.op()
@@ -134,9 +148,12 @@ class WeaviateVectorDB(Model):
 
         Args:
             collection_name (str): Name of the collection to create.
-            properties (Optional[list[Property]]): Properties of the collection schema.
-            vectorizer_config (Optional[Configure.Vectorizer]): Vectorizer configuration.
-            generative_config (Optional[Configure.Generative]): Generative AI configuration.
+            properties (Optional[list[Property]]): Properties of the
+                collection schema.
+            vectorizer_config (Optional[Configure.Vectorizer]): Vectorizer
+                configuration.
+            generative_config (Optional[Configure.Generative]): Generative
+                AI configuration.
 
         Raises:
             ValueError: If the Weaviate client is not initialized.
@@ -165,7 +182,8 @@ class WeaviateVectorDB(Model):
         """Upsert vectors into the selected Weaviate collection.
 
         Args:
-            data (list[dict[str, Any]]): List of records with vector and properties to upsert.
+            data (list[dict[str, Any]]): List of records with vector and
+                properties to upsert.
 
         Raises:
             RuntimeError: If upsertion fails for any objects.

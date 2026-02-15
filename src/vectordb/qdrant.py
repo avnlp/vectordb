@@ -1,12 +1,27 @@
+"""Qdrant vector database interface.
+
+This module provides an interface for interacting with Qdrant vector databases,
+including collection management, vector upserts, and similarity search queries.
+"""
+
 import logging
-from typing import Any, List, Optional, Dict, Union
+from typing import Any, Dict, List, Optional
+
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import VectorParams, Filter, PointStruct, ScoredPoint
+from qdrant_client.http.models import Filter, PointStruct, ScoredPoint, VectorParams
+
+from vectordb.utils.logging import LoggerFactory
+
+
+logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
+logger = logger_factory.get_logger()
+
 
 class QdrantVectorDB:
     """Interface for interacting with Qdrant vector databases.
 
-    Provides functionalities for creating collections, inserting vectors, querying vectors, and deleting collections.
+    Provides functionalities for creating collections, inserting vectors,
+    querying vectors, and deleting collections.
     """
 
     def __init__(
@@ -20,16 +35,22 @@ class QdrantVectorDB:
         """Initialize the Qdrant client with the given parameters.
 
         Args:
-            host (str): Host address of the Qdrant server (default: "localhost").
+            host (str): Host address of the Qdrant server
+                (default: "localhost").
             port (int): Port number for the Qdrant server (default: 6333).
-            api_key (Optional[str]): API key for Qdrant (if using managed service).
-            collection_name (Optional[str]): Name of the Qdrant collection to use (optional).
-            timeout (Optional[float]): Timeout for client requests in seconds (default: 60.0).
-            retries (Optional[int]): Number of retries for failed requests (default: 3).
+            api_key (Optional[str]): API key for Qdrant
+                (if using managed service).
+            collection_name (Optional[str]): Name of the Qdrant collection
+                to use (optional).
+            timeout (Optional[float]): Timeout for client requests
+                in seconds (default: 60.0).
+            retries (Optional[int]): Number of retries for failed requests
+                (default: 3).
         """
-        self.client = QdrantClient(host=host, port=port, api_key=api_key, timeout=timeout)
+        self.client = QdrantClient(
+            host=host, port=port, api_key=api_key, timeout=timeout
+        )
         self.collection_name = collection_name
-
 
     def create_collection(
         self,
@@ -46,7 +67,9 @@ class QdrantVectorDB:
         """
         self.collection_name = collection_name
         if self.client.get_collection(collection_name, raise_on_not_found=False):
-            logger.info(f"Collection '{collection_name}' already exists. Skipping creation.")
+            logger.info(
+                f"Collection '{collection_name}' already exists. Skipping creation."
+            )
             return
 
         self.client.create_collection(
@@ -62,17 +85,25 @@ class QdrantVectorDB:
         """Insert or update vectors in the specified Qdrant collection.
 
         Args:
-            vectors (List[Dict[str, Any]]): List of vectors to upsert, where each vector contains `id`, `vector`, and optional `payload`.
+            vectors (List[Dict[str, Any]]): List of vectors to upsert,
+                where each vector contains `id`, `vector`,
+                and optional `payload`.
         """
         if not self.collection_name:
-            raise ValueError("No collection selected. Create or specify a collection first.")
+            raise ValueError(
+                "No collection selected. Create or specify a collection first."
+            )
 
         points = [
-            PointStruct(id=vector["id"], vector=vector["vector"], payload=vector.get("payload"))
+            PointStruct(
+                id=vector["id"], vector=vector["vector"], payload=vector.get("payload")
+            )
             for vector in vectors
         ]
         self.client.upsert(collection_name=self.collection_name, points=points)
-        logger.info(f"Upserted {len(vectors)} vectors into collection '{self.collection_name}'.")
+        logger.info(
+            f"Upserted {len(vectors)} vectors into collection '{self.collection_name}'."
+        )
 
     def query_vectors(
         self,
@@ -85,15 +116,20 @@ class QdrantVectorDB:
 
         Args:
             query_vector (List[float]): Query vector.
-            top_k (int): Number of nearest neighbors to return (default: 5).
-            query_filter (Optional[Filter]): Filter to apply to the query (default: None).
-            include_payload (bool): Whether to include payload in the query result (default: True).
+            top_k (int): Number of nearest neighbors to return
+                (default: 5).
+            query_filter (Optional[Filter]): Filter to apply to the query
+                (default: None).
+            include_payload (bool): Whether to include payload in the
+                query result (default: True).
 
         Returns:
             List[ScoredPoint]: List of points with their similarity scores.
         """
         if not self.collection_name:
-            raise ValueError("No collection selected. Create or specify a collection first.")
+            raise ValueError(
+                "No collection selected. Create or specify a collection first."
+            )
 
         results = self.client.search(
             collection_name=self.collection_name,
@@ -122,4 +158,3 @@ class QdrantVectorDB:
         """
         collections = self.client.get_collections().collections
         return [collection.name for collection in collections]
-

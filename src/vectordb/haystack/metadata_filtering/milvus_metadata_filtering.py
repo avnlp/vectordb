@@ -1,5 +1,20 @@
+"""Metadata filtering script for Milvus vector database.
+
+This module provides functionality to query Milvus vector database
+with metadata filtering using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
+
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
+from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 
 from vectordb import MilvusVectorDB
@@ -8,7 +23,9 @@ from vectordb import MilvusVectorDB
 def main():
     """Perform Metadata Filtering using Milvus."""
     # Argument parser for user inputs
-    parser = argparse.ArgumentParser(description="Script for querying Milvus with metadata filtering.")
+    parser = argparse.ArgumentParser(
+        description="Script for querying Milvus with metadata filtering."
+    )
 
     # Dataloader parameters
     parser.add_argument(
@@ -17,21 +34,39 @@ def main():
         choices=["triviaqa", "arc", "popqa", "factscore", "edgar"],
         help="Dataloader to use for loading datasets.",
     )
-    parser.add_argument("--dataset_name", required=True, help="Name of the dataset to be used by the dataloader.")
-    parser.add_argument("--split", default="test", help="Dataset split to process (e.g., 'test', 'train').")
+    parser.add_argument(
+        "--dataset_name",
+        required=True,
+        help="Name of the dataset to be used by the dataloader.",
+    )
+    parser.add_argument(
+        "--split",
+        default="test",
+        help="Dataset split to process (e.g., 'test', 'train').",
+    )
     parser.add_argument(
         "--text_splitter",
         default="RecursiveCharacterTextSplitter",
         help="Text splitter method to preprocess documents.",
     )
     parser.add_argument(
-        "--text_splitter_params", type=str, help="JSON string of parameters for configuring the text splitter."
+        "--text_splitter_params",
+        type=str,
+        help="JSON string of parameters for configuring the text splitter.",
     )
 
     # Generator parameters
-    parser.add_argument("--generator_model", type=str, help="Model name for the dataloader's generator.")
-    parser.add_argument("--generator_api_key", help="API key for the dataloader generator.")
-    parser.add_argument("--generator_llm_params", type=str, help="JSON string of parameters for the generator LLM.")
+    parser.add_argument(
+        "--generator_model", type=str, help="Model name for the dataloader's generator."
+    )
+    parser.add_argument(
+        "--generator_api_key", help="API key for the dataloader generator."
+    )
+    parser.add_argument(
+        "--generator_llm_params",
+        type=str,
+        help="JSON string of parameters for the generator LLM.",
+    )
 
     # Embedder parameters
     parser.add_argument(
@@ -39,21 +74,37 @@ def main():
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="Model to use for generating document embeddings.",
     )
-    parser.add_argument("--embedding_model_params", type=str, help="JSON string of parameters for the embedding model.")
+    parser.add_argument(
+        "--embedding_model_params",
+        type=str,
+        help="JSON string of parameters for the embedding model.",
+    )
 
     # Milvus VectorDB parameters
     parser.add_argument("--milvus_host", required=True, help="Milvus server host.")
     parser.add_argument("--milvus_port", default="19530", help="Milvus server port.")
-    parser.add_argument("--collection_name", required=True, help="Name of the collection to query.")
-    parser.add_argument("--filter_expression", required=True, help="Filter expression for metadata filtering.")
-    parser.add_argument("--limit", type=int, default=10, help="Number of results to retrieve.")
+    parser.add_argument(
+        "--collection_name", required=True, help="Name of the collection to query."
+    )
+    parser.add_argument(
+        "--filter_expression",
+        required=True,
+        help="Filter expression for metadata filtering.",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=10, help="Number of results to retrieve."
+    )
 
     args = parser.parse_args()
 
     # Parse parameters
-    text_splitter_params = literal_eval(args.text_splitter_params) if args.text_splitter_params else {}
-    generator_params = literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
-    embedding_model_params = literal_eval(args.embedding_model_params) if args.embedding_model_params else {}
+    text_splitter_params = (
+        literal_eval(args.text_splitter_params) if args.text_splitter_params else {}
+    )
+    generator_params = (
+        literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
+    )
+    (literal_eval(args.embedding_model_params) if args.embedding_model_params else {})
 
     # Instantiate generator if model and API key are provided
     generator = None
@@ -81,7 +132,7 @@ def main():
     }
     if generator:
         dataloader_kwargs["answer_summary_generator"] = generator
-    dataloader = dataloader_cls(**dataloader_kwargs)
+    dataloader_cls(**dataloader_kwargs)
 
     # Instantiate the text embedder
     text_embedder = SentenceTransformersTextEmbedder(model=args.embedding_model)
@@ -109,4 +160,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

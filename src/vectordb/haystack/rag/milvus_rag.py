@@ -1,3 +1,9 @@
+"""RAG pipeline implementation using Milvus vector database.
+
+This module provides a Retrieval-Augmented Generation pipeline
+using Milvus as the vector database with Haystack components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -8,36 +14,79 @@ from haystack.components.builders.prompt_builder import PromptBuilder
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack.components.generators import OpenAIGenerator
 from haystack.utils import Secret
-from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType
+from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections
+
 
 def main():
-    parser = argparse.ArgumentParser(description="RAG pipeline with Milvus and TriviaQA")
+    """Run RAG pipeline using Milvus vector database.
+
+    This function sets up Milvus collection, loads data, creates a RAG pipeline,
+    and answers questions using retrieved documents.
+
+    Returns:
+        None
+    """
+    parser = argparse.ArgumentParser(
+        description="RAG pipeline with Milvus and TriviaQA"
+    )
 
     # Milvus parameters
-    parser.add_argument("--milvus_uri", default="http://localhost:19530", help="Milvus server URI.")
-    parser.add_argument("--milvus_token", default="root:Milvus", help="Milvus authentication token.")
-    parser.add_argument("--collection_name", default="test_collection", help="Milvus collection name.")
-    parser.add_argument("--partition_name", default="default_partition", help="Milvus partition name.")
+    parser.add_argument(
+        "--milvus_uri", default="http://localhost:19530", help="Milvus server URI."
+    )
+    parser.add_argument(
+        "--milvus_token", default="root:Milvus", help="Milvus authentication token."
+    )
+    parser.add_argument(
+        "--collection_name", default="test_collection", help="Milvus collection name."
+    )
+    parser.add_argument(
+        "--partition_name", default="default_partition", help="Milvus partition name."
+    )
 
     # Generator parameters
-    parser.add_argument("--generator_model", default="llama-3.1-8b-instant", help="Model for the ChatGroqGenerator.")
-    parser.add_argument("--generator_api_key", required=True, help="API key for the generator.")
-    parser.add_argument("--generator_params", default="{}", help="JSON string of additional LLM parameters.")
+    parser.add_argument(
+        "--generator_model",
+        default="llama-3.1-8b-instant",
+        help="Model for the ChatGroqGenerator.",
+    )
+    parser.add_argument(
+        "--generator_api_key", required=True, help="API key for the generator."
+    )
+    parser.add_argument(
+        "--generator_params",
+        default="{}",
+        help="JSON string of additional LLM parameters.",
+    )
 
     # Dataloader parameters
-    parser.add_argument("--dataset_name", required=True, help="Name of the TriviaQA dataset.")
-    parser.add_argument("--split", default="test[:5]", help="Split of the dataset to use.")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Name of the TriviaQA dataset."
+    )
+    parser.add_argument(
+        "--split", default="test[:5]", help="Split of the dataset to use."
+    )
 
     # Embedding model parameters
-    parser.add_argument("--embedding_model", default="sentence-transformers/all-mpnet-base-v2", help="Embedding model.")
+    parser.add_argument(
+        "--embedding_model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Embedding model.",
+    )
 
     # LLM parameters
     parser.add_argument("--llm_api_key", required=True, help="API key for the LLM.")
-    parser.add_argument("--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM.")
-    parser.add_argument("--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response.")
+    parser.add_argument(
+        "--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM."
+    )
+    parser.add_argument(
+        "--llm_max_tokens", type=int, default=512, help="Max tokens for LLM response."
+    )
 
     # Prompt template
-    parser.add_argument("--prompt_template", type=str, help="Prompt template for the LLM.")
+    parser.add_argument(
+        "--prompt_template", type=str, help="Prompt template for the LLM."
+    )
 
     args = parser.parse_args()
 
@@ -47,7 +96,7 @@ def main():
     # Define Milvus schema and collection
     fields = [
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=False),
-        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768),  
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768),
     ]
     schema = CollectionSchema(fields, "Collection for document embeddings")
 
@@ -115,12 +164,16 @@ def main():
         )
 
         retrieval_results = [
-            {"id": res.id, "content": haystack_documents[res.id]["content"]} for res in search_results[0]
+            {"id": res.id, "content": haystack_documents[res.id]["content"]}
+            for res in search_results[0]
         ]
 
         result = rag_pipeline.run(
             data={
-                "prompt_builder": {"question": question, "documents": retrieval_results},
+                "prompt_builder": {
+                    "question": question,
+                    "documents": retrieval_results,
+                },
                 "answer_builder": {"query": question, "documents": retrieval_results},
             }
         )
@@ -129,4 +182,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,3 +1,9 @@
+"""Chroma RAG pipeline example with LangChain integration.
+
+This module demonstrates how to build a Retrieval-Augmented Generation (RAG) pipeline
+using Chroma VectorDB and LangChain components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -9,26 +15,58 @@ from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack.components.generators import OpenAIGenerator
 from haystack.utils import Secret
 
-from vectordb import ChromaDocumentConverter, PineconeVectorDB
+from vectordb import ChromaDocumentConverter, ChromaVectorDB, PineconeVectorDB
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Chroma RAG Pipeline with Dense Embedding Search.")
+    """Run the Chroma RAG pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes Chroma VectorDB and LLM generator
+    - Loads the TriviaQA dataset
+    - Builds a RAG pipeline with Haystack components
+    - Processes questions and generates answers
+    """
+    parser = argparse.ArgumentParser(
+        description="Run Chroma RAG Pipeline with Dense Embedding Search."
+    )
 
     # Chroma VectorDB arguments
-    parser.add_argument("--chroma_path", default="./chroma_database_files", help="Path for Chroma database files.")
-    parser.add_argument("--chroma_collection", default="test_collection_dense1", help="Name of the Chroma collection.")
-    parser.add_argument("--vector_db_path", required=True, help="Path to Chroma or Pinecone vector database files.")
+    parser.add_argument(
+        "--chroma_path",
+        default="./chroma_database_files",
+        help="Path for Chroma database files.",
+    )
+    parser.add_argument(
+        "--chroma_collection",
+        default="test_collection_dense1",
+        help="Name of the Chroma collection.",
+    )
+    parser.add_argument(
+        "--vector_db_path",
+        required=True,
+        help="Path to Chroma or Pinecone vector database files.",
+    )
 
     # LLM arguments
     parser.add_argument(
-        "--model_name", required=True, help="Model for generating summaries (e.g., 'llama-3.1-8b-instant')."
+        "--model_name",
+        required=True,
+        help="Model for generating summaries (e.g., 'llama-3.1-8b-instant').",
     )
     parser.add_argument("--api_key", required=True, help="API key for the LLM service.")
 
     # Query arguments
-    parser.add_argument("--dataset_name", required=True, help="Dataset name for Trivia QA.")
-    parser.add_argument("--n_results", type=int, default=10, help="Number of results to retrieve from the database.")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Dataset name for Trivia QA."
+    )
+    parser.add_argument(
+        "--n_results",
+        type=int,
+        default=10,
+        help="Number of results to retrieve from the database.",
+    )
 
     args = parser.parse_args()
 
@@ -40,7 +78,12 @@ def main():
     generator = ChatGroqGenerator(
         model=args.model_name,
         api_key=args.api_key,
-        llm_params={"temperature": 0, "max_tokens": 1024, "timeout": 360, "max_retries": 100},
+        llm_params={
+            "temperature": 0,
+            "max_tokens": 1024,
+            "timeout": 360,
+            "max_retries": 100,
+        },
     )
 
     # Load dataset
@@ -53,7 +96,9 @@ def main():
     questions = dataloader.get_questions()
 
     # Initialize text embedder
-    text_embedder = SentenceTransformersTextEmbedder(model="sentence-transformers/all-mpnet-base-v2")
+    text_embedder = SentenceTransformersTextEmbedder(
+        model="sentence-transformers/all-mpnet-base-v2"
+    )
     text_embedder.warm_up()
 
     # Build a LLM Pipeline to answer questions based on Semantic Search Results
@@ -91,12 +136,21 @@ def main():
         question_embedding = text_embedder.run(text=question)["embedding"]
 
         # Query the vector database (Chroma or Pinecone)
-        query_response = pinecone_vector_db.query(vector=question_embedding, n_results=args.n_results)
-        retrieval_results = ChromaDocumentConverter.convert_query_results_to_haystack_documents(query_response)
+        query_response = pinecone_vector_db.query(
+            vector=question_embedding, n_results=args.n_results
+        )
+        retrieval_results = (
+            ChromaDocumentConverter.convert_query_results_to_haystack_documents(
+                query_response
+            )
+        )
 
         result = rag_pipeline.run(
             data={
-                "prompt_builder": {"question": question, "documents": retrieval_results},
+                "prompt_builder": {
+                    "question": question,
+                    "documents": retrieval_results,
+                },
                 "answer_builder": {"query": question, "documents": retrieval_results},
             }
         )

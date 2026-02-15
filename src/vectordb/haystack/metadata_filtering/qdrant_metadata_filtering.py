@@ -1,8 +1,17 @@
+"""Metadata filtering script for Qdrant vector database.
+
+This module provides functionality to query Qdrant vector database
+with metadata filtering using dense and sparse embeddings.
+"""
+
 import argparse
+
 from haystack.components.embedders import SentenceTransformersTextEmbedder
-from haystack_integrations.components.embedders.fastembed import FastembedSparseTextEmbedder
+from haystack_integrations.components.embedders.fastembed import (
+    FastembedSparseTextEmbedder,
+)
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, ScoredPoint, Filter
+from qdrant_client.models import Filter
 
 
 def main():
@@ -14,14 +23,34 @@ def main():
     - Queries a Qdrant vector database using the embeddings.
     - Prints the retrieval results.
     """
-    parser = argparse.ArgumentParser(description="Hybrid embedding and retrieval using Qdrant")
+    parser = argparse.ArgumentParser(
+        description="Hybrid embedding and retrieval using Qdrant"
+    )
     parser.add_argument("--qdrant_url", type=str, required=True, help="Qdrant URL")
-    parser.add_argument("--collection_name", type=str, required=True, help="Name of the Qdrant collection")
-    parser.add_argument("--dense_model", type=str, required=True, help="Model name for dense embeddings")
-    parser.add_argument("--sparse_model", type=str, required=True, help="Model name for sparse embeddings")
-    parser.add_argument("--question", type=str, required=True, help="The query/question text")
-    parser.add_argument("--top_k", type=int, default=10, help="Number of top results to retrieve")
-    parser.add_argument("--filter", type=str, help="Filter for Qdrant query in JSON format")
+    parser.add_argument(
+        "--collection_name",
+        type=str,
+        required=True,
+        help="Name of the Qdrant collection",
+    )
+    parser.add_argument(
+        "--dense_model", type=str, required=True, help="Model name for dense embeddings"
+    )
+    parser.add_argument(
+        "--sparse_model",
+        type=str,
+        required=True,
+        help="Model name for sparse embeddings",
+    )
+    parser.add_argument(
+        "--question", type=str, required=True, help="The query/question text"
+    )
+    parser.add_argument(
+        "--top_k", type=int, default=10, help="Number of top results to retrieve"
+    )
+    parser.add_argument(
+        "--filter", type=str, help="Filter for Qdrant query in JSON format"
+    )
     args = parser.parse_args()
 
     # Initialize Qdrant client
@@ -37,12 +66,14 @@ def main():
 
     # Generate embeddings for the query
     dense_question_embedding = text_embedder.run(text=args.question)["embedding"]
-    sparse_question_embedding = sparse_embedder.run(text=args.question)["sparse_embedding"].to_dict()
+    sparse_question_embedding = sparse_embedder.run(text=args.question)[
+        "sparse_embedding"
+    ].to_dict()
 
     # Prepare Qdrant filter if provided
     filter = None
     if args.filter:
-        filter = Filter.from_dict(eval(args.filter))  
+        filter = Filter.from_dict(eval(args.filter))
 
     # Query Qdrant vector database for both dense and sparse embeddings
     query_response = qdrant_client.search(
@@ -57,11 +88,13 @@ def main():
     retrieval_results = []
     for hit in query_response:
         # Convert Qdrant search result to Haystack document format
-        retrieval_results.append({
-            "id": hit.id,
-            "score": hit.score,
-            "metadata": hit.payload, 
-        })
+        retrieval_results.append(
+            {
+                "id": hit.id,
+                "score": hit.score,
+                "metadata": hit.payload,
+            }
+        )
 
     # Output the results
     print(retrieval_results)
@@ -69,4 +102,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

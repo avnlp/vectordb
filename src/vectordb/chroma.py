@@ -1,20 +1,32 @@
+"""Chroma vector database interface.
+
+This module provides an interface for interacting with Chroma vector databases,
+including collection management, vector upserts, and similarity search queries.
+"""
+
 import logging
 import sys
 from typing import Any, Optional
 
 import pysqlite3  # noqa: F401
 
+
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
-import chromadb
-import weave
-from chromadb import Client, Collection
-from chromadb.api.configuration import CollectionConfiguration
-from chromadb.api.types import CollectionMetadata, Embeddable, EmbeddingFunction
-from chromadb.utils import embedding_functions
-from weave import Model
+import chromadb  # noqa: E402
+import weave  # noqa: E402
+from chromadb import Client, Collection  # noqa: E402
+from chromadb.api.configuration import CollectionConfiguration  # noqa: E402
+from chromadb.api.types import (  # noqa: E402
+    CollectionMetadata,
+    Embeddable,
+    EmbeddingFunction,
+)
+from chromadb.utils import embedding_functions  # noqa: E402
+from weave import Model  # noqa: E402
 
-from vectordb.utils.logging import LoggerFactory
+from vectordb.utils.logging import LoggerFactory  # noqa: E402
+
 
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
@@ -48,9 +60,12 @@ class ChromaVectorDB(Model):
         Args:
             path (str): Path to the database for persistence. Defaults to "./chroma".
             persistent (bool): Whether to use a persistent database. Defaults to True.
-            collection_name (Optional[str]): Name of an existing collection to use. Defaults to None.
-            tracing_project_name (str): The name of the Weave project for tracing. Defaults to "chroma".
-            weave_params (Optional[dict[str, Any]]): Additional parameters for initializing Weave.
+            collection_name (Optional[str]): Name of an existing collection to use.
+                Defaults to None.
+            tracing_project_name (str): The name of the Weave project for tracing.
+                Defaults to "chroma".
+            weave_params (Optional[dict[str, Any]]): Additional parameters for
+                initializing Weave.
 
         Raises:
             ValueError: If the client initialization fails.
@@ -80,7 +95,8 @@ class ChromaVectorDB(Model):
     def _initialize_weave(self, **weave_params) -> None:
         """Initialize Weave with the specified tracing project name.
 
-        Sets up the Weave environment and creates a tracer for monitoring pipeline execution.
+        Sets up the Weave environment and creates a tracer for monitoring pipeline
+        execution.
 
         Args:
             weave_params (dict[str, Any]): Additional parameters for configuring Weave.
@@ -93,23 +109,33 @@ class ChromaVectorDB(Model):
         name: str,
         configuration: Optional[CollectionConfiguration] = None,
         metadata: Optional[CollectionMetadata] = None,
-        embedding_function: Optional[EmbeddingFunction[Embeddable]] = embedding_functions.DefaultEmbeddingFunction(),
+        embedding_function: Optional[EmbeddingFunction[Embeddable]] = None,
         **kwargs: Any,
     ) -> None:
         """Create a new collection.
 
         Args:
             name (str): Name of the collection to create or retrieve.
-            configuration (Optional[CollectionConfiguration]): Configuration for the collection.
-            metadata (Optional[CollectionMetadata]): Metadata associated with the collection.
-            embedding_function (Optional[EmbeddingFunction[Embeddable]]): Function for embedding data.
+            configuration (Optional[CollectionConfiguration]): Configuration for the
+                collection.
+            metadata (Optional[CollectionMetadata]): Metadata associated with the
+                collection.
+            embedding_function (Optional[EmbeddingFunction[Embeddable]]): Function for
+                embedding data.
             **kwargs: Additional arguments for the collection creation.
 
         Returns:
             None
         """
+        if embedding_function is None:
+            embedding_function = embedding_functions.DefaultEmbeddingFunction()
+
         self.collection = self.client.get_or_create_collection(
-            name=name, configuration=configuration, metadata=metadata, embedding_function=embedding_function, **kwargs
+            name=name,
+            configuration=configuration,
+            metadata=metadata,
+            embedding_function=embedding_function,
+            **kwargs,
         )
 
     @weave.op()
@@ -121,7 +147,8 @@ class ChromaVectorDB(Model):
         """Upserts (inserts or updates) vectors into the current collection.
 
         Args:
-            data (Dict[str, Any]): Data containing embeddings, texts, metadatas, and ids.
+            data (Dict[str, Any]): Data containing embeddings, texts, metadatas, and
+                ids.
                 - embeddings: A list of embedding vectors.
                 - texts: A list of corresponding text documents.
                 - metadatas: A list of metadata dictionaries for the documents.
@@ -158,7 +185,8 @@ class ChromaVectorDB(Model):
         """Query the collection for similar vectors.
 
         Args:
-            query_embedding (List[float]): The embedding vector to query against the collection.
+            query_embedding (List[float]): The embedding vector to query against the
+                collection.
             n_results (int): The number of results to retrieve. Defaults to 10.
             where (Optional[Dict[str, Any]]): Filter conditions for metadata.
             where_document (Optional[Dict[str, Any]]): Filter conditions for documents.
@@ -174,11 +202,10 @@ class ChromaVectorDB(Model):
             msg = "No collection initialized. Use `create_collection` first."
             raise ValueError(msg)
 
-        query_results = self.collection.query(
+        return self.collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
             where=where,
             where_document=where_document,
             **kwargs,
         )
-        return query_results

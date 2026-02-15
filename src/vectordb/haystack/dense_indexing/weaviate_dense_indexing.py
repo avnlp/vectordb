@@ -1,7 +1,19 @@
+"""Dense indexing script for Weaviate vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Weaviate vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
-from dataloaders import ARCDataloader, EdgarDataloader, FactScoreDataloader, PopQADataloader, TriviaQADataloader
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
 from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 
@@ -9,7 +21,7 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
-    """Process data, generate embeddings, and index them into a Weaviate vector database.
+    """Process data, generate embeddings, and index them into Weaviate.
 
     This script is designed to:
     - Load datasets using specified dataloaders.
@@ -19,7 +31,9 @@ def main():
     - Index processed data into a Weaviate vector database.
     """
     # Argument parser for user inputs
-    parser = argparse.ArgumentParser(description="Script for processing and indexing data with Weaviate.")
+    parser = argparse.ArgumentParser(
+        description="Script for processing and indexing data with Weaviate."
+    )
 
     # Dataloader parameters
     parser.add_argument(
@@ -28,21 +42,39 @@ def main():
         choices=["triviaqa", "arc", "popqa", "factscore", "edgar"],
         help="Dataloader to use for loading datasets.",
     )
-    parser.add_argument("--dataset_name", required=True, help="Name of the dataset to be used by the dataloader.")
-    parser.add_argument("--split", default="test", help="Dataset split to process (e.g., 'test', 'train').")
+    parser.add_argument(
+        "--dataset_name",
+        required=True,
+        help="Name of the dataset to be used by the dataloader.",
+    )
+    parser.add_argument(
+        "--split",
+        default="test",
+        help="Dataset split to process (e.g., 'test', 'train').",
+    )
     parser.add_argument(
         "--text_splitter",
         default="RecursiveCharacterTextSplitter",
         help="Text splitter method to preprocess documents.",
     )
     parser.add_argument(
-        "--text_splitter_params", type=str, help="JSON string of parameters for configuring the text splitter."
+        "--text_splitter_params",
+        type=str,
+        help="JSON string of parameters for configuring the text splitter.",
     )
 
     # Generator parameters
-    parser.add_argument("--generator_model", type=str, help="Model name for the dataloader's generator.")
-    parser.add_argument("--generator_api_key", help="API key for the dataloader generator.")
-    parser.add_argument("--generator_llm_params", type=str, help="JSON string of parameters for the generator LLM.")
+    parser.add_argument(
+        "--generator_model", type=str, help="Model name for the dataloader's generator."
+    )
+    parser.add_argument(
+        "--generator_api_key", help="API key for the dataloader generator."
+    )
+    parser.add_argument(
+        "--generator_llm_params",
+        type=str,
+        help="JSON string of parameters for the generator LLM.",
+    )
 
     # Embedder parameters
     parser.add_argument(
@@ -50,22 +82,46 @@ def main():
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="Model to use for generating document embeddings.",
     )
-    parser.add_argument("--embedding_model_params", type=str, help="JSON string of parameters for the embedding model.")
+    parser.add_argument(
+        "--embedding_model_params",
+        type=str,
+        help="JSON string of parameters for the embedding model.",
+    )
 
     # Weaviate VectorDB parameters
-    parser.add_argument("--weaviate_cluster_url", required=True, help="Weaviate cluster URL.")
-    parser.add_argument("--weaviate_api_key", required=True, help="API key for accessing Weaviate.")
-    parser.add_argument("--headers", type=str, help="JSON string of headers for the Weaviate API.")
-    parser.add_argument("--collection_name", type=str, help="Name of the collection to interact with.")
-    parser.add_argument("--tracing_project_name", default="weaviate", help="Name of the Weave project for tracing.")
-    parser.add_argument("--weave_params", type=str, help="JSON string of additional Weave parameters.")
+    parser.add_argument(
+        "--weaviate_cluster_url", required=True, help="Weaviate cluster URL."
+    )
+    parser.add_argument(
+        "--weaviate_api_key", required=True, help="API key for accessing Weaviate."
+    )
+    parser.add_argument(
+        "--headers", type=str, help="JSON string of headers for the Weaviate API."
+    )
+    parser.add_argument(
+        "--collection_name", type=str, help="Name of the collection to interact with."
+    )
+    parser.add_argument(
+        "--tracing_project_name",
+        default="weaviate",
+        help="Name of the Weave project for tracing.",
+    )
+    parser.add_argument(
+        "--weave_params", type=str, help="JSON string of additional Weave parameters."
+    )
 
     args = parser.parse_args()
 
     # Parse parameters
-    text_splitter_params = literal_eval(args.text_splitter_params) if args.text_splitter_params else {}
-    generator_params = literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
-    embedding_model_params = literal_eval(args.embedding_model_params) if args.embedding_model_params else {}
+    text_splitter_params = (
+        literal_eval(args.text_splitter_params) if args.text_splitter_params else {}
+    )
+    generator_params = (
+        literal_eval(args.generator_llm_params) if args.generator_llm_params else {}
+    )
+    embedding_model_params = (
+        literal_eval(args.embedding_model_params) if args.embedding_model_params else {}
+    )
     headers = literal_eval(args.headers) if args.headers else {}
     weave_params = literal_eval(args.weave_params) if args.weave_params else {}
 
@@ -102,7 +158,9 @@ def main():
     haystack_documents = dataloader.get_haystack_documents()
 
     # Load the embedding model
-    embedder = SentenceTransformersDocumentEmbedder(model=args.embedding_model, **embedding_model_params)
+    embedder = SentenceTransformersDocumentEmbedder(
+        model=args.embedding_model, **embedding_model_params
+    )
     embedder.warm_up()
 
     # Create the embeddings for each document
@@ -121,7 +179,9 @@ def main():
     weaviate_vectordb.create_collection(collection_name=args.collection_name)
 
     # Prepare and upsert the documents to Weaviate
-    data_for_weaviate = WeaviateDocumentConverter.prepare_haystack_documents_for_upsert(docs_with_embeddings)
+    data_for_weaviate = WeaviateDocumentConverter.prepare_haystack_documents_for_upsert(
+        docs_with_embeddings
+    )
     weaviate_vectordb.upsert(data=data_for_weaviate)
 
 

@@ -1,7 +1,15 @@
+"""Metadata filtering script for Pinecone vector database.
+
+This module provides functionality to query Pinecone vector database
+with metadata filtering using dense and sparse embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder
-from haystack_integrations.components.embedders.fastembed import FastembedSparseTextEmbedder
+from haystack_integrations.components.embedders.fastembed import (
+    FastembedSparseTextEmbedder,
+)
 
 from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
@@ -15,17 +23,42 @@ def main():
     - Queries a Pinecone vector database using the embeddings.
     - Prints the retrieval results.
     """
-    parser = argparse.ArgumentParser(description="Hybrid embedding and retrieval using Pinecone")
+    parser = argparse.ArgumentParser(
+        description="Hybrid embedding and retrieval using Pinecone"
+    )
     parser.add_argument("--api_key", type=str, required=True, help="Pinecone API key")
-    parser.add_argument("--index_name", type=str, required=True, help="Name of the Pinecone index")
-    parser.add_argument("--dense_model", type=str, required=True, help="Model name for dense embeddings")
-    parser.add_argument("--sparse_model", type=str, required=True, help="Model name for sparse embeddings")
-    parser.add_argument("--question", type=str, required=True, help="The query/question text")
-    parser.add_argument("--namespace", type=str, required=True, help="Namespace for Pinecone index")
-    parser.add_argument("--top_k", type=int, default=10, help="Number of top results to retrieve")
-    parser.add_argument("--filter",type=str,help="Filter for Pinecone query in JSON format")
-    parser.add_argument("--tracing_project_name", type=str, help="Name of the tracing project.")
-    parser.add_argument("--weave_params", type=str, help="JSON string of parameters for configuring Weave.")
+    parser.add_argument(
+        "--index_name", type=str, required=True, help="Name of the Pinecone index"
+    )
+    parser.add_argument(
+        "--dense_model", type=str, required=True, help="Model name for dense embeddings"
+    )
+    parser.add_argument(
+        "--sparse_model",
+        type=str,
+        required=True,
+        help="Model name for sparse embeddings",
+    )
+    parser.add_argument(
+        "--question", type=str, required=True, help="The query/question text"
+    )
+    parser.add_argument(
+        "--namespace", type=str, required=True, help="Namespace for Pinecone index"
+    )
+    parser.add_argument(
+        "--top_k", type=int, default=10, help="Number of top results to retrieve"
+    )
+    parser.add_argument(
+        "--filter", type=str, help="Filter for Pinecone query in JSON format"
+    )
+    parser.add_argument(
+        "--tracing_project_name", type=str, help="Name of the tracing project."
+    )
+    parser.add_argument(
+        "--weave_params",
+        type=str,
+        help="JSON string of parameters for configuring Weave.",
+    )
     args = parser.parse_args()
 
     # Initialize Pinecone vector database
@@ -44,7 +77,9 @@ def main():
 
     # Generate embeddings for the query
     dense_question_embedding = text_embedder.run(text=args.question)["embedding"]
-    sparse_question_embedding = sparse_embedder.run(text=args.question)["sparse_embedding"].to_dict()
+    sparse_question_embedding = sparse_embedder.run(text=args.question)[
+        "sparse_embedding"
+    ].to_dict()
 
     # Query Pinecone vector database
     query_response = pinecone_vector_db.query(
@@ -57,7 +92,11 @@ def main():
     )
 
     # Convert and print results
-    retrieval_results = PineconeDocumentConverter.convert_query_results_to_haystack_documents(query_response)
+    retrieval_results = (
+        PineconeDocumentConverter.convert_query_results_to_haystack_documents(
+            query_response
+        )
+    )
     print(retrieval_results)
 
 

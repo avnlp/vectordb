@@ -1,7 +1,19 @@
+"""Dense indexing script for Chroma vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Chroma vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
-from dataloaders import ARCDataloader, EdgarDataloader, FactScoreDataloader, PopQADataloader, TriviaQADataloader
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
 from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 
@@ -19,7 +31,9 @@ def main():
     - Index processed data into a Chroma vector database.
     """
     # Argument parser for user inputs
-    parser = argparse.ArgumentParser(description="Script for processing and indexing data with Chroma.")
+    parser = argparse.ArgumentParser(
+        description="Script for processing and indexing data with Chroma."
+    )
 
     # Dataloader parameters
     parser.add_argument(
@@ -28,21 +42,39 @@ def main():
         choices=["triviaqa", "arc", "popqa", "factscore", "edgar"],
         help="Dataloader to use for loading datasets.",
     )
-    parser.add_argument("--dataset_name", required=True, help="Name of the dataset to be used by the dataloader.")
-    parser.add_argument("--split", default="test", help="Dataset split to process (e.g., 'test', 'train').")
+    parser.add_argument(
+        "--dataset_name",
+        required=True,
+        help="Name of the dataset to be used by the dataloader.",
+    )
+    parser.add_argument(
+        "--split",
+        default="test",
+        help="Dataset split to process (e.g., 'test', 'train').",
+    )
     parser.add_argument(
         "--text_splitter",
         default="RecursiveCharacterTextSplitter",
         help="Text splitter method to preprocess documents.",
     )
     parser.add_argument(
-        "--text_splitter_params", type=str, help="JSON string of parameters for configuring the text splitter."
+        "--text_splitter_params",
+        type=str,
+        help="JSON string of parameters for configuring the text splitter.",
     )
 
     # Generator parameters
-    parser.add_argument("--generator_model", type=str, help="Model name for the dataloader's generator.")
-    parser.add_argument("--generator_api_key", help="API key for the dataloader generator.")
-    parser.add_argument("--generator_llm_params", type=str, help="JSON string of parameters for the generator LLM.")
+    parser.add_argument(
+        "--generator_model", type=str, help="Model name for the dataloader's generator."
+    )
+    parser.add_argument(
+        "--generator_api_key", help="API key for the dataloader generator."
+    )
+    parser.add_argument(
+        "--generator_llm_params",
+        type=str,
+        help="JSON string of parameters for the generator LLM.",
+    )
 
     # Embedder parameters
     parser.add_argument(
@@ -50,13 +82,33 @@ def main():
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="Model to use for generating document embeddings.",
     )
-    parser.add_argument("--embedding_model_params", type=str, help="JSON string of parameters for the embedding model.")
+    parser.add_argument(
+        "--embedding_model_params",
+        type=str,
+        help="JSON string of parameters for the embedding model.",
+    )
 
     # Chroma VectorDB arguments
-    parser.add_argument("--chroma_path", default="./chroma_database_files", help="Path for Chroma database files.")
-    parser.add_argument("--collection_name", default="test_collection_dense1", help="Name of the Chroma collection.")
-    parser.add_argument("--tracing_project_name", default="chroma", help="Name of the Weave project for tracing.")
-    parser.add_argument("--weave_params", type=str, help="JSON string of parameters for initializing Weave.")
+    parser.add_argument(
+        "--chroma_path",
+        default="./chroma_database_files",
+        help="Path for Chroma database files.",
+    )
+    parser.add_argument(
+        "--collection_name",
+        default="test_collection_dense1",
+        help="Name of the Chroma collection.",
+    )
+    parser.add_argument(
+        "--tracing_project_name",
+        default="chroma",
+        help="Name of the Weave project for tracing.",
+    )
+    parser.add_argument(
+        "--weave_params",
+        type=str,
+        help="JSON string of parameters for initializing Weave.",
+    )
 
     args = parser.parse_args()
 
@@ -78,7 +130,11 @@ def main():
     }
 
     dataloader_cls = dataloader_map[args.dataloader]
-    dataloader = dataloader_cls(dataset_name=args.dataset_name, split=args.split, answer_summary_generator=generator)
+    dataloader = dataloader_cls(
+        dataset_name=args.dataset_name,
+        split=args.split,
+        answer_summary_generator=generator,
+    )
 
     # Load the data
     dataloader.load_data()
@@ -103,7 +159,9 @@ def main():
     chroma_vector_db.create_collection(name=args.collection_name)
 
     # Add the documents to Chroma
-    data_for_chroma = ChromaDocumentConverter.prepare_haystack_documents_for_upsert(docs_with_embeddings)
+    data_for_chroma = ChromaDocumentConverter.prepare_haystack_documents_for_upsert(
+        docs_with_embeddings
+    )
     chroma_vector_db.upsert(data=data_for_chroma)
 
 

@@ -1,8 +1,8 @@
 """Pinecone Vector Database.
 
-This module provides an interface for interacting with Pinecone, enabling functionalities such as
-index creation, vector upsertion, querying, and deletion. It simplifies the management of vector
-databases with Pinecone's API.
+This module provides an interface for interacting with Pinecone, enabling
+functionalities such as index creation, vector upsertion, querying, and deletion.
+It simplifies the management of vector databases with Pinecone's API.
 
 Classes:
     - PineconeVectorDB: Encapsulates methods for managing Pinecone vector databases.
@@ -20,11 +20,12 @@ from typing import Any, Optional, Union
 
 import weave
 from pinecone import ServerlessSpec
-from pinecone.data import Index
+from pinecone.db_data import Index
 from pinecone.grpc import PineconeGRPC as Pinecone
 from weave import Model
 
 from vectordb.utils.logging import LoggerFactory
+
 
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
@@ -33,8 +34,8 @@ logger = logger_factory.get_logger()
 class PineconeVectorDB(Model):
     """Interface for interacting with Pinecone vector databases.
 
-    Provides functionalities for creating indexes, upserting vectors, querying vectors, and
-    deleting indexes.
+    Provides functionalities for creating indexes, upserting vectors, querying
+    vectors, and deleting indexes.
     """
 
     api_key: Optional[str] = None
@@ -72,13 +73,18 @@ class PineconeVectorDB(Model):
             host (Optional[str]): Control plane host for Pinecone.
             proxy_url (Optional[str]): Proxy URL for the connection.
             proxy_headers (Optional[dict[str, str]]): Headers for proxy authentication.
-            ssl_ca_certs (Optional[str]): Path to SSL CA certificate bundle in PEM format.
+            ssl_ca_certs (Optional[str]): Path to SSL CA certificate bundle in PEM
+                format.
             ssl_verify (Optional[bool]): Flag for SSL verification (default: True).
-            additional_headers (Optional[dict[str, str]]): Additional headers for API requests.
+            additional_headers (Optional[dict[str, str]]): Additional headers for API
+                requests.
             pool_threads (int): Number of threads for the connection pool (default: 1).
-            index_name (Optional[str]): Name of the Pinecone index to use (if existing).
-            tracing_project_name (str): The name of the Weave project for tracing. Defaults to "pinecone".
-            weave_params (Optional[dict[str, Any]]): Additional parameters for initializing Weave.
+            index_name (Optional[str]): Name of the Pinecone index to use (if
+                existing).
+            tracing_project_name (str): The name of the Weave project for tracing.
+                Defaults to "pinecone".
+            weave_params (Optional[dict[str, Any]]): Additional parameters for
+                initializing Weave.
         """
         super().__init__(
             api_key=api_key,
@@ -120,7 +126,8 @@ class PineconeVectorDB(Model):
     def _initialize_weave(self, **weave_params) -> None:
         """Initialize Weave with the specified tracing project name.
 
-        Sets up the Weave environment and creates a tracer for monitoring pipeline execution.
+        Sets up the Weave environment and creates a tracer for monitoring pipeline
+        execution.
 
         Args:
             weave_params (dict[str, Any]): Additional parameters for configuring Weave.
@@ -150,7 +157,9 @@ class PineconeVectorDB(Model):
         Returns:
             bool: True if the index exists and is selected, False otherwise.
         """
-        existing_indexes = [index_info["name"] for index_info in self.client.list_indexes()]
+        existing_indexes = [
+            index_info["name"] for index_info in self.client.list_indexes()
+        ]
         if index_name in existing_indexes:
             self.index = self.client.Index(index_name)
             logger.info(f"Selected existing index: {index_name}")
@@ -164,7 +173,7 @@ class PineconeVectorDB(Model):
         index_name: str,
         dimension: int,
         metric: str = "cosine",
-        spec: ServerlessSpec = ServerlessSpec(cloud="aws", region="us-east-1"),
+        spec: Optional[ServerlessSpec] = None,
         deletion_protection: str = "disabled",
     ):
         """Create a Pinecone index with the specified configuration.
@@ -173,9 +182,13 @@ class PineconeVectorDB(Model):
             index_name (str): Name of the new index.
             dimension (int): Dimensionality of the vectors.
             metric (str): Distance metric for similarity search (default: "cosine").
-            spec (ServerlessSpec): Serverless specifications for the index.
-            deletion_protection (str): Index deletion protection setting (default: "disabled").
+            spec (Optional[ServerlessSpec]): Serverless specifications for the index.
+            deletion_protection (str): Index deletion protection setting (default:
+                "disabled").
         """
+        if spec is None:
+            spec = ServerlessSpec(cloud="aws", region="us-east-1")
+
         self.index_name = index_name
 
         # Select an existing index
@@ -250,10 +263,13 @@ class PineconeVectorDB(Model):
             namespace (str): Namespace for the query.
             vector (List[float]): Query vector.
             top_k (int): Number of nearest neighbors to return (default: 5).
-            sparse_vector (Optional[Dict[str, Union[List[float], List[int]]]]): Sparse vector.
+            sparse_vector (Optional[Dict[str, Union[List[float], List[int]]]]): Sparse
+                vector.
             filter (Optional[Dict]): Query filter.
-            include_values (bool): Whether to include vector values in the response (default: False).
-            include_metadata (bool): Whether to include metadata in the response (default: True).
+            include_values (bool): Whether to include vector values in the response
+                (default: False).
+            include_metadata (bool): Whether to include metadata in the response
+                (default: True).
 
         Returns:
             Any: Query response from Pinecone.
@@ -264,7 +280,7 @@ class PineconeVectorDB(Model):
 
         logger.info(f"Querying index {self.index_name} with top_k={top_k}.")
 
-        query_response = self.index.query(
+        return self.index.query(
             vector=vector,
             top_k=top_k,
             namespace=namespace,
@@ -273,7 +289,6 @@ class PineconeVectorDB(Model):
             include_values=include_values,
             include_metadata=include_metadata,
         )
-        return query_response
 
     @weave.op()
     def delete_index(self):

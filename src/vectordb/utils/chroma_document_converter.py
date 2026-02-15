@@ -1,19 +1,25 @@
 """Chroma Document Converter.
 
-This module provides utilities for preparing and converting documents between different formats
-for use in vector store operations with Chroma. It includes methods for handling Haystack and LangChain
-document formats and for converting query results into Haystack documents.
+This module provides utilities for preparing and converting documents between
+different formats for use in vector store operations with Chroma. It includes
+methods for handling Haystack and LangChain document formats and for converting
+query results into Haystack documents.
 
 Classes:
-    - ChromaDocumentConverter: Contains static methods for preparing and transforming documents.
+    - ChromaDocumentConverter: Contains static methods for preparing and
+      transforming documents.
 
 Methods:
-    - prepare_haystack_documents_for_upsert: Prepares Haystack Document objects for vector store upsertion.
-    - prepare_langchain_documents_for_upsert: Placeholder for preparing LangChain Document objects for upsertion.
-    - convert_query_results_to_haystack_documents: Converts query results into Haystack Document objects.
+    - prepare_haystack_documents_for_upsert: Prepares Haystack Document objects
+      for vector store upsertion.
+    - prepare_langchain_documents_for_upsert: Placeholder for preparing
+      LangChain Document objects for upsertion.
+    - convert_query_results_to_haystack_documents: Converts query results into
+      Haystack Document objects.
 
 Logging:
-    - Uses a centralized logging utility to provide detailed logs for all operations.
+    - Uses a centralized logging utility to provide detailed logs for all
+      operations.
 
 Exceptions:
     - Raises ValueError for invalid document inputs.
@@ -27,37 +33,43 @@ from langchain_core.documents import Document as LangchainDocument
 
 from vectordb.utils.logging import LoggerFactory
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
 
 class ChromaDocumentConverter:
-    """Utility class for preparing and converting documents for vector store operations."""
+    """Utility class for preparing and converting documents for vector store ops."""
 
     @staticmethod
-    def prepare_haystack_documents_for_upsert(documents: list[HaystackDocument]) -> dict[str, Any]:
+    def prepare_haystack_documents_for_upsert(
+        documents: list[HaystackDocument],
+    ) -> dict[str, Any]:
         """Convert Haystack documents to Pinecone upsert format.
 
-        This method takes a list of Haystack Document objects and prepares them for upsertion into a vector store.
-        It ensures that each document has an ID and embeddings, and formats the data accordingly for the vector store.
-        The method also handles sparse embeddings if they are present in the documents.
+        This method takes a list of Haystack Document objects and prepares them
+        for upsertion into a vector store. It ensures that each document has an
+        ID and embeddings, and formats the data accordingly for the vector store.
+        The method also handles sparse embeddings if they are present in the
+        documents.
 
         Args:
-            documents (List[HaystackDocument]): A list of Haystack Document objects, each containing embeddings,
-                                                sparse embeddings, and metadata.
+            documents (List[HaystackDocument]): A list of Haystack Document
+                objects, each containing embeddings, sparse embeddings, and
+                metadata.
 
         Returns:
-            Dict[str, Any]: A dictionary formatted for vector store upsertion. The dictionary includes:
+            Dict[str, Any]: A dictionary formatted for vector store upsertion.
+                The dictionary includes:
                 - 'texts': The document content.
                 - 'embeddings': The dense embedding of the document.
-                - 'metadatas': Metadata, including the document content and additional attributes.
+                - 'metadatas': Metadata, including the document content and
+                  additional attributes.
                 - 'ids': The document ID.
 
         Raises:
             ValueError: If any document lacks an ID or embeddings.
         """
-        upsert_data: dict[str, Any] = {}
-
         if not documents:
             msg = "The document list is empty. Please provide valid documents."
             logger.error(msg)
@@ -87,25 +99,29 @@ class ChromaDocumentConverter:
             metadatas.append(doc.meta)
 
         logger.info(f"Prepared {len(documents)} documents for upsertion.")
-        upsert_data = {"texts": texts, "embeddings": embeddings, "metadatas": metadatas, "ids": ids}
-
-        return upsert_data
+        return {
+            "texts": texts,
+            "embeddings": embeddings,
+            "metadatas": metadatas,
+            "ids": ids,
+        }
 
     @staticmethod
     def prepare_langchain_documents_for_upsert(
         documents: list[LangchainDocument], embeddings: list[list[float]]
     ) -> list[dict[str, Any]]:
-        """Prepare a list of LangChain Document objects for upserting into a vector store.
+        """Prepare LangChain Document objects for upserting into a vector store.
 
         Args:
-            documents (List[LangChainDocument]): A list of LangChain Document objects.
-            embeddings (List[List[float]]): A list of embeddings corresponding to the documents.
+            documents (List[LangChainDocument]): A list of LangChain Document
+                objects.
+            embeddings (List[List[float]]): A list of embeddings corresponding
+                to the documents.
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries formatted for vector store upsertion.
+            List[Dict[str, Any]]: A list of dictionaries formatted for vector
+                store upsertion.
         """
-        upsert_data: dict[str, Any] = {}
-
         if not documents:
             msg = "The document list is empty. Please provide valid documents."
             logger.error(msg)
@@ -128,18 +144,25 @@ class ChromaDocumentConverter:
             metadatas.append(document_metadata)
 
         logger.info(f"Prepared {len(documents)} documents for upsertion.")
-        upsert_data = {"texts": texts, "embeddings": embeddings, "metadatas": metadatas, "ids": ids}
-
-        return upsert_data
+        return {
+            "texts": texts,
+            "embeddings": embeddings,
+            "metadatas": metadatas,
+            "ids": ids,
+        }
 
     @staticmethod
-    def convert_query_results_to_haystack_documents(query_results: dict[str, Any]) -> list[HaystackDocument]:
+    def convert_query_results_to_haystack_documents(
+        query_results: dict[str, Any],
+    ) -> list[HaystackDocument]:
         """Convert query results into a list of Haystack Document objects.
 
-        This method extracts relevant information from the query results and constructs Haystack Document objects.
+        This method extracts relevant information from the query results and
+        constructs Haystack Document objects.
 
         Args:
-            query_results (Dict[str, Any]): Query results containing match information.
+            query_results (Dict[str, Any]): Query results containing match
+                information.
 
         Returns:
             List[HaystackDocument]: A list of Haystack Document objects.
@@ -157,17 +180,23 @@ class ChromaDocumentConverter:
 
             haystack_docs.append(document)
 
-        logger.info(f"Converted {len(haystack_docs)} query results into HaystackDocument objects.")
+        logger.info(
+            f"Converted {len(haystack_docs)} query results into HaystackDocument objects."
+        )
         return haystack_docs
 
     @staticmethod
-    def convert_query_results_to_langchain_documents(query_results: dict[str, Any]) -> list[LangchainDocument]:
+    def convert_query_results_to_langchain_documents(
+        query_results: dict[str, Any],
+    ) -> list[LangchainDocument]:
         """Convert query results into a list of LangChain Document objects.
 
-        This method extracts relevant information from the query results and constructs LangChain Document objects.
+        This method extracts relevant information from the query results and
+        constructs LangChain Document objects.
 
         Args:
-            query_results (Dict[str, Any]): Query results containing match information.
+            query_results (Dict[str, Any]): Query results containing match
+                information.
 
         Returns:
             List[LangChainDocument]: A list of LangChain Document objects.
@@ -185,5 +214,7 @@ class ChromaDocumentConverter:
 
             langchain_docs.append(document)
 
-        logger.info(f"Converted {len(langchain_docs)} query results into LangChainDocument objects.")
+        logger.info(
+            f"Converted {len(langchain_docs)} query results into LangChainDocument objects."
+        )
         return langchain_docs
