@@ -1,24 +1,46 @@
 import argparse
-from pymilvus import connections, Collection, utility, CollectionSchema, FieldSchema, DataType
+
 from dataloaders import TriviaQADataloader
 from dataloaders.llms import ChatGroqGenerator
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
+from pymilvus import (
+    Collection,
+    CollectionSchema,
+    DataType,
+    FieldSchema,
+    connections,
+    utility,
+)
 
 
 def main():
     # Set up argparse
-    parser = argparse.ArgumentParser(description="RAG pipeline for question answering using Milvus and ChatGroq.")
+    parser = argparse.ArgumentParser(
+        description="RAG pipeline for question answering using Milvus and ChatGroq."
+    )
 
     # Dataloader arguments
-    parser.add_argument("--dataset_name", required=True, help="Dataset name for TriviaQA dataloader.")
-    parser.add_argument("--split", default="test[:5]", help="Dataset split to use (default: 'test[:5]').")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Dataset name for TriviaQA dataloader."
+    )
+    parser.add_argument(
+        "--split",
+        default="test[:5]",
+        help="Dataset split to use (default: 'test[:5]').",
+    )
 
     # LLM generator arguments
-    parser.add_argument("--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM generator.")
-    parser.add_argument("--llm_api_key", required=True, help="API key for the LLM service.")
+    parser.add_argument(
+        "--llm_model",
+        default="llama-3.1-8b-instant",
+        help="Model name for the LLM generator.",
+    )
+    parser.add_argument(
+        "--llm_api_key", required=True, help="API key for the LLM service."
+    )
     parser.add_argument(
         "--llm_params",
         type=str,
@@ -28,15 +50,28 @@ def main():
 
     # Embedding arguments
     parser.add_argument(
-        "--dense_model", default="sentence-transformers/all-mpnet-base-v2", help="Dense embedding model name."
+        "--dense_model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Dense embedding model name.",
     )
-    parser.add_argument("--sparse_model", default="prithivida/Splade_PP_en_v1", help="Sparse embedding model name.")
+    parser.add_argument(
+        "--sparse_model",
+        default="prithivida/Splade_PP_en_v1",
+        help="Sparse embedding model name.",
+    )
 
     # Milvus arguments
     parser.add_argument("--milvus_host", default="localhost", help="Milvus host.")
     parser.add_argument("--milvus_port", default="19530", help="Milvus port.")
-    parser.add_argument("--collection_name", default="rag_collection", help="Milvus collection name.")
-    parser.add_argument("--top_k", type=int, default=10, help="Number of top results to retrieve from Milvus.")
+    parser.add_argument(
+        "--collection_name", default="rag_collection", help="Milvus collection name."
+    )
+    parser.add_argument(
+        "--top_k",
+        type=int,
+        default=10,
+        help="Number of top results to retrieve from Milvus.",
+    )
 
     args = parser.parse_args()
 
@@ -47,12 +82,23 @@ def main():
     if not utility.has_collection(args.collection_name):
         fields = [
             FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
-            FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=768),  # Adjust dim as needed
+            FieldSchema(
+                name="vector", dtype=DataType.FLOAT_VECTOR, dim=768
+            ),  # Adjust dim as needed
             FieldSchema(name="content", dtype=DataType.VARCHAR, max_length=65535),
         ]
-        schema = CollectionSchema(fields=fields, description="RAG collection for Milvus")
+        schema = CollectionSchema(
+            fields=fields, description="RAG collection for Milvus"
+        )
         collection = Collection(name=args.collection_name, schema=schema)
-        collection.create_index("vector", {"metric_type": "IP", "index_type": "HNSW", "params": {"M": 16, "efConstruction": 200}})
+        collection.create_index(
+            "vector",
+            {
+                "metric_type": "IP",
+                "index_type": "HNSW",
+                "params": {"M": 16, "efConstruction": 200},
+            },
+        )
     else:
         collection = Collection(args.collection_name)
         collection.load()
@@ -75,7 +121,7 @@ def main():
 
     # Initialize embeddings
     text_embedder = HuggingFaceEmbeddings(model_name=args.dense_model)
-    sparse_embedder = FastEmbedSparse(model_name=args.sparse_model)
+    FastEmbedSparse(model_name=args.sparse_model)
 
     # Initialize LLM
     llm = ChatGroq(
@@ -117,6 +163,7 @@ def main():
         response = llm.invoke(messages)
         result = response.content
         print(f"Question: {question}\nAnswer: {result}\n")
+
 
 if __name__ == "__main__":
     main()

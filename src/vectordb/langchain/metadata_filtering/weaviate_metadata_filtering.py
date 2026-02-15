@@ -3,6 +3,7 @@ from weaviate.classes.query import Filter
 
 from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
+
 weaviate_vector_db = WeaviateVectorDB(
     cluster_url="https://kzlfxowbtpn5oyhcqbag.c0.us-west3.gcp.weaviate.cloud",
     api_key="1N2AxyRUtlPyQYjFlc9tdWvzc6PD8xRKHlXa",
@@ -10,7 +11,9 @@ weaviate_vector_db = WeaviateVectorDB(
 )
 
 
-text_embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+text_embedder = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-mpnet-base-v2"
+)
 
 
 question = "Who was the man behind The Chipmunks?"
@@ -25,5 +28,9 @@ query_response = weaviate_vector_db.query(
     filters=Filter.by_property("text").like("Chipmunks"),
 )
 
-retrieval_results = WeaviateDocumentConverter.convert_query_results_to_haystack_documents(query_response)
+retrieval_results = (
+    WeaviateDocumentConverter.convert_query_results_to_haystack_documents(
+        query_response
+    )
+)
 print(retrieval_results)

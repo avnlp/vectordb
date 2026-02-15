@@ -27,6 +27,7 @@ from langchain_core.documents import Document as LangchainDocument
 
 from vectordb.utils.logging import LoggerFactory
 
+
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
 
@@ -35,7 +36,9 @@ class ChromaDocumentConverter:
     """Utility class for preparing and converting documents for vector store operations."""
 
     @staticmethod
-    def prepare_haystack_documents_for_upsert(documents: list[HaystackDocument]) -> dict[str, Any]:
+    def prepare_haystack_documents_for_upsert(
+        documents: list[HaystackDocument],
+    ) -> dict[str, Any]:
         """Convert Haystack documents to Pinecone upsert format.
 
         This method takes a list of Haystack Document objects and prepares them for upsertion into a vector store.
@@ -56,8 +59,6 @@ class ChromaDocumentConverter:
         Raises:
             ValueError: If any document lacks an ID or embeddings.
         """
-        upsert_data: dict[str, Any] = {}
-
         if not documents:
             msg = "The document list is empty. Please provide valid documents."
             logger.error(msg)
@@ -87,9 +88,12 @@ class ChromaDocumentConverter:
             metadatas.append(doc.meta)
 
         logger.info(f"Prepared {len(documents)} documents for upsertion.")
-        upsert_data = {"texts": texts, "embeddings": embeddings, "metadatas": metadatas, "ids": ids}
-
-        return upsert_data
+        return {
+            "texts": texts,
+            "embeddings": embeddings,
+            "metadatas": metadatas,
+            "ids": ids,
+        }
 
     @staticmethod
     def prepare_langchain_documents_for_upsert(
@@ -104,8 +108,6 @@ class ChromaDocumentConverter:
         Returns:
             List[Dict[str, Any]]: A list of dictionaries formatted for vector store upsertion.
         """
-        upsert_data: dict[str, Any] = {}
-
         if not documents:
             msg = "The document list is empty. Please provide valid documents."
             logger.error(msg)
@@ -128,12 +130,17 @@ class ChromaDocumentConverter:
             metadatas.append(document_metadata)
 
         logger.info(f"Prepared {len(documents)} documents for upsertion.")
-        upsert_data = {"texts": texts, "embeddings": embeddings, "metadatas": metadatas, "ids": ids}
-
-        return upsert_data
+        return {
+            "texts": texts,
+            "embeddings": embeddings,
+            "metadatas": metadatas,
+            "ids": ids,
+        }
 
     @staticmethod
-    def convert_query_results_to_haystack_documents(query_results: dict[str, Any]) -> list[HaystackDocument]:
+    def convert_query_results_to_haystack_documents(
+        query_results: dict[str, Any],
+    ) -> list[HaystackDocument]:
         """Convert query results into a list of Haystack Document objects.
 
         This method extracts relevant information from the query results and constructs Haystack Document objects.
@@ -157,11 +164,15 @@ class ChromaDocumentConverter:
 
             haystack_docs.append(document)
 
-        logger.info(f"Converted {len(haystack_docs)} query results into HaystackDocument objects.")
+        logger.info(
+            f"Converted {len(haystack_docs)} query results into HaystackDocument objects."
+        )
         return haystack_docs
 
     @staticmethod
-    def convert_query_results_to_langchain_documents(query_results: dict[str, Any]) -> list[LangchainDocument]:
+    def convert_query_results_to_langchain_documents(
+        query_results: dict[str, Any],
+    ) -> list[LangchainDocument]:
         """Convert query results into a list of LangChain Document objects.
 
         This method extracts relevant information from the query results and constructs LangChain Document objects.
@@ -185,5 +196,7 @@ class ChromaDocumentConverter:
 
             langchain_docs.append(document)
 
-        logger.info(f"Converted {len(langchain_docs)} query results into LangChainDocument objects.")
+        logger.info(
+            f"Converted {len(langchain_docs)} query results into LangChainDocument objects."
+        )
         return langchain_docs

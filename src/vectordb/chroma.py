@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 import pysqlite3  # noqa: F401
 
+
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
 import chromadb
@@ -15,6 +16,7 @@ from chromadb.utils import embedding_functions
 from weave import Model
 
 from vectordb.utils.logging import LoggerFactory
+
 
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
 logger = logger_factory.get_logger()
@@ -93,7 +95,9 @@ class ChromaVectorDB(Model):
         name: str,
         configuration: Optional[CollectionConfiguration] = None,
         metadata: Optional[CollectionMetadata] = None,
-        embedding_function: Optional[EmbeddingFunction[Embeddable]] = embedding_functions.DefaultEmbeddingFunction(),
+        embedding_function: Optional[
+            EmbeddingFunction[Embeddable]
+        ] = embedding_functions.DefaultEmbeddingFunction(),
         **kwargs: Any,
     ) -> None:
         """Create a new collection.
@@ -109,7 +113,11 @@ class ChromaVectorDB(Model):
             None
         """
         self.collection = self.client.get_or_create_collection(
-            name=name, configuration=configuration, metadata=metadata, embedding_function=embedding_function, **kwargs
+            name=name,
+            configuration=configuration,
+            metadata=metadata,
+            embedding_function=embedding_function,
+            **kwargs,
         )
 
     @weave.op()
@@ -174,11 +182,10 @@ class ChromaVectorDB(Model):
             msg = "No collection initialized. Use `create_collection` first."
             raise ValueError(msg)
 
-        query_results = self.collection.query(
+        return self.collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
             where=where,
             where_document=where_document,
             **kwargs,
         )
-        return query_results

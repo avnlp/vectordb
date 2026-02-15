@@ -1,12 +1,19 @@
 import argparse
+
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from pymilvus import MilvusClient, DataType, CollectionSchema, FieldSchema, HybridSearchRequest, Filter
+from pymilvus import (
+    HybridSearchRequest,
+    MilvusClient,
+)
+
 from vectordb import MilvusDocumentConverter
 
 
 def main():
     # Argument parsing
-    parser = argparse.ArgumentParser(description="Query Milvus VectorDB using HuggingFace embeddings.")
+    parser = argparse.ArgumentParser(
+        description="Query Milvus VectorDB using HuggingFace embeddings."
+    )
     parser.add_argument(
         "--milvus_host",
         type=str,
@@ -62,7 +69,9 @@ def main():
 
     # Check if the collection exists
     if not client.has_collection(args.collection_name):
-        raise ValueError(f"Collection '{args.collection_name}' does not exist in Milvus.")
+        raise ValueError(
+            f"Collection '{args.collection_name}' does not exist in Milvus."
+        )
 
     # Initialize text embedder
     text_embedder = HuggingFaceEmbeddings(model_name=args.embedding_model)
@@ -81,12 +90,11 @@ def main():
     # If hybrid search is enabled, include a sparse vector field (if applicable)
     if args.hybrid:
         hybrid_search_request = HybridSearchRequest(
-            dense_search_request=dense_search_request,
-            alpha=args.alpha
+            dense_search_request=dense_search_request, alpha=args.alpha
         )
         search_response = client.hybrid_search(
-            collection_name=args.collection_name, 
-            hybrid_search_request=hybrid_search_request
+            collection_name=args.collection_name,
+            hybrid_search_request=hybrid_search_request,
         )
     else:
         search_response = client.search(
@@ -94,11 +102,15 @@ def main():
             anns_field=dense_search_request["anns_field"],
             data=dense_search_request["data"],
             param=dense_search_request["param"],
-            limit=dense_search_request["limit"]
+            limit=dense_search_request["limit"],
         )
 
     # Convert and print the results
-    retrieval_results = MilvusDocumentConverter.convert_query_results_to_haystack_documents(search_response)
+    retrieval_results = (
+        MilvusDocumentConverter.convert_query_results_to_haystack_documents(
+            search_response
+        )
+    )
     print(retrieval_results)
 
 

@@ -1,6 +1,12 @@
 import argparse
 
-from dataloaders import ARCDataloader, EdgarDataloader, FactScoreDataloader, PopQADataloader, TriviaQADataloader
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
 from dataloaders.llms import ChatGroqGenerator
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
@@ -11,7 +17,9 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 def main():
     # Set up argparse
-    parser = argparse.ArgumentParser(description="Hybrid embedding-based upsert to Pinecone VectorDB.")
+    parser = argparse.ArgumentParser(
+        description="Hybrid embedding-based upsert to Pinecone VectorDB."
+    )
 
     # General arguments
     parser.add_argument(
@@ -20,12 +28,24 @@ def main():
         choices=["triviaqa", "arc", "popqa", "factscore", "edgar"],
         help="Dataloader to use.",
     )
-    parser.add_argument("--dataset_name", required=True, help="Dataset name for the dataloader.")
-    parser.add_argument("--split", default="test[:5]", help="Dataset split to use (default: 'test[:5]').")
+    parser.add_argument(
+        "--dataset_name", required=True, help="Dataset name for the dataloader."
+    )
+    parser.add_argument(
+        "--split",
+        default="test[:5]",
+        help="Dataset split to use (default: 'test[:5]').",
+    )
 
     # Generator arguments
-    parser.add_argument("--llm_model", default="llama-3.1-8b-instant", help="Model name for the LLM generator.")
-    parser.add_argument("--llm_api_key", required=True, help="API key for the LLM service.")
+    parser.add_argument(
+        "--llm_model",
+        default="llama-3.1-8b-instant",
+        help="Model name for the LLM generator.",
+    )
+    parser.add_argument(
+        "--llm_api_key", required=True, help="API key for the LLM service."
+    )
     parser.add_argument(
         "--llm_params",
         type=str,
@@ -35,19 +55,51 @@ def main():
 
     # Embedding arguments
     parser.add_argument(
-        "--dense_model", default="sentence-transformers/all-mpnet-base-v2", help="Dense embedding model name."
+        "--dense_model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Dense embedding model name.",
     )
-    parser.add_argument("--sparse_model", default="prithivida/Splade_PP_en_v1", help="Sparse embedding model name.")
+    parser.add_argument(
+        "--sparse_model",
+        default="prithivida/Splade_PP_en_v1",
+        help="Sparse embedding model name.",
+    )
 
     # Pinecone arguments
     parser.add_argument("--pinecone_api_key", required=True, help="Pinecone API key.")
-    parser.add_argument("--index_name", default="test-index-hybrid", help="Pinecone index name.")
-    parser.add_argument("--dimension", type=int, default=768, help="Dimension of embeddings (default: 768).")
-    parser.add_argument("--metric", default="dotproduct", help="Similarity metric (default: 'dotproduct').")
-    parser.add_argument("--namespace", default="test_namespace", help="Namespace for the Pinecone index.")
-    parser.add_argument("--batch_size", type=int, default=50, help="Batch size for upserts (default: 50).")
-    parser.add_argument("--cloud", default="aws", help="Cloud provider for Pinecone (default: 'aws').")
-    parser.add_argument("--region", default="us-east-1", help="Region for Pinecone (default: 'us-east-1').")
+    parser.add_argument(
+        "--index_name", default="test-index-hybrid", help="Pinecone index name."
+    )
+    parser.add_argument(
+        "--dimension",
+        type=int,
+        default=768,
+        help="Dimension of embeddings (default: 768).",
+    )
+    parser.add_argument(
+        "--metric",
+        default="dotproduct",
+        help="Similarity metric (default: 'dotproduct').",
+    )
+    parser.add_argument(
+        "--namespace",
+        default="test_namespace",
+        help="Namespace for the Pinecone index.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=50,
+        help="Batch size for upserts (default: 50).",
+    )
+    parser.add_argument(
+        "--cloud", default="aws", help="Cloud provider for Pinecone (default: 'aws')."
+    )
+    parser.add_argument(
+        "--region",
+        default="us-east-1",
+        help="Region for Pinecone (default: 'us-east-1').",
+    )
 
     args = parser.parse_args()
 
@@ -67,7 +119,11 @@ def main():
         "edgar": EdgarDataloader,
     }
     dataloader_cls = dataloader_map[args.dataloader]
-    dataloader = dataloader_cls(dataset_name=args.dataset_name, split=args.split, answer_summary_generator=generator)
+    dataloader = dataloader_cls(
+        dataset_name=args.dataset_name,
+        split=args.split,
+        answer_summary_generator=generator,
+    )
 
     # Load data
     dataloader.load_data()
@@ -93,11 +149,18 @@ def main():
     )
 
     # Prepare data for Pinecone and upsert
-    data_for_pinecone = PineconeDocumentConverter.prepare_langchain_documents_for_upsert(
-        documents=langchain_documents, embeddings=doc_embeddings, sparse_embeddings=sparse_embeddings
+    data_for_pinecone = (
+        PineconeDocumentConverter.prepare_langchain_documents_for_upsert(
+            documents=langchain_documents,
+            embeddings=doc_embeddings,
+            sparse_embeddings=sparse_embeddings,
+        )
     )
     pinecone_vector_db.upsert(
-        data=data_for_pinecone, namespace=args.namespace, batch_size=args.batch_size, show_progress=True
+        data=data_for_pinecone,
+        namespace=args.namespace,
+        batch_size=args.batch_size,
+        show_progress=True,
     )
 
 

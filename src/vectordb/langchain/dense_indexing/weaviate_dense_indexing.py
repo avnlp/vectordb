@@ -1,6 +1,12 @@
 import argparse
 
-from dataloaders import ARCDataloader, EdgarDataloader, FactScoreDataloader, PopQADataloader, TriviaQADataloader
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
 from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 
@@ -9,7 +15,9 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 def main():
     # Set up argument parser
-    parser = argparse.ArgumentParser(description="Load data, generate embeddings, and upsert to Weaviate.")
+    parser = argparse.ArgumentParser(
+        description="Load data, generate embeddings, and upsert to Weaviate."
+    )
 
     # Add arguments
     parser.add_argument(
@@ -18,12 +26,22 @@ def main():
         choices=["triviaqa", "arc", "popqa", "factscore", "edgar"],
         help="Name of the dataloader to use.",
     )
-    parser.add_argument("--dataset_name", default="awinml/triviaqa", help="Name of the dataset.")
+    parser.add_argument(
+        "--dataset_name", default="awinml/triviaqa", help="Name of the dataset."
+    )
     parser.add_argument("--split", default="test[:5]", help="Dataset split to use.")
-    parser.add_argument("--model", default="sentence-transformers/all-mpnet-base-v2", help="Embedding model name.")
+    parser.add_argument(
+        "--model",
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="Embedding model name.",
+    )
     parser.add_argument("--weaviate_url", required=True, help="Weaviate cluster URL.")
-    parser.add_argument("--weaviate_api_key", required=True, help="API key for Weaviate.")
-    parser.add_argument("--collection_name", required=True, help="Name of the collection in Weaviate.")
+    parser.add_argument(
+        "--weaviate_api_key", required=True, help="API key for Weaviate."
+    )
+    parser.add_argument(
+        "--collection_name", required=True, help="Name of the collection in Weaviate."
+    )
 
     args = parser.parse_args()
 
@@ -40,10 +58,19 @@ def main():
     generator = ChatGroqGenerator(
         model="llama-3.1-8b-instant",
         api_key="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",
-        llm_params={"temperature": 0, "max_tokens": 1024, "timeout": 360, "max_retries": 100},
+        llm_params={
+            "temperature": 0,
+            "max_tokens": 1024,
+            "timeout": 360,
+            "max_retries": 100,
+        },
     )
 
-    dataloader = dataloader_cls(dataset_name=args.dataset_name, split=args.split, answer_summary_generator=generator)
+    dataloader = dataloader_cls(
+        dataset_name=args.dataset_name,
+        split=args.split,
+        answer_summary_generator=generator,
+    )
 
     # Load data
     dataloader.load_data()
@@ -58,16 +85,22 @@ def main():
     docs_with_embeddings = embedder.run(documents=haystack_documents)["documents"]
 
     # Initialize Weaviate vector database
-    weaviate_vectordb = WeaviateVectorDB(cluster_url=args.weaviate_url, api_key=args.weaviate_api_key)
+    weaviate_vectordb = WeaviateVectorDB(
+        cluster_url=args.weaviate_url, api_key=args.weaviate_api_key
+    )
 
     # Create the collection in Weaviate
     weaviate_vectordb.create_collection(collection_name=args.collection_name)
 
     # Prepare data and upsert to Weaviate
-    data_for_weaviate = WeaviateDocumentConverter.prepare_haystack_documents_for_upsert(docs_with_embeddings)
+    data_for_weaviate = WeaviateDocumentConverter.prepare_haystack_documents_for_upsert(
+        docs_with_embeddings
+    )
     weaviate_vectordb.upsert(data=data_for_weaviate)
 
-    print(f"Upserted documents to Weaviate collection '{args.collection_name}' successfully.")
+    print(
+        f"Upserted documents to Weaviate collection '{args.collection_name}' successfully."
+    )
 
 
 if __name__ == "__main__":
