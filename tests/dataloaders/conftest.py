@@ -39,7 +39,9 @@ def mock_hf_dataset():
         with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
             mock_load.return_value = mock_hf_dataset
     """
-
+    mock = MagicMock()
+    mock.__iter__ = MagicMock(return_value=iter([]))
+    return mock
 
 @pytest.fixture
 def arc_sample_rows():
