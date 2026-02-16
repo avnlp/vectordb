@@ -1,3 +1,9 @@
+"""Chroma metadata filtering example with LangChain integration.
+
+This module demonstrates how to perform metadata filtering queries using Chroma VectorDB
+with HuggingFace embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
@@ -6,6 +12,15 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 
 def main():
+    """Run the Chroma metadata filtering query.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the Chroma VectorDB
+    - Embeds a query question
+    - Queries the database with metadata filters
+    - Converts and prints the results
+    """
     # Argument parsing
     parser = argparse.ArgumentParser(
         description="Query Chroma VectorDB with a question"

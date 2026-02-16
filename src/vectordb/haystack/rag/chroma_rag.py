@@ -1,4 +1,11 @@
+"""RAG pipeline implementation using Chroma vector database.
+
+This module provides a Retrieval-Augmented Generation pipeline
+using Chroma as the vector database with Haystack components.
+"""
+
 import argparse
+from ast import literal_eval
 
 from dataloaders import TriviaQADataloader
 from dataloaders.llms import ChatGroqGenerator
@@ -13,6 +20,14 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 
 def main():
+    """Run RAG pipeline using Chroma vector database.
+
+    This function loads data, creates a RAG pipeline with retrieval
+    from Chroma and LLM generation, and answers questions.
+
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(description="Run Chroma RAG Pipeline")
 
     # Chroma VectorDB arguments

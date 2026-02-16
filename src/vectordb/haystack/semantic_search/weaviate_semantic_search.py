@@ -1,11 +1,26 @@
+"""Semantic search script for Weaviate vector database.
+
+This module provides functionality to perform semantic search
+using Weaviate vector database with dense embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder
+from pinecone import ServerlessSpec
 
-from vectordb import WeaviateDocumentConverter
+from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
+    """Perform semantic search using Weaviate vector database.
+
+    This function initializes Weaviate, generates embeddings for a query,
+    and retrieves top-k similar documents.
+
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(description="Weaviate Semantic Search Script")
 
     # Arguments for Weaviate configuration
@@ -66,7 +81,7 @@ def main():
     args = parser.parse_args()
 
     # Initialize Weaviate vector DB
-    weaviate_vector_db = WeavaiteVectorDB(api_key=args.api_key)
+    weaviate_vector_db = WeaviateVectorDB(api_key=args.api_key)
     weaviate_vector_db.create_index(
         index_name=args.index_name,
         dimension=args.dimension,

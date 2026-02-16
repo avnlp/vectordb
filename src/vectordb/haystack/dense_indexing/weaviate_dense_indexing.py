@@ -1,3 +1,9 @@
+"""Dense indexing script for Weaviate vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Weaviate vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
@@ -15,7 +21,7 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
-    """Process data, generate embeddings, and index them into a Weaviate vector database.
+    """Process data, generate embeddings, and index them into Weaviate.
 
     This script is designed to:
     - Load datasets using specified dataloaders.

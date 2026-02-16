@@ -1,3 +1,9 @@
+"""RAG pipeline implementation using Milvus vector database.
+
+This module provides a Retrieval-Augmented Generation pipeline
+using Milvus as the vector database with Haystack components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -12,6 +18,7 @@ from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connec
 
 
 def main():
+    """Run RAG pipeline with Milvus and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Milvus and TriviaQA"
     )

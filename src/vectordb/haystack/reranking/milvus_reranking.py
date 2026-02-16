@@ -1,3 +1,9 @@
+"""Reranking script for Milvus vector database.
+
+This module provides functionality to perform hybrid search with reranking
+in Milvus vector database using Haystack components.
+"""
+
 import argparse
 import json
 
@@ -5,6 +11,7 @@ from pymilvus import AnnSearchRequest, DataType, MilvusClient, RRFRanker, Weight
 
 
 def main():
+    """Perform hybrid search with reranking in Milvus."""
     parser = argparse.ArgumentParser(
         description="Hybrid Search in Milvus with Argparse"
     )

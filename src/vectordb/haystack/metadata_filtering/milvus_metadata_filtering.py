@@ -1,6 +1,20 @@
+"""Metadata filtering script for Milvus vector database.
+
+This module provides functionality to query Milvus vector database
+with metadata filtering using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
+from dataloaders.llms import ChatGroqGenerator
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 
 from vectordb import MilvusVectorDB

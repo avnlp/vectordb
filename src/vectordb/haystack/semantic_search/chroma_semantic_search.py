@@ -1,3 +1,9 @@
+"""Semantic search script for Chroma vector database.
+
+This module provides functionality to perform semantic search
+using Chroma vector database with dense and sparse embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder
@@ -9,6 +15,14 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 
 def main():
+    """Perform semantic search using Chroma vector database.
+
+    This function initializes Chroma, generates dense and sparse embeddings
+    for a query, and retrieves top-k similar documents.
+
+    Returns:
+        None
+    """
     # Argument parser for user inputs
     parser = argparse.ArgumentParser(
         description="Script for processing and indexing data with Chroma."

@@ -1,3 +1,9 @@
+"""Weaviate collections example with LangChain integration.
+
+This module demonstrates how to work with Weaviate collections for organizing
+and querying vector data across multiple collections.
+"""
+
 import argparse
 
 from dataloaders.llms.groq import ChatGroqGenerator
@@ -7,8 +13,8 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
-# Argument parsing
 def parse_args():
+    """Parse command line arguments for Weaviate collections script."""
     parser = argparse.ArgumentParser(
         description="Upsert documents to Weaviate and query the database."
     )
@@ -73,8 +79,17 @@ def parse_args():
     return parser.parse_args()
 
 
-# Main function
 def main():
+    """Run the Weaviate collections example.
+
+    This function:
+    - Parses command line arguments
+    - Loads data from two different splits
+    - Generates embeddings for each split
+    - Creates Weaviate collections
+    - Upserts data into separate collections
+    - Queries both collections and prints results
+    """
     # Parse arguments
     args = parse_args()
 

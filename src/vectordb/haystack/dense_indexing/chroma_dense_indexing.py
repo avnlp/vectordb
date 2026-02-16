@@ -1,3 +1,9 @@
+"""Dense indexing script for Chroma vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Chroma vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 

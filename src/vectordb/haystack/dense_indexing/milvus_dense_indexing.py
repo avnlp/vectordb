@@ -1,8 +1,15 @@
+"""Dense indexing script for Milvus vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Milvus vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
 from dataloaders import (
     ARCDataloader,
+    EdgarDataloader,
     FactScoreDataloader,
     PopQADataloader,
     TriviaQADataloader,

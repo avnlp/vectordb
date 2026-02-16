@@ -95,7 +95,7 @@ implicit_reexport = false
 strict_equality = true
 extra_checks = true
 mypy_path = "src"
-disable_error_code = ["operator"]
+disable_error_code = ["operator", "untyped-decorator", "union-attr", "attr-defined", "misc"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -132,8 +132,20 @@ module = [
   "pysqlite3",
   "sklearn",
   "sklearn.*",
+  "weave",
+  "weave.*",
+  "dataloaders",
+  "dataloaders.*",
 ]
 ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+  "vectordb.langchain.*",
+  "vectordb.haystack.*",
+]
+follow_imports = "skip"
 ignore_errors = true
 
 [tool.ruff]

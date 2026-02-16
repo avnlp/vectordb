@@ -1,3 +1,9 @@
+"""Pinecone dense indexing example with LangChain integration.
+
+This module demonstrates how to perform dense indexing using Pinecone VectorDB
+with HuggingFace embeddings and various datasets.
+"""
+
 import argparse
 
 from dataloaders import (
@@ -15,6 +21,15 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run the Pinecone dense indexing pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the data loader and generator
+    - Loads and processes the dataset
+    - Generates embeddings using HuggingFace embeddings
+    - Creates a Pinecone index and upserts the data
+    """
     # Argument parser setup
     parser = argparse.ArgumentParser(
         description="Run data processing and upsert to Pinecone VectorDB."

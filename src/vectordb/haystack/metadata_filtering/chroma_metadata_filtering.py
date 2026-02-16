@@ -1,4 +1,11 @@
+"""Metadata filtering script for Chroma vector database.
+
+This module provides functionality to query Chroma vector database
+with metadata filtering using Haystack components.
+"""
+
 import argparse
+from ast import literal_eval
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder
 
@@ -6,6 +13,7 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 
 def main():
+    """Perform Metadata Filtering using Chroma."""
     parser = argparse.ArgumentParser(
         description="Query Chroma vector database with a dense embedding."
     )

@@ -1,3 +1,9 @@
+"""Milvus semantic search example with LangChain integration.
+
+This module demonstrates how to perform semantic search using Milvus VectorDB
+with dense embeddings.
+"""
+
 import argparse
 
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -5,6 +11,15 @@ from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connec
 
 
 def main():
+    """Run the Milvus semantic search query.
+
+    This function:
+    - Parses command line arguments
+    - Connects to Milvus and creates/loads a collection
+    - Generates query embeddings using HuggingFace
+    - Performs semantic search on the collection
+    - Prints the search results
+    """
     parser = argparse.ArgumentParser(description="Milvus Semantic Search Script")
 
     # Arguments for Milvus configuration

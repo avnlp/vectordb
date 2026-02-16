@@ -1,3 +1,9 @@
+"""RAG pipeline implementation using Qdrant vector database.
+
+This module provides a Retrieval-Augmented Generation pipeline
+using Qdrant as the vector database with Haystack components.
+"""
+
 import argparse
 
 from dataloaders.haystack import (
@@ -17,6 +23,7 @@ from vectordb import QdrantDocumentConverter
 
 
 def main():
+    """Run RAG pipeline with Qdrant and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Qdrant and TriviaQA"
     )

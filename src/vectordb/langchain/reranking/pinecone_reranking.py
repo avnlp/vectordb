@@ -1,3 +1,9 @@
+"""Pinecone reranking example with LangChain integration.
+
+This module demonstrates how to perform semantic search with reranking using Pinecone
+with dense and sparse embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
@@ -7,6 +13,16 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run the Pinecone reranking example.
+
+    This function:
+    - Parses command line arguments
+    - Initializes Pinecone VectorDB
+    - Generates dense and sparse query embeddings
+    - Queries Pinecone and retrieves results
+    - Reranks results using Pinecone's inference API
+    - Prints the reranked results
+    """
     # Set up argparse
     parser = argparse.ArgumentParser(
         description="Semantic search and reranking pipeline using Pinecone."

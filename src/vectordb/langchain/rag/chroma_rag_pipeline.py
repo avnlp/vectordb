@@ -1,3 +1,9 @@
+"""Chroma RAG pipeline example with LangChain integration.
+
+This module demonstrates how to build a Retrieval-Augmented Generation (RAG) pipeline
+using Chroma VectorDB and LangChain components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -9,10 +15,11 @@ from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack.components.generators import OpenAIGenerator
 from haystack.utils import Secret
 
-from vectordb import ChromaDocumentConverter, PineconeVectorDB
+from vectordb import ChromaDocumentConverter, ChromaVectorDB, PineconeVectorDB
 
 
 def main():
+    """Run Chroma RAG Pipeline with Dense Embedding Search."""
     parser = argparse.ArgumentParser(
         description="Run Chroma RAG Pipeline with Dense Embedding Search."
     )

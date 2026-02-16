@@ -1,3 +1,9 @@
+"""Chroma dense indexing example with LangChain integration.
+
+This module demonstrates how to perform dense indexing using Chroma VectorDB
+with HuggingFace embeddings and various datasets.
+"""
+
 import argparse
 
 from dataloaders import (
@@ -14,6 +20,15 @@ from vectordb import ChromaDocumentConverter, ChromaVectorDB
 
 
 def main():
+    """Run the Chroma dense indexing pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the data loader and generator
+    - Loads and processes the dataset
+    - Generates embeddings using HuggingFace embeddings
+    - Creates a Chroma collection and upserts the data
+    """
     # Argument parsing
     parser = argparse.ArgumentParser(
         description="Run a query using Chroma VectorDB with HuggingFace embeddings."

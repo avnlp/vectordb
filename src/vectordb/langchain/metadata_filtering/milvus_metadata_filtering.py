@@ -1,3 +1,9 @@
+"""Milvus metadata filtering example with LangChain integration.
+
+This module demonstrates how to perform metadata filtering queries using Milvus VectorDB
+with HuggingFace embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
@@ -10,6 +16,15 @@ from vectordb import MilvusDocumentConverter
 
 
 def main():
+    """Run the Milvus metadata filtering query.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the Milvus client
+    - Embeds a query question
+    - Queries the database with optional hybrid search
+    - Converts and prints the results
+    """
     # Argument parsing
     parser = argparse.ArgumentParser(
         description="Query Milvus VectorDB using HuggingFace embeddings."

@@ -1,8 +1,8 @@
 """Pinecone Vector Database.
 
-This module provides an interface for interacting with Pinecone, enabling functionalities such as
-index creation, vector upsertion, querying, and deletion. It simplifies the management of vector
-databases with Pinecone's API.
+This module provides an interface for interacting with Pinecone, enabling
+functionalities such as index creation, vector upsertion, querying, and deletion.
+It simplifies the management of vector databases with Pinecone's API.
 
 Classes:
     - PineconeVectorDB: Encapsulates methods for managing Pinecone vector databases.
@@ -20,7 +20,7 @@ from typing import Any, Optional, Union
 
 import weave
 from pinecone import ServerlessSpec
-from pinecone.data import Index
+from pinecone.db_data import Index
 from pinecone.grpc import PineconeGRPC as Pinecone
 from weave import Model
 
@@ -34,8 +34,8 @@ logger = logger_factory.get_logger()
 class PineconeVectorDB(Model):
     """Interface for interacting with Pinecone vector databases.
 
-    Provides functionalities for creating indexes, upserting vectors, querying vectors, and
-    deleting indexes.
+    Provides functionalities for creating indexes, upserting vectors, querying
+    vectors, and deleting indexes.
     """
 
     api_key: Optional[str] = None
@@ -73,13 +73,18 @@ class PineconeVectorDB(Model):
             host (Optional[str]): Control plane host for Pinecone.
             proxy_url (Optional[str]): Proxy URL for the connection.
             proxy_headers (Optional[dict[str, str]]): Headers for proxy authentication.
-            ssl_ca_certs (Optional[str]): Path to SSL CA certificate bundle in PEM format.
+            ssl_ca_certs (Optional[str]): Path to SSL CA certificate bundle in PEM
+                format.
             ssl_verify (Optional[bool]): Flag for SSL verification (default: True).
-            additional_headers (Optional[dict[str, str]]): Additional headers for API requests.
+            additional_headers (Optional[dict[str, str]]): Additional headers for API
+                requests.
             pool_threads (int): Number of threads for the connection pool (default: 1).
-            index_name (Optional[str]): Name of the Pinecone index to use (if existing).
-            tracing_project_name (str): The name of the Weave project for tracing. Defaults to "pinecone".
-            weave_params (Optional[dict[str, Any]]): Additional parameters for initializing Weave.
+            index_name (Optional[str]): Name of the Pinecone index to use (if
+                existing).
+            tracing_project_name (str): The name of the Weave project for tracing.
+                Defaults to "pinecone".
+            weave_params (Optional[dict[str, Any]]): Additional parameters for
+                initializing Weave.
         """
         super().__init__(
             api_key=api_key,
@@ -118,17 +123,18 @@ class PineconeVectorDB(Model):
 
         self._initialize_weave(**(weave_params or {}))
 
-    def _initialize_weave(self, **weave_params) -> None:
+    def _initialize_weave(self, **weave_params: Any) -> None:
         """Initialize Weave with the specified tracing project name.
 
-        Sets up the Weave environment and creates a tracer for monitoring pipeline execution.
+        Sets up the Weave environment and creates a tracer for monitoring pipeline
+        execution.
 
         Args:
             weave_params (dict[str, Any]): Additional parameters for configuring Weave.
         """
         weave.init(self.tracing_project_name, **weave_params)
 
-    def _initialize_client(self):
+    def _initialize_client(self) -> None:
         """Initialize the Pinecone client."""
         self.client = Pinecone(
             api_key=self.api_key,
@@ -161,24 +167,28 @@ class PineconeVectorDB(Model):
         logger.warning(f"Index {index_name} does not exist.")
         return False
 
-    @weave.op()
-    def create_index(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def create_index(  # type: ignore[no-untyped-def]
         self,
         index_name: str,
         dimension: int,
         metric: str = "cosine",
-        spec: ServerlessSpec = ServerlessSpec(cloud="aws", region="us-east-1"),
+        spec: Optional[ServerlessSpec] = None,
         deletion_protection: str = "disabled",
-    ):
+    ) -> None:
         """Create a Pinecone index with the specified configuration.
 
         Args:
             index_name (str): Name of the new index.
             dimension (int): Dimensionality of the vectors.
             metric (str): Distance metric for similarity search (default: "cosine").
-            spec (ServerlessSpec): Serverless specifications for the index.
-            deletion_protection (str): Index deletion protection setting (default: "disabled").
+            spec (Optional[ServerlessSpec]): Serverless specifications for the index.
+            deletion_protection (str): Index deletion protection setting (default:
+                "disabled").
         """
+        if spec is None:
+            spec = ServerlessSpec(cloud="aws", region="us-east-1")
+
         self.index_name = index_name
 
         # Select an existing index
@@ -204,14 +214,14 @@ class PineconeVectorDB(Model):
         self._select_index(index_name)
         logger.info(f"New index '{index_name}' created and selected.")
 
-    @weave.op()
-    def upsert(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def upsert(  # type: ignore[no-untyped-def]
         self,
         data: list[dict[str, Any]],
         namespace: Optional[str] = None,
         batch_size: Optional[int] = None,
         show_progress: bool = True,
-    ):
+    ) -> None:
         """Upsert vectors into the selected Pinecone index.
 
         Args:
@@ -236,8 +246,8 @@ class PineconeVectorDB(Model):
             show_progress=show_progress,
         )
 
-    @weave.op()
-    def query(
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def query(  # type: ignore[no-untyped-def]
         self,
         namespace: str,
         vector: list[float],
@@ -253,10 +263,13 @@ class PineconeVectorDB(Model):
             namespace (str): Namespace for the query.
             vector (List[float]): Query vector.
             top_k (int): Number of nearest neighbors to return (default: 5).
-            sparse_vector (Optional[Dict[str, Union[List[float], List[int]]]]): Sparse vector.
+            sparse_vector (Optional[Dict[str, Union[List[float], List[int]]]]): Sparse
+                vector.
             filter (Optional[Dict]): Query filter.
-            include_values (bool): Whether to include vector values in the response (default: False).
-            include_metadata (bool): Whether to include metadata in the response (default: True).
+            include_values (bool): Whether to include vector values in the response
+                (default: False).
+            include_metadata (bool): Whether to include metadata in the response
+                (default: True).
 
         Returns:
             Any: Query response from Pinecone.
@@ -277,8 +290,8 @@ class PineconeVectorDB(Model):
             include_metadata=include_metadata,
         )
 
-    @weave.op()
-    def delete_index(self):
+    @weave.op()  # type: ignore[no-untyped-dec]
+    def delete_index(self) -> None:  # type: ignore[no-untyped-def]
         """Delete the currently selected Pinecone index.
 
         Raises:

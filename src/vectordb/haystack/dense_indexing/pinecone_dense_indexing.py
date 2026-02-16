@@ -1,3 +1,9 @@
+"""Dense indexing script for Pinecone vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Pinecone vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
@@ -16,7 +22,7 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
-    """Process data, generate embeddings, and index them into a Pinecone vector database.
+    """Process data, generate embeddings, and index them into Pinecone.
 
     This script is designed to:
     - Load datasets using specified dataloaders.

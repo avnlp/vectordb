@@ -1,3 +1,9 @@
+"""Pinecone RAG pipeline example with LangChain integration.
+
+This module demonstrates how to build a Retrieval-Augmented Generation (RAG) pipeline
+using Pinecone VectorDB and LangChain components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -11,6 +17,15 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run the Pinecone RAG pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes Pinecone VectorDB and LLM generator
+    - Loads the TriviaQA dataset
+    - Processes questions through the RAG pipeline
+    - Generates answers using retrieved context from Pinecone
+    """
     # Set up argparse
     parser = argparse.ArgumentParser(
         description="RAG pipeline for question answering using Pinecone and ChatGroq."

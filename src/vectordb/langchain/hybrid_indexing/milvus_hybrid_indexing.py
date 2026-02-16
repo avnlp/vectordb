@@ -1,3 +1,9 @@
+"""Milvus hybrid indexing example with LangChain integration.
+
+This module demonstrates how to perform hybrid (dense + sparse) indexing using Milvus
+with HuggingFace embeddings and various datasets.
+"""
+
 import argparse
 
 from dataloaders import (
@@ -15,6 +21,15 @@ from vectordb import MilvusDocumentConverter
 
 
 def main():
+    """Run the Milvus hybrid indexing pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the data loader and generator
+    - Loads and processes the dataset
+    - Generates embeddings using HuggingFace embeddings
+    - Creates a Milvus collection and inserts the data
+    """
     # Argument parsing
     parser = argparse.ArgumentParser(
         description="Run a query using Milvus VectorDB with HuggingFace embeddings."

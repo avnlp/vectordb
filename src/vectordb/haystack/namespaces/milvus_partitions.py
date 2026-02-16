@@ -1,3 +1,9 @@
+"""Milvus partitions management script.
+
+This module provides functionality to manage partitions
+in Milvus vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 

@@ -1,3 +1,9 @@
+"""Semantic search script for Qdrant vector database.
+
+This module provides functionality to perform semantic search
+using Qdrant vector database with dense embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder
@@ -7,6 +13,14 @@ from vectordb import QdrantDocumentConverter
 
 
 def main():
+    """Perform semantic search using Qdrant vector database.
+
+    This function connects to Qdrant, generates embeddings for a query,
+    and retrieves top-k similar documents.
+
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(description="Qdrant Semantic Search Script")
 
     # Arguments for Qdrant configuration

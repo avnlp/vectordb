@@ -1,3 +1,9 @@
+"""Pinecone semantic search example with LangChain integration.
+
+This module demonstrates how to perform semantic search using Pinecone VectorDB
+with dense and sparse embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
@@ -7,6 +13,15 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run the Pinecone semantic search query.
+
+    This function:
+    - Parses command line arguments
+    - Initializes Pinecone VectorDB
+    - Generates dense and sparse query embeddings
+    - Queries Pinecone and retrieves results
+    - Converts and prints the results
+    """
     # Set up argument parser
     parser = argparse.ArgumentParser(
         description="Query a Pinecone index using dense and sparse embeddings."

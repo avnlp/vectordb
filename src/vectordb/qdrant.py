@@ -1,13 +1,24 @@
+"""Qdrant vector database interface.
+
+This module provides an interface for interacting with Qdrant vector databases,
+including collection management, vector upserts, and similarity search queries.
+"""
+
+import logging
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, PointStruct, ScoredPoint, VectorParams
 
 
+logger = logging.getLogger(__name__)
+
+
 class QdrantVectorDB:
     """Interface for interacting with Qdrant vector databases.
 
-    Provides functionalities for creating collections, inserting vectors, querying vectors, and deleting collections.
+    Provides functionalities for creating collections, inserting vectors,
+    querying vectors, and deleting collections.
     """
 
     def __init__(
@@ -21,12 +32,17 @@ class QdrantVectorDB:
         """Initialize the Qdrant client with the given parameters.
 
         Args:
-            host (str): Host address of the Qdrant server (default: "localhost").
+            host (str): Host address of the Qdrant server
+                (default: "localhost").
             port (int): Port number for the Qdrant server (default: 6333).
-            api_key (Optional[str]): API key for Qdrant (if using managed service).
-            collection_name (Optional[str]): Name of the Qdrant collection to use (optional).
-            timeout (Optional[float]): Timeout for client requests in seconds (default: 60.0).
-            retries (Optional[int]): Number of retries for failed requests (default: 3).
+            api_key (Optional[str]): API key for Qdrant
+                (if using managed service).
+            collection_name (Optional[str]): Name of the Qdrant collection
+                to use (optional).
+            timeout (Optional[float]): Timeout for client requests
+                in seconds (default: 60.0).
+            retries (Optional[int]): Number of retries for failed requests
+                (default: 3).
         """
         self.client = QdrantClient(
             host=host, port=port, api_key=api_key, timeout=timeout
@@ -38,7 +54,7 @@ class QdrantVectorDB:
         collection_name: str,
         vector_size: int,
         distance: str = "Cosine",
-    ):
+    ) -> None:
         """Create a Qdrant collection with the specified configuration.
 
         Args:
@@ -62,11 +78,13 @@ class QdrantVectorDB:
     def upsert_vectors(
         self,
         vectors: List[Dict[str, Any]],
-    ):
+    ) -> None:
         """Insert or update vectors in the specified Qdrant collection.
 
         Args:
-            vectors (List[Dict[str, Any]]): List of vectors to upsert, where each vector contains `id`, `vector`, and optional `payload`.
+            vectors (List[Dict[str, Any]]): List of vectors to upsert,
+                where each vector contains `id`, `vector`,
+                and optional `payload`.
         """
         if not self.collection_name:
             raise ValueError(
@@ -95,9 +113,12 @@ class QdrantVectorDB:
 
         Args:
             query_vector (List[float]): Query vector.
-            top_k (int): Number of nearest neighbors to return (default: 5).
-            query_filter (Optional[Filter]): Filter to apply to the query (default: None).
-            include_payload (bool): Whether to include payload in the query result (default: True).
+            top_k (int): Number of nearest neighbors to return
+                (default: 5).
+            query_filter (Optional[Filter]): Filter to apply to the query
+                (default: None).
+            include_payload (bool): Whether to include payload in the
+                query result (default: True).
 
         Returns:
             List[ScoredPoint]: List of points with their similarity scores.
@@ -117,7 +138,7 @@ class QdrantVectorDB:
         logger.info(f"Query returned {len(results)} results.")
         return results
 
-    def delete_collection(self):
+    def delete_collection(self) -> None:
         """Delete the current Qdrant collection."""
         if not self.collection_name:
             raise ValueError("No collection selected for deletion.")

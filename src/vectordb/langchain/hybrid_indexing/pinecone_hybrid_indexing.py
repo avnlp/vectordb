@@ -1,3 +1,9 @@
+"""Pinecone hybrid indexing example with LangChain integration.
+
+This module demonstrates how to perform hybrid (dense + sparse) indexing using Pinecone
+with HuggingFace embeddings and various datasets.
+"""
+
 import argparse
 
 from dataloaders import (
@@ -16,6 +22,15 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run the Pinecone hybrid indexing pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the data loader and generator
+    - Loads and processes the dataset
+    - Generates dense and sparse embeddings
+    - Creates a Pinecone index and upserts the data
+    """
     # Set up argparse
     parser = argparse.ArgumentParser(
         description="Hybrid embedding-based upsert to Pinecone VectorDB."

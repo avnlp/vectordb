@@ -1,13 +1,21 @@
+"""Milvus dense indexing example with LangChain integration.
+
+This module demonstrates how to perform dense indexing and retrieval
+using Milvus VectorDB.
+"""
+
 import argparse
 from ast import literal_eval
 
 from dataloaders import (
     ARCDataloader,
+    EdgarDataloader,
     FactScoreDataloader,
     PopQADataloader,
     TriviaQADataloader,
 )
 from dataloaders.llms import ChatGroqGenerator
+from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 
 from vectordb import MilvusVectorDB
 

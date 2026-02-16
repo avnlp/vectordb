@@ -1,3 +1,9 @@
+"""Semantic search script for Pinecone vector database.
+
+This module provides functionality to perform semantic search
+using Pinecone vector database with dense and sparse embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder
@@ -9,6 +15,14 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Perform semantic search using Pinecone vector database.
+
+    This function initializes Pinecone, generates dense and sparse embeddings
+    for a query, and retrieves top-k similar documents.
+
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(
         description="Perform semantic search using Pinecone with dense and sparse embeddings."
     )

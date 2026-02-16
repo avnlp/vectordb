@@ -1,3 +1,9 @@
+"""RAG pipeline implementation using Pinecone vector database.
+
+This module provides a Retrieval-Augmented Generation pipeline
+using Pinecone as the vector database with Haystack components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -13,6 +19,17 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main(args):
+    """Run RAG pipeline using Pinecone vector database.
+
+    This function initializes Pinecone, loads data, creates a RAG pipeline,
+    and answers questions using retrieved documents.
+
+    Args:
+        args: Command line arguments parsed by argparse.
+
+    Returns:
+        None
+    """
     # Initialize Pinecone Vector DB
     pinecone_vector_db = PineconeVectorDB(
         api_key=args.pinecone_api_key, index_name=args.index_name

@@ -1,3 +1,9 @@
+"""Weaviate collections management script.
+
+This module provides functionality to manage multiple collections
+in Weaviate vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 

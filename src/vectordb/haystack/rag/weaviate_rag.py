@@ -1,4 +1,11 @@
+"""RAG pipeline implementation using Weaviate vector database.
+
+This module provides a Retrieval-Augmented Generation pipeline
+using Weaviate as the vector database with Haystack components.
+"""
+
 import argparse
+from ast import literal_eval
 
 from dataloaders import TriviaQADataloader
 from dataloaders.llms import ChatGroqGenerator
@@ -13,6 +20,7 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
+    """Run RAG pipeline with Weaviate and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Weaviate and TriviaQA"
     )
@@ -75,6 +83,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Parse parameters
+    headers = literal_eval(args.headers) if args.headers else {}
+    weave_params = literal_eval(args.weave_params) if args.weave_params else {}
 
     # Initialize Weaviate VectorDB
     weaviate_vectordb = WeaviateVectorDB(

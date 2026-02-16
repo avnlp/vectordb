@@ -1,8 +1,15 @@
+"""Qdrant collections example with LangChain integration.
+
+This module demonstrates how to work with Qdrant collections for organizing
+and querying vector data across multiple collections.
+"""
+
 import argparse
 from ast import literal_eval
 
 from dataloaders import TriviaQADataloader
 from dataloaders.llms import ChatGroqGenerator
+from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from qdrant_client import QdrantClient
 
 from vectordb import QdrantDocumentConverter

@@ -1,3 +1,9 @@
+"""Milvus RAG pipeline example with LangChain integration.
+
+This module demonstrates how to build a Retrieval-Augmented Generation (RAG) pipeline
+using Milvus VectorDB and LangChain components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -17,6 +23,16 @@ from pymilvus import (
 
 
 def main():
+    """Run the Milvus RAG pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Connects to Milvus and creates/loads a collection
+    - Initializes the data loader and generator
+    - Loads the TriviaQA dataset
+    - Processes questions through the RAG pipeline
+    - Generates answers using retrieved context
+    """
     # Set up argparse
     parser = argparse.ArgumentParser(
         description="RAG pipeline for question answering using Milvus and ChatGroq."

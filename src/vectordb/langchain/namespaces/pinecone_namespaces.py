@@ -1,3 +1,9 @@
+"""Pinecone namespaces example with LangChain integration.
+
+This module demonstrates how to work with Pinecone namespaces for organizing
+and querying vector data across multiple data splits.
+"""
+
 import argparse
 
 from dataloaders.llms.groq import ChatGroqGenerator
@@ -10,6 +16,16 @@ from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
 def main():
+    """Run the Pinecone namespaces example.
+
+    This function:
+    - Parses command line arguments
+    - Loads data from two different splits
+    - Generates embeddings for each split
+    - Creates a Pinecone index
+    - Upserts data into separate namespaces
+    - Queries both namespaces and prints results
+    """
     # Set up argparse
     parser = argparse.ArgumentParser(
         description="Process multiple data splits and query Pinecone namespaces."

@@ -1,3 +1,9 @@
+"""Metadata filtering script for Qdrant vector database.
+
+This module provides functionality to query Qdrant vector database
+with metadata filtering using dense and sparse embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder

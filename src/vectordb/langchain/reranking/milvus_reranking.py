@@ -1,3 +1,9 @@
+"""Milvus reranking example with LangChain integration.
+
+This module demonstrates how to perform hybrid search with reranking using Milvus
+with various reranking strategies (Weighted and RRF).
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -6,6 +12,7 @@ from pymilvus import AnnSearchRequest, DataType, MilvusClient, RRFRanker, Weight
 
 
 def main():
+    """Perform hybrid search with reranking in Milvus."""
     parser = argparse.ArgumentParser(
         description="Hybrid Search in Milvus with Argparse"
     )

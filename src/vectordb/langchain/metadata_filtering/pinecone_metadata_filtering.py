@@ -1,3 +1,9 @@
+"""Pinecone metadata filtering example with LangChain integration.
+
+This module demonstrates how to perform metadata filtering queries using
+Pinecone VectorDB with dense and sparse embeddings.
+"""
+
 import argparse
 
 from haystack.components.embedders import SentenceTransformersTextEmbedder

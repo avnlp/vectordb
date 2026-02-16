@@ -1,3 +1,9 @@
+"""Qdrant semantic search example with LangChain integration.
+
+This module demonstrates how to perform semantic search using Qdrant VectorDB
+with dense and sparse embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
@@ -8,6 +14,15 @@ from vectordb import QdrantDocumentConverter
 
 
 def main():
+    """Run the Qdrant semantic search query.
+
+    This function:
+    - Parses command line arguments
+    - Initializes Qdrant client
+    - Generates dense and sparse query embeddings
+    - Performs semantic search on the collection
+    - Converts and prints the results
+    """
     parser = argparse.ArgumentParser(description="Qdrant Semantic Search Script")
 
     # Arguments for Qdrant configuration

@@ -1,3 +1,9 @@
+"""Qdrant metadata filtering example with LangChain integration.
+
+This module demonstrates how to perform metadata filtering queries using Qdrant VectorDB
+with HuggingFace embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings

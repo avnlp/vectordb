@@ -1,19 +1,25 @@
 """Weaviate Document Converter.
 
-This module provides utilities for preparing and converting documents between different formats
-for use in vector store operations with Weaviate. It includes methods for handling Haystack and LangChain
-document formats and for converting query results into Haystack documents.
+This module provides utilities for preparing and converting documents between
+different formats for use in vector store operations with Weaviate. It includes
+methods for handling Haystack and LangChain document formats and for converting
+query results into Haystack documents.
 
 Classes:
-    - WeaviateDocumentConverter: Contains static methods for preparing and transforming documents.
+    - WeaviateDocumentConverter: Contains static methods for preparing and
+      transforming documents.
 
 Methods:
-    - prepare_haystack_documents_for_upsert: Prepares Haystack Document objects for vector store upsertion.
-    - prepare_langchain_documents_for_upsert: Placeholder for preparing LangChain Document objects for upsertion.
-    - convert_query_results_to_haystack_documents: Converts query results into Haystack Document objects.
+    - prepare_haystack_documents_for_upsert: Prepares Haystack Document objects
+      for vector store upsertion.
+    - prepare_langchain_documents_for_upsert: Placeholder for preparing
+      LangChain Document objects for upsertion.
+    - convert_query_results_to_haystack_documents: Converts query results into
+      Haystack Document objects.
 
 Logging:
-    - Uses a centralized logging utility to provide detailed logs for all operations.
+    - Uses a centralized logging utility to provide detailed logs for all
+      operations.
 
 Exceptions:
     - Raises ValueError for invalid document inputs.
@@ -35,7 +41,7 @@ logger = logger_factory.get_logger()
 
 
 class WeaviateDocumentConverter:
-    """Utility class for preparing and converting documents for vector store operations."""
+    """Utility class for preparing and converting documents for vector store ops."""
 
     @staticmethod
     def prepare_haystack_documents_for_upsert(
@@ -43,16 +49,20 @@ class WeaviateDocumentConverter:
     ) -> list[dict[str, Any]]:
         """Convert Haystack documents to Pinecone upsert format.
 
-        This method takes a list of Haystack Document objects and prepares them for upsertion into a vector store.
-        It ensures that each document has an ID and embeddings, and formats the data accordingly for the vector store.
-        The method also handles sparse embeddings if they are present in the documents.
+        This method takes a list of Haystack Document objects and prepares them
+        for upsertion into a vector store. It ensures that each document has an
+        ID and embeddings, and formats the data accordingly for the vector store.
+        The method also handles sparse embeddings if they are present in the
+        documents.
 
         Args:
-            documents (List[HaystackDocument]): A list of Haystack Document objects, each containing embeddings,
-                                                sparse embeddings, and metadata.
+            documents (List[HaystackDocument]): A list of Haystack Document
+                objects, each containing embeddings, sparse embeddings, and
+                metadata.
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries formatted for vector store upsertion. Each dictionary includes:
+            List[Dict[str, Any]]: A list of dictionaries formatted for vector
+                store upsertion. Each dictionary includes:
                 - 'id': The document ID.
                 - 'vector': The dense embedding of the document.
                 - 'text': The document content.
@@ -102,14 +112,18 @@ class WeaviateDocumentConverter:
     ) -> list[dict[str, Any]]:
         """Convert LangChain documents to Pinecone upsert format.
 
-        This method takes a list of LangChain Document objects and prepares them for upsertion into a vector store.
+        This method takes a list of LangChain Document objects and prepares them
+        for upsertion into a vector store.
 
         Args:
-            documents (List[LangChainDocument]): A list of LangChain Document objects.
-            embeddings (List[List[float]]): A list of embeddings for each document.
+            documents (List[LangChainDocument]): A list of LangChain Document
+                objects.
+            embeddings (List[List[float]]): A list of embeddings for each
+                document.
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries formatted for vector store upsertion. Each dictionary includes:
+            List[Dict[str, Any]]: A list of dictionaries formatted for vector
+                store upsertion. Each dictionary includes:
                 - 'id': The document ID.
                 - 'vector': The dense embedding of the document.
                 - 'text': The document content.
@@ -152,10 +166,12 @@ class WeaviateDocumentConverter:
     ) -> list[HaystackDocument]:
         """Convert query results into a list of Haystack Document objects.
 
-        This method extracts relevant information from the query results and constructs Haystack Document objects.
+        This method extracts relevant information from the query results and
+        constructs Haystack Document objects.
 
         Args:
-            query_results (QueryReturn): Query results containing match information.
+            query_results (QueryReturn): Query results containing match
+                information.
 
         Returns:
             List[HaystackDocument]: A list of Haystack Document objects.
@@ -191,10 +207,12 @@ class WeaviateDocumentConverter:
     ) -> list[LangchainDocument]:
         """Convert query results into a list of LangChain Document objects.
 
-        This method extracts relevant information from the query results and constructs LangChain Document objects.
+        This method extracts relevant information from the query results and
+        constructs LangChain Document objects.
 
         Args:
-            query_results (QueryReturn): Query results containing match information.
+            query_results (QueryReturn): Query results containing match
+                information.
 
         Returns:
             List[LangChainDocument]: A list of LangChain Document objects.

@@ -1,8 +1,15 @@
+"""Hybrid indexing script for Milvus vector database.
+
+This module provides functionality to process data, generate sparse embeddings,
+and index them into a Milvus vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 
 from dataloaders import (
     ARCDataloader,
+    EdgarDataloader,
     FactScoreDataloader,
     PopQADataloader,
     TriviaQADataloader,
@@ -14,7 +21,7 @@ from vectordb import MilvusVectorDB
 
 
 def main():
-    """Process data, generate sparse embeddings, and index them into a Milvus vector database.
+    """Process data, generate sparse embeddings, and index them into Milvus.
 
     This script is designed to:
     - Load datasets using specified dataloaders.

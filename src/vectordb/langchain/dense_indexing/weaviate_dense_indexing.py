@@ -1,3 +1,9 @@
+"""Weaviate dense indexing example with LangChain integration.
+
+This module demonstrates how to perform dense indexing using Weaviate VectorDB
+with HuggingFace embeddings and various datasets.
+"""
+
 import argparse
 
 from dataloaders import (
@@ -14,6 +20,15 @@ from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
 def main():
+    """Run the Weaviate dense indexing pipeline.
+
+    This function:
+    - Parses command line arguments
+    - Initializes the data loader and generator
+    - Loads and processes the dataset
+    - Generates embeddings using HuggingFace embeddings
+    - Creates a Weaviate collection and upserts the data
+    """
     # Set up argument parser
     parser = argparse.ArgumentParser(
         description="Load data, generate embeddings, and upsert to Weaviate."

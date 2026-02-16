@@ -1,3 +1,9 @@
+"""Hybrid indexing script for Qdrant vector database.
+
+This module provides functionality to process data, generate embeddings,
+and index them into a Qdrant vector database using Haystack components.
+"""
+
 import argparse
 from ast import literal_eval
 

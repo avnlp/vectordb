@@ -1,3 +1,9 @@
+"""Semantic search script for Milvus vector database.
+
+This module provides functionality to perform semantic search
+using Milvus vector database with dense embeddings.
+"""
+
 import argparse
 
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -5,6 +11,14 @@ from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connec
 
 
 def main():
+    """Perform semantic search using Milvus vector database.
+
+    This function connects to Milvus, generates embeddings for a query,
+    and retrieves top-k similar documents.
+
+    Returns:
+        None
+    """
     parser = argparse.ArgumentParser(description="Milvus Semantic Search Script")
 
     # Arguments for Milvus configuration

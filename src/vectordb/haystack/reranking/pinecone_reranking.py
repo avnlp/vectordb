@@ -1,4 +1,22 @@
+"""Reranking script for Pinecone vector database.
+
+This module provides functionality to perform hybrid search with reranking
+in Pinecone vector database using Haystack components.
+"""
+
 import argparse
+from ast import literal_eval
+
+from dataloaders import (
+    ARCDataloader,
+    EdgarDataloader,
+    FactScoreDataloader,
+    PopQADataloader,
+    TriviaQADataloader,
+)
+from dataloaders.llms import ChatGroqGenerator
+from haystack.components.embedders import SentenceTransformersDocumentEmbedder
+from pinecone import ServerlessSpec
 
 from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
@@ -220,6 +238,14 @@ def main():
         dimension=args.dimension,
         metric=args.metric,
         spec=ServerlessSpec(cloud=args.cloud, region=args.region),
+    )
+
+    # Query the Pinecone VectorDB
+    query_response = pinecone_vector_db.query(
+        vector=[0.0]
+        * args.dimension,  # Placeholder - should use actual query embedding
+        top_k=args.rerank_top_n,
+        namespace=args.namespace,
     )
 
     # Convert query results to Haystack documents

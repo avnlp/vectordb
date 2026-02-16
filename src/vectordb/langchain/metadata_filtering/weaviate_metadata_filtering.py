@@ -1,3 +1,9 @@
+"""Weaviate metadata filtering example with LangChain integration.
+
+This module demonstrates how to perform metadata filtering queries using
+Weaviate VectorDB with HuggingFace embeddings.
+"""
+
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from weaviate.classes.query import Filter
 

@@ -1,3 +1,9 @@
+"""Qdrant hybrid indexing example with LangChain integration.
+
+This module demonstrates how to perform hybrid indexing and retrieval
+using Qdrant VectorDB.
+"""
+
 import argparse
 from ast import literal_eval
 

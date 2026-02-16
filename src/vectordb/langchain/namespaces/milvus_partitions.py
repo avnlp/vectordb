@@ -1,3 +1,9 @@
+"""Milvus partitions example with LangChain integration.
+
+This module demonstrates how to work with Milvus partitions for organizing
+and querying vector data.
+"""
+
 import argparse
 from ast import literal_eval
 

@@ -1,3 +1,9 @@
+"""Qdrant RAG pipeline example with LangChain integration.
+
+This module demonstrates how to build a Retrieval-Augmented Generation (RAG) pipeline
+using Qdrant VectorDB and LangChain components.
+"""
+
 import argparse
 
 from dataloaders import TriviaQADataloader
@@ -6,10 +12,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_qdrant.fastembed_sparse import FastEmbedSparse
+from pinecone import PineconeVectorDB
 from qdrant_client import QdrantClient
+
+from vectordb import PineconeDocumentConverter
 
 
 def main():
+    """Run RAG pipeline with Qdrant and TriviaQA."""
     parser = argparse.ArgumentParser(
         description="RAG pipeline with Qdrant and TriviaQA"
     )
@@ -72,14 +82,13 @@ def main():
     # Initialize Qdrant VectorDB
     QdrantClient(url=args.qdrant_host, api_key=args.qdrant_api_key)
 
-    # Initialize the generator
-    generator = ChatGroqGenerator(
-        model=args.generator_model,
-        api_key=args.generator_api_key,
-        llm_params=eval(args.generator_params),
+    # Initialize Pinecone VectorDB
+    pinecone_vector_db = PineconeVectorDB(
+        api_key=args.pinecone_api_key,
+        index_name=args.index_name,
     )
 
-    # Initialize generator
+    # Initialize the generator
     generator = ChatGroqGenerator(
         model=args.llm_model,
         api_key=args.llm_api_key,

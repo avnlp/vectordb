@@ -1,3 +1,9 @@
+"""Weaviate semantic search example with LangChain integration.
+
+This module demonstrates how to perform semantic search using Weaviate VectorDB
+with dense and sparse embeddings.
+"""
+
 import argparse
 
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
@@ -6,8 +12,8 @@ from langchain_qdrant.fastembed_sparse import FastEmbedSparse
 from vectordb import WeaviateDocumentConverter, WeaviateVectorDB
 
 
-# Argument parsing function
 def parse_args():
+    """Parse command line arguments for Weaviate semantic search."""
     parser = argparse.ArgumentParser(
         description="Run a query using Weaviate VectorDB and HuggingFace embeddings."
     )
@@ -53,8 +59,16 @@ def parse_args():
     return parser.parse_args()
 
 
-# Main function
 def main():
+    """Run the Weaviate semantic search query.
+
+    This function:
+    - Parses command line arguments
+    - Initializes Weaviate VectorDB
+    - Generates dense and sparse query embeddings
+    - Queries Weaviate and retrieves results
+    - Converts and prints the results
+    """
     # Parse arguments
     args = parse_args()
 
