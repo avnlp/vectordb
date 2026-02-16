@@ -5,7 +5,7 @@ from configuration and extracting queries for evaluation.
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest  # noqa: F401
 
@@ -522,10 +522,10 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = []
-            mock_loader.return_value = mock_instance
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = []
 
             queries = extract_queries_and_ground_truth(config)
 
@@ -540,19 +540,18 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = [
                 {
-                    "text": "Test question",
+                    "query": "What is X?",
+                    "answers": ["X"],
                     "metadata": {
-                        "question": "What is X?",
-                        "answer": "X",
                         "id": "test-1",
                     },
                 }
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
 
@@ -571,10 +570,10 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = []
-            mock_loader.return_value = mock_instance
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = []
 
             queries = extract_queries_and_ground_truth(config, limit=5)
 
@@ -589,32 +588,24 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            # EvaluationExtractor already handles deduplication, so we get single result
+            mock_extract.return_value = [
                 {
-                    "text": "Test",
+                    "query": "Same question?",
+                    "answers": ["Answer"],
                     "metadata": {
-                        "question": "Same question?",
-                        "answer": "Answer",
                         "id": "id1",
                     },
-                },
-                {
-                    "text": "Test",
-                    "metadata": {
-                        "question": "Same question?",
-                        "answer": "Answer",
-                        "id": "id2",
-                    },
-                },
+                }
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
 
-            # Should have deduplicated
-            assert len(queries) <= 2
+            # Should have deduplicated (EvaluationExtractor does this)
+            assert len(queries) == 1
 
     def test_extract_queries_empty_dataset(self) -> None:
         """Test extracting queries from empty dataset."""
@@ -625,10 +616,10 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = []
-            mock_loader.return_value = mock_instance
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = []
 
             queries = extract_queries_and_ground_truth(config)
 
@@ -644,16 +635,15 @@ class TestExtractQueriesAndGroundTruth:
         }
 
         with patch(
-            "vectordb.dataloaders.haystack.EarningsCallDataloader"
-        ) as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = [
                 {
-                    "question": "What was revenue?",
-                    "answer": "$100M",
+                    "query": "What was revenue?",
+                    "answers": ["$100M"],
+                    "metadata": {},
                 }
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
 
@@ -670,28 +660,26 @@ class TestExtractQueriesAndGroundTruth:
         }
 
         with patch(
-            "vectordb.dataloaders.haystack.EarningsCallDataloader"
-        ) as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            # EvaluationExtractor already deduplicates
+            mock_extract.return_value = [
                 {
-                    "question": "What was revenue?",
-                    "answer": "$100M",
+                    "query": "What was revenue?",
+                    "answers": ["$100M"],
+                    "metadata": {},
                 },
                 {
-                    "question": "What was profit?",
-                    "answer": "$50M",
-                },
-                {
-                    "question": "What was revenue?",  # Duplicate
-                    "answer": "$100M",
+                    "query": "What was profit?",
+                    "answers": ["$50M"],
+                    "metadata": {},
                 },
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
 
-            # Should have 2 unique queries (duplicate removed)
+            # Should have 2 unique queries
+            # (deduplication handled by EvaluationExtractor)
             assert len(queries) == 2
             assert queries[0]["query"] == "What was revenue?"
             assert queries[1]["query"] == "What was profit?"
@@ -706,19 +694,10 @@ class TestExtractQueriesAndGroundTruth:
         }
 
         with patch(
-            "vectordb.dataloaders.haystack.EarningsCallDataloader"
-        ) as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
-                {
-                    "question": "",  # Empty question
-                    "answer": "$100M",
-                },
-                {
-                    "answer": "$50M",  # Missing question field
-                },
-            ]
-            mock_loader.return_value = mock_instance
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            # EvaluationExtractor already filters out empty questions
+            mock_extract.return_value = []
 
             queries = extract_queries_and_ground_truth(config)
 
@@ -735,28 +714,26 @@ class TestExtractQueriesAndGroundTruth:
         }
 
         with patch(
-            "vectordb.dataloaders.haystack.EarningsCallDataloader"
-        ) as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
-                {"question": f"Question {i}", "answer": f"Answer {i}"}
-                for i in range(10)
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = [
+                {"query": f"Question {i}", "answers": [f"Answer {i}"], "metadata": {}}
+                for i in range(3)
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config, limit=3)
 
-            # Should respect the limit
+            # Should respect the limit (passed to EvaluationExtractor)
             assert len(queries) == 3
 
     def test_extract_queries_edge_case_empty_config(self) -> None:
         """Test query extraction with empty configuration."""
         config = {"dataloader": {"type": "arc"}}
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = []
-            mock_loader.return_value = mock_instance
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = []
 
             queries = extract_queries_and_ground_truth(config)
             assert queries == []
@@ -770,22 +747,11 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
-                {
-                    "text": "Test question",
-                    # Missing metadata
-                },
-                {
-                    "text": "Test question 2",
-                    "metadata": {
-                        # Missing question field
-                        "answer": "Answer",
-                    },
-                },
-            ]
-            mock_loader.return_value = mock_instance
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            # EvaluationExtractor filters out items with missing questions
+            mock_extract.return_value = []
 
             queries = extract_queries_and_ground_truth(config)
             # Should filter out items with missing metadata/question
@@ -800,19 +766,18 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = [
                 {
-                    "text": "Test",
+                    "query": "What is X? \n\t\r",  # Special chars
+                    "answers": ["X"],
                     "metadata": {
-                        "question": "What is X? \n\t\r",  # Special chars
-                        "answer": "X",
                         "id": "test-1",
                     },
                 }
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
             if queries:
@@ -828,19 +793,18 @@ class TestExtractQueriesAndGroundTruth:
             }
         }
 
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = [
                 {
-                    "text": "Test",
+                    "query": "What is 你好?",  # Unicode chars
+                    "answers": ["你好"],
                     "metadata": {
-                        "question": "What is 你好?",  # Unicode chars
-                        "answer": "你好",
                         "id": "test-1",
                     },
                 }
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
             if queries:
@@ -857,19 +821,18 @@ class TestExtractQueriesAndGroundTruth:
         }
 
         long_question = "A" * 10000  # Very long question
-        with patch("vectordb.dataloaders.haystack.ARCDataloader") as mock_loader:
-            mock_instance = MagicMock()
-            mock_instance.load_data.return_value = [
+        with patch(
+            "vectordb.dataloaders.evaluation.EvaluationExtractor.extract"
+        ) as mock_extract:
+            mock_extract.return_value = [
                 {
-                    "text": "Test",
+                    "query": long_question,
+                    "answers": ["Answer"],
                     "metadata": {
-                        "question": long_question,
-                        "answer": "Answer",
                         "id": "test-1",
                     },
                 }
             ]
-            mock_loader.return_value = mock_instance
 
             queries = extract_queries_and_ground_truth(config)
             if queries:

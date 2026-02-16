@@ -92,31 +92,33 @@ class EarningsCallDataloader:
         """Load and process the Earnings Call QA dataset.
 
         Processes QA pairs by extracting temporal information from the
-        quarter field (format: "YYYY-QN") and structuring the data for
-        query extraction.
+        quarter field (format: "YYYY-QN") and structuring the data in
+        standardized text/metadata format.
 
         Returns:
-            List of dicts with structure:
+            List of dicts with standardized structure:
             {
-                "question": "Financial question",
-                "answer": "Answer from transcript",
-                "date": "YYYY-MM-DD",
-                "context": "Transcript text",
-                "year": "2023",
-                "quarter": "Q4",
-                "ticker": "AAPL",
-                "year-quarter": "2023-Q4"
+                "text": "Transcript text",
+                "metadata": {
+                    "question": "Financial question",
+                    "answer": "Answer from transcript",
+                    "date": "YYYY-MM-DD",
+                    "year": "2023",
+                    "quarter": "Q4",
+                    "ticker": "AAPL",
+                    "year-quarter": "2023-Q4"
+                }
             }
         """
         # Lazy loading: only process if not already cached
         if self.data is None:
             logger.info("Loading and processing dataset.")
-            self.data = []
+            raw_data = []
             for row in self.dataset:
                 # Parse quarter format "YYYY-QN" into separate year and quarter
                 # This enables temporal filtering and aggregation queries
                 year, quarter = row["q"].split("-")
-                self.data.append(
+                raw_data.append(
                     {
                         "question": row["question"],
                         "answer": row["answer"],
@@ -128,7 +130,25 @@ class EarningsCallDataloader:
                         "year-quarter": row["q"],
                     }
                 )
-            logger.info(f"Processed {len(self.data)} rows.")
+            logger.info(f"Processed {len(raw_data)} rows.")
+
+            # Format into standardized text/metadata structure
+            # This ensures compliance with DataloaderProtocol used by factory.py
+            self.data = [
+                {
+                    "text": row["context"],
+                    "metadata": {
+                        "question": row["question"],
+                        "answer": row["answer"],
+                        "date": row["date"],
+                        "year": row["year"],
+                        "quarter": row["quarter"],
+                        "ticker": row["ticker"],
+                        "year-quarter": row["year-quarter"],
+                    },
+                }
+                for row in raw_data
+            ]
 
         return self.data
 

@@ -290,8 +290,8 @@ def extract_queries_and_ground_truth(
     """Extract queries and ground truth from a dataset for evaluation.
 
     Creates query-document pairs where each query maps to its
-    relevant document IDs for evaluation. Handles dataset-specific
-    variations in data structure.
+    relevant document IDs for evaluation. Leverages EvaluationExtractor
+    for consistent dataset handling.
 
     Args:
         config: Configuration dictionary with dataloader settings
@@ -309,61 +309,36 @@ def extract_queries_and_ground_truth(
         Earnings calls dataset returns empty relevant_doc_ids as it lacks
         explicit document ID mappings in its structure.
     """
-    dataloader = create_dataloader(config)
-    data = dataloader.load_data()
+    from vectordb.dataloaders.evaluation import EvaluationExtractor
 
-    # Dataset type determines how we extract queries and answers
-    dataloader_type = config.get("dataloader", {}).get("type", "").lower()
+    dataloader_config = config.get("dataloader", {})
+    dataset_type = dataloader_config.get("type", "").lower()
+    dataset_name = dataloader_config.get("dataset_name")
+    split = dataloader_config.get("split", "test")
 
+    # Use EvaluationExtractor for unified dataset handling
+    evaluation_data = EvaluationExtractor.extract(
+        dataset_type=dataset_type,
+        dataset_name=dataset_name,
+        split=split,
+        limit=limit,
+    )
+
+    # Transform evaluation format to include relevant_doc_ids
     queries: list[dict[str, Any]] = []
-    seen_questions: set[str] = set()
+    for item in evaluation_data:
+        # Get the first answer if multiple exist; handle empty answers list
+        answer = item["answers"][0] if item["answers"] else ""
 
-    if dataloader_type in {"triviaqa", "popqa", "factscore"}:
-        # These datasets have consistent question/answer/docs structure
-        for item in data:
-            question = item.get("metadata", {}).get("question", "")
-            if question and question not in seen_questions:
-                seen_questions.add(question)
-                queries.append(
-                    {
-                        "query": question,
-                        "answer": item.get("metadata", {}).get("answer", ""),
-                        "relevant_doc_ids": [item.get("metadata", {}).get("id", "")],
-                    }
-                )
-
-    elif dataloader_type == "arc":
-        # ARC has formatted questions with multiple choice context
-        for item in data:
-            question = item.get("metadata", {}).get("question", "")
-            if question and question not in seen_questions:
-                seen_questions.add(question)
-                queries.append(
-                    {
-                        "query": question,
-                        "answer": item.get("metadata", {}).get("answer", ""),
-                        "relevant_doc_ids": [item.get("metadata", {}).get("id", "")],
-                    }
-                )
-
-    elif dataloader_type == "earnings_calls":
-        # Earnings calls use different structure - load from QA dataset
-        dataloader_obj = create_dataloader(config)
-        qa_data = dataloader_obj.load_data()
-        for item in qa_data:
-            question = item.get("question", "")
-            if question and question not in seen_questions:
-                seen_questions.add(question)
-                queries.append(
-                    {
-                        "query": question,
-                        "answer": item.get("answer", ""),
-                        # No explicit doc IDs in this dataset structure
-                        "relevant_doc_ids": [],
-                    }
-                )
-
-    if limit:
-        queries = queries[:limit]
+        queries.append(
+            {
+                "query": item["query"],
+                "answer": answer,
+                # Extract doc ID from metadata if available, otherwise empty
+                "relevant_doc_ids": (
+                    [item["metadata"]["id"]] if "id" in item["metadata"] else []
+                ),
+            }
+        )
 
     return queries

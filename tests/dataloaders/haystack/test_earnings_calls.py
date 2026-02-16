@@ -183,14 +183,17 @@ class TestHaystackEarningsCallDataloaderLoadData:
 
             assert len(result) > 0
             item = result[0]
-            # Check that the expected fields are present in the result
-            assert "question" in item
-            assert "answer" in item
-            assert "date" in item
-            assert "context" in item
-            assert "year" in item
-            assert "quarter" in item
-            assert "ticker" in item
+            # Check standardized format: text and metadata
+            assert "text" in item
+            assert "metadata" in item
+            # Check metadata contains all expected fields
+            metadata = item["metadata"]
+            assert "question" in metadata
+            assert "answer" in metadata
+            assert "date" in metadata
+            assert "year" in metadata
+            assert "quarter" in metadata
+            assert "ticker" in metadata
 
     def test_earnings_call_load_data_preserves_question(
         self, haystack_earnings_calls_sample_rows, mock_recursive_document_splitter
@@ -253,8 +256,9 @@ class TestHaystackEarningsCallDataloaderLoadData:
 
             assert len(result) > 0
             item = result[0]
-            assert "question" in item
-            assert "What was the revenue?" in item["question"]
+            assert "metadata" in item
+            assert "question" in item["metadata"]
+            assert "What was the revenue?" in item["metadata"]["question"]
 
     def test_earnings_call_load_data_preserves_answer(
         self, haystack_earnings_calls_sample_rows, mock_recursive_document_splitter
@@ -317,8 +321,9 @@ class TestHaystackEarningsCallDataloaderLoadData:
 
             assert len(result) > 0
             item = result[0]
-            assert "answer" in item
-            assert "10 billion" in item["answer"]
+            assert "metadata" in item
+            assert "answer" in item["metadata"]
+            assert "10 billion" in item["metadata"]["answer"]
 
     def test_earnings_call_load_data_preserves_date_and_ticker(
         self, haystack_earnings_calls_sample_rows, mock_recursive_document_splitter
@@ -381,9 +386,12 @@ class TestHaystackEarningsCallDataloaderLoadData:
 
             assert len(result) > 0
             item = result[0]
-            assert "date" in item
-            assert "ticker" in item
-            assert "year-quarter" in item  # The q field is stored as year-quarter
+            assert "metadata" in item
+            assert "date" in item["metadata"]
+            assert "ticker" in item["metadata"]
+            assert (
+                "year-quarter" in item["metadata"]
+            )  # The q field is stored as year-quarter
 
     def test_earnings_call_load_data_caches_data(
         self, haystack_earnings_calls_sample_rows, mock_recursive_document_splitter
