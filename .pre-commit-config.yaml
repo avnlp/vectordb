@@ -78,4 +78,4 @@ ci:
   autofix_prs_limit: 5
   autoupdate_schedule: monthly
   autoupdate_commit_msg: "ci: Pre-commit autoupdate"
-  skip: [mypy, pytest]
+  skip: [mypy, pytest, uv-lock]
