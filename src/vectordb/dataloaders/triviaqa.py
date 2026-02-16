@@ -120,13 +120,13 @@ class TriviaQADataloader:
 
             for i in range(num_results):
                 # Prefer search_context over description when available
-                text_content = (
-                    search_results["search_context"][i]
-                    if i < len(search_results.get("search_context", []))
-                    else search_results["description"][i]
-                    if i < len(search_results.get("description", []))
-                    else ""
-                )
+                search_context = search_results.get("search_context", [])
+                description = search_results.get("description", [])
+                text_content = ""
+                if i < len(search_context):
+                    text_content = search_context[i]
+                elif i < len(description):
+                    text_content = description[i]
 
                 result.append(
                     {

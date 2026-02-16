@@ -58,7 +58,7 @@ class EvaluationExtractor:
     @classmethod
     def extract(
         cls,
-        dataset_type: str,
+        dataset_type: DatasetType,
         dataset_name: str | None = None,
         split: str = "test",
         limit: int | None = None,
