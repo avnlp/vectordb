@@ -161,7 +161,7 @@ class ChromaVectorDB(Model):
         Returns:
             None
         """
-        if not hasattr(self, "collection"):
+        if self.collection is None:
             msg = "No collection initialized. Use `create_collection` first."
             raise ValueError(msg)
 
@@ -198,7 +198,7 @@ class ChromaVectorDB(Model):
         Returns:
             Dict[str, Any]: A dictionary containing the query results.
         """
-        if not hasattr(self, "collection"):
+        if self.collection is None:
             msg = "No collection initialized. Use `create_collection` first."
             raise ValueError(msg)
 

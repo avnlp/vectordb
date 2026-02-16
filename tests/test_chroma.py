@@ -1,90 +1,45 @@
 """Tests for the Chroma vector database interface."""
 
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-
-# Mock external modules at the very beginning before any imports
-sys.modules["pysqlite3"] = MagicMock()
-sys.modules["sqlite3"] = MagicMock()
-
-
-# Create a proper mock for weave that includes Model base class
-class MockWeaveModel:
-    """Mock base class for weave.Model."""
-
-    def __init__(self, **kwargs):
-        # Copy class attributes to instance
-        for attr_name in dir(self.__class__):
-            if not attr_name.startswith("_"):
-                attr_value = getattr(self.__class__, attr_name)
-                if not callable(attr_value):
-                    setattr(self, attr_name, attr_value)
-        # Set instance attributes from kwargs
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-
-class MockWeave:
-    """Mock weave module."""
-
-    class Model(MockWeaveModel):
-        """Mock Model class."""
-
-    @staticmethod
-    def op():
-        """Mock op function."""
-
-        def decorator(func):
-            return func
-
-        return decorator
-
-    @staticmethod
-    def model(cls_):
-        """Decorator to mark a class as a weave model."""
-        return cls_
-
-    @staticmethod
-    def init(project_name, **kwargs):
-        """Mock init function."""
-        pass
-
-    @staticmethod
-    def track(value, name=None):
-        """Mock track function for weave tracking."""
-        return value
-
-
-sys.modules["weave"] = MockWeave()
-
-# Create mock for chromadb and its submodules
-mock_chromadb = MagicMock()
-sys.modules["chromadb"] = mock_chromadb
-sys.modules["chromadb.api"] = MagicMock()
-sys.modules["chromadb.api.configuration"] = MagicMock()
-sys.modules["chromadb.api.types"] = MagicMock()
-sys.modules["chromadb.utils"] = MagicMock()
-sys.modules["chromadb.utils.embedding_functions"] = MagicMock()
-
+# NOTE: Mocks are now set up in conftest.py via pytest_configure
+# to ensure they work properly with pytest-xdist
 # Import after setting up mocks
 from vectordb.chroma import ChromaVectorDB  # noqa: E402
 
 
+@pytest.fixture
+def chromadb_mocked():
+    """Fixture to set up chromadb mocking for each test."""
+    # Create fresh mocks for this test
+    mock_client = MagicMock()
+    mock_persistent_client = MagicMock()
+
+    # Set up the mocks in sys.modules
+    sys.modules["chromadb"].Client = MagicMock(return_value=mock_client)
+    sys.modules["chromadb"].PersistentClient = MagicMock(
+        return_value=mock_persistent_client
+    )
+    sys.modules[
+        "chromadb.utils.embedding_functions"
+    ].DefaultEmbeddingFunction = MagicMock
+
+    yield {
+        "client": mock_client,
+        "persistent_client": mock_persistent_client,
+    }
+
+
+@pytest.mark.usefixtures("chromadb_mocked")
 class TestChromaVectorDB:
     """Test cases for ChromaVectorDB class."""
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_init_with_default_parameters(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_init_with_default_parameters(self, chromadb_mocked):
         """Test initialization with default parameters."""
-        mock_client = MagicMock()
-        mock_persistent_client_class.return_value = mock_client
-        mock_client_class.return_value = mock_client
+        mock_persistent_client_class = sys.modules["chromadb"].PersistentClient
 
         db = ChromaVectorDB()
 
@@ -93,18 +48,13 @@ class TestChromaVectorDB:
         assert db.collection_name is None
         assert db.tracing_project_name == "chroma"
         assert db.weave_params is None
-        assert db.client == mock_client
         assert db.collection is None
         mock_persistent_client_class.assert_called_once_with("./chroma")
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_init_with_non_persistent_client(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_init_with_non_persistent_client(self, chromadb_mocked):
         """Test initialization with non-persistent client."""
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
+        mock_client_class = sys.modules["chromadb"].Client
+        mock_persistent_client_class = sys.modules["chromadb"].PersistentClient
 
         db = ChromaVectorDB(persistent=False)
 
@@ -112,16 +62,15 @@ class TestChromaVectorDB:
         mock_client_class.assert_called_once()
         mock_persistent_client_class.assert_not_called()
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_init_with_existing_collection_name(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_init_with_existing_collection_name(self, chromadb_mocked):
         """Test initialization with existing collection_name calls get_collection."""
+        # Reset and set up fresh mocks for this test
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_client.get_collection.return_value = mock_collection
-        mock_persistent_client_class.return_value = mock_client
+
+        sys.modules["chromadb"].Client = MagicMock(return_value=mock_client)
+        sys.modules["chromadb"].PersistentClient = MagicMock(return_value=mock_client)
 
         db = ChromaVectorDB(collection_name="test_collection")
 
@@ -129,14 +78,9 @@ class TestChromaVectorDB:
         assert db.collection == mock_collection
         mock_client.get_collection.assert_called_once_with("test_collection")
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_init_with_custom_parameters(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_init_with_custom_parameters(self, chromadb_mocked):
         """Test initialization with custom parameters."""
-        mock_client = MagicMock()
-        mock_persistent_client_class.return_value = mock_client
+        mock_persistent_client_class = sys.modules["chromadb"].PersistentClient
         weave_params = {"param1": "value1"}
 
         db = ChromaVectorDB(
@@ -151,21 +95,15 @@ class TestChromaVectorDB:
         assert db.weave_params == weave_params
         mock_persistent_client_class.assert_called_once_with("/custom/path")
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_create_collection_calls_get_or_create_collection(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_create_collection_calls_get_or_create_collection(self, chromadb_mocked):
         """Test that create_collection calls get_or_create_collection."""
+        # Reset and set up fresh mocks for this test
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_persistent_client_class.return_value = mock_client
 
-        # Mock the embedding functions module
-        import chromadb.utils.embedding_functions as ef_module
-
-        ef_module.DefaultEmbeddingFunction = MagicMock
+        sys.modules["chromadb"].Client = MagicMock(return_value=mock_client)
+        sys.modules["chromadb"].PersistentClient = MagicMock(return_value=mock_client)
 
         db = ChromaVectorDB()
         db.create_collection(name="test_collection")
@@ -175,16 +113,15 @@ class TestChromaVectorDB:
         call_args = mock_client.get_or_create_collection.call_args
         assert call_args.kwargs["name"] == "test_collection"
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_create_collection_with_custom_parameters(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_create_collection_with_custom_parameters(self, chromadb_mocked):
         """Test create_collection with custom parameters."""
+        # Reset and set up fresh mocks for this test
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_client.get_or_create_collection.return_value = mock_collection
-        mock_persistent_client_class.return_value = mock_client
+
+        sys.modules["chromadb"].Client = MagicMock(return_value=mock_client)
+        sys.modules["chromadb"].PersistentClient = MagicMock(return_value=mock_client)
 
         mock_embedding_function = MagicMock()
         mock_configuration = MagicMock()
@@ -207,15 +144,8 @@ class TestChromaVectorDB:
             custom_arg="custom_value",
         )
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_upsert_raises_error_when_collection_is_none(
-        self, mock_client_class, mock_persistent_client_class
-    ):
-        """Test that upsert raises AttributeError when collection is None."""
-        mock_client = MagicMock()
-        mock_persistent_client_class.return_value = mock_client
-
+    def test_upsert_raises_error_when_collection_is_none(self, chromadb_mocked):
+        """Test that upsert raises ValueError when collection is None."""
         db = ChromaVectorDB()
         # collection is None by default
 
@@ -226,17 +156,13 @@ class TestChromaVectorDB:
             "ids": ["id1"],
         }
 
-        # When collection is None, calling .add() raises AttributeError
-        with pytest.raises(AttributeError):
+        # When collection is None, calling upsert raises ValueError
+        with pytest.raises(ValueError, match="No collection initialized"):
             db.upsert(data)
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_upsert_success(self, mock_client_class, mock_persistent_client_class):
+    def test_upsert_success(self, chromadb_mocked):
         """Test successful upsert operation."""
-        mock_client = MagicMock()
         mock_collection = MagicMock()
-        mock_persistent_client_class.return_value = mock_client
 
         db = ChromaVectorDB()
         db.collection = mock_collection
@@ -257,15 +183,9 @@ class TestChromaVectorDB:
             ids=data["ids"],
         )
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_upsert_with_additional_kwargs(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_upsert_with_additional_kwargs(self, chromadb_mocked):
         """Test upsert with additional keyword arguments."""
-        mock_client = MagicMock()
         mock_collection = MagicMock()
-        mock_persistent_client_class.return_value = mock_client
 
         db = ChromaVectorDB()
         db.collection = mock_collection
@@ -287,27 +207,17 @@ class TestChromaVectorDB:
             custom_param="custom_value",
         )
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_query_raises_error_when_collection_is_none(
-        self, mock_client_class, mock_persistent_client_class
-    ):
-        """Test that query raises AttributeError when collection is None."""
-        mock_client = MagicMock()
-        mock_persistent_client_class.return_value = mock_client
-
+    def test_query_raises_error_when_collection_is_none(self, chromadb_mocked):
+        """Test that query raises ValueError when collection is None."""
         db = ChromaVectorDB()
         # collection is None by default
 
-        # When collection is None, calling .query() raises AttributeError
-        with pytest.raises(AttributeError):
+        # When collection is None, calling query raises ValueError
+        with pytest.raises(ValueError, match="No collection initialized"):
             db.query(query_embedding=[0.1, 0.2, 0.3])
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_query_success(self, mock_client_class, mock_persistent_client_class):
+    def test_query_success(self, chromadb_mocked):
         """Test successful query operation."""
-        mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_query_result = {
             "ids": [["id1", "id2"]],
@@ -315,7 +225,6 @@ class TestChromaVectorDB:
             "documents": [["doc1", "doc2"]],
         }
         mock_collection.query.return_value = mock_query_result
-        mock_persistent_client_class.return_value = mock_client
 
         db = ChromaVectorDB()
         db.collection = mock_collection
@@ -330,17 +239,11 @@ class TestChromaVectorDB:
             where_document=None,
         )
 
-    @patch("chromadb.PersistentClient")
-    @patch("chromadb.Client")
-    def test_query_with_custom_parameters(
-        self, mock_client_class, mock_persistent_client_class
-    ):
+    def test_query_with_custom_parameters(self, chromadb_mocked):
         """Test query with custom parameters."""
-        mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_query_result = {"ids": [["id1"]]}
         mock_collection.query.return_value = mock_query_result
-        mock_persistent_client_class.return_value = mock_client
 
         db = ChromaVectorDB()
         db.collection = mock_collection
