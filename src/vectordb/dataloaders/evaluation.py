@@ -40,7 +40,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from vectordb.dataloaders.loaders import DatasetRegistry
+from vectordb.dataloaders.loaders import DatasetRegistry, DatasetType
 
 
 class EvaluationExtractor:

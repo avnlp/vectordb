@@ -43,6 +43,7 @@ def mock_hf_dataset():
     mock.__iter__ = MagicMock(return_value=iter([]))
     return mock
 
+
 @pytest.fixture
 def arc_sample_rows():
     """Create sample ARC (AI2 Reasoning Challenge) rows for testing.
