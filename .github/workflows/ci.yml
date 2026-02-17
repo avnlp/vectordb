@@ -24,81 +24,86 @@ env:
   FORCE_COLOR: "1"
 
 jobs:
-  lint:
-    name: Lint & Format Check
+  test:
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v5
         with:
-          version: "0.9.26"
+          python-version: ${{ matrix.python-version }}
+
+      - uses: astral-sh/setup-uv@v7
+        with:
           enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version-file: ".python-version"
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: make sync
 
-      - name: Run lint checks
-        run: make lint-check
+      - name: Lint & type check
+        if: matrix.python-version == '3.11'
+        run: |
+          make lint-check
+          make lint-typing
 
-  type-check:
-    name: Type Checking (mypy)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+      - name: Run tests with coverage
+        if: matrix.python-version == '3.11'
+        run: make test-ci
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Run tests
+        if: matrix.python-version != '3.11'
+        run: make test
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v5
         with:
-          fetch-depth: 1
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-vectordb
+          fail_ci_if_error: false
+          verbose: true
+          slug: avnlp/vectordb
+        env:
+          OS: ubuntu-latest
+          PYTHON: ${{ matrix.python-version }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - name: Upload test results
+        if: matrix.python-version == '3.11' && always()
+        uses: actions/upload-artifact@v4
         with:
-          version: "0.9.26"
-          enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version-file: ".python-version"
-
-      - name: Install dependencies
-        run: make sync
-
-      - name: Run mypy
-        run: make lint-typing
+          name: pytest-results-${{ matrix.python-version }}
+          path: pytest-results.xml
+          retention-days: 30
 
   security-scan:
     name: Security Scanning
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v7
         with:
-          version: "0.9.26"
           enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version-file: ".python-version"
 
@@ -129,66 +134,4 @@ jobs:
         with:
           name: bandit-security-report
           path: bandit-report.json
-          retention-days: 30
-
-  test:
-    name: Test (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          version: "0.9.26"
-          enable-cache: true
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: make sync
-
-      - name: Run tests with coverage
-        if: matrix.python-version == '3.11'
-        run: make test-ci
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
-
-      - name: Run tests
-        if: matrix.python-version != '3.11'
-        run: make test
-
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-vectordb
-          fail_ci_if_error: false
-          verbose: true
-          slug: avnlp/vectordb
-        env:
-          OS: ubuntu-latest
-          PYTHON: ${{ matrix.python-version }}
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-results-${{ matrix.python-version }}
-          path: pytest-results.xml
           retention-days: 30
