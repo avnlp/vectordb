@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from vectordb.dataloaders.base import BaseDatasetLoader
 from vectordb.dataloaders.datasets.arc import ARCLoader
@@ -50,8 +50,10 @@ class DataloaderCatalog:
             raise UnsupportedDatasetError(f"Unsupported dataset: {name}")
 
         loader_cls = cls._REGISTRY[name]
-        kwargs = {"dataset_name": dataset_id} if dataset_id is not None else {}
-        return loader_cls(split=split, limit=limit, **kwargs)
+        kwargs: dict[str, Any] = {"split": split, "limit": limit}
+        if dataset_id is not None:
+            kwargs["dataset_name"] = dataset_id
+        return loader_cls(**kwargs)
 
     @classmethod
     def supported_datasets(cls) -> tuple[DatasetType, ...]:
