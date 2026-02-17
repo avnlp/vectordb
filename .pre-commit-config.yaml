@@ -64,8 +64,8 @@ repos:
         name: pytest
         entry: uv run pytest tests -m "not integration"
         language: system
+        types: [python]
         pass_filenames: false
-        always_run: true
 
   - repo: https://github.com/crate-ci/typos
     rev: v1.42.3

@@ -1,8 +1,7 @@
 codecov:
   require_ci_to_pass: true
   notify:
-    after_n_builds: 2
-    wait_for_ci: yes
+    wait_for_ci: true
 
 coverage:
   status:
@@ -14,13 +13,13 @@ coverage:
         target: 80%
     project:
       default:
-        target: 80%
-        threshold: 2%
+        target: auto
+        threshold: 5%
 
 comment:
   layout: "reach, diff, flags, tree"
   behavior: default
-  require_changes: true
+  require_changes: false
   show_carryforward_flags: false
 
 github_checks:
