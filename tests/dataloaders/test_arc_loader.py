@@ -1,224 +1,173 @@
-"""Tests for ARC dataset loader.
+"""Unit tests for ARC loader."""
 
-This module tests the ARCDataloader class which loads the
-AI2 Reasoning Challenge dataset.
-"""
+from unittest.mock import patch
 
-from unittest.mock import MagicMock, patch
+from vectordb.dataloaders.base import BaseDatasetLoader
+from vectordb.dataloaders.dataset import LoadedDataset
+from vectordb.dataloaders.datasets.arc import ARCLoader
+from vectordb.dataloaders.types import DatasetValidationError
 
-from vectordb.dataloaders.arc import ARCDataloader
 
+class TestARCLoaderInitialization:
+    """Tests for ARC loader initialization."""
 
-class TestARCDataloaderInitialization:
-    """Test suite for ARCDataloader initialization.
-
-    Tests cover:
-    - Default configuration
-    - Custom configuration
-    - Parameter handling
-    """
-
-    def test_arc_dataloader_init_defaults(self) -> None:
-        """Test ARC dataloader with default parameters."""
-        loader = ARCDataloader()
+    def test_defaults(self) -> None:
+        """Test that ARCLoader initializes with correct default values."""
+        loader = ARCLoader()
 
         assert loader.dataset_name == "ai2_arc"
         assert loader.config == "ARC-Challenge"
         assert loader.split == "validation"
         assert loader.limit is None
+        assert loader.streaming is True
 
-    def test_arc_dataloader_init_custom_split(self) -> None:
-        """Test ARC dataloader with custom split."""
-        loader = ARCDataloader(split="test")
-
-        assert loader.split == "test"
-
-    def test_arc_dataloader_init_custom_dataset_name(self) -> None:
-        """Test ARC dataloader with custom dataset name."""
-        loader = ARCDataloader(dataset_name="custom_arc")
-
-        assert loader.dataset_name == "custom_arc"
-
-    def test_arc_dataloader_init_with_limit(self) -> None:
-        """Test ARC dataloader with limit."""
-        loader = ARCDataloader(limit=100)
-
-        assert loader.limit == 100
-
-    def test_arc_dataloader_init_all_params(self) -> None:
-        """Test ARC dataloader with all custom parameters."""
-        loader = ARCDataloader(
-            dataset_name="custom",
+    def test_custom_values(self) -> None:
+        """Test that ARCLoader accepts and stores custom initialization values."""
+        loader = ARCLoader(
+            dataset_name="custom_arc",
             config="ARC-Easy",
-            split="validation",
-            limit=50,
+            split="test",
+            limit=10,
+            streaming=False,
         )
 
-        assert loader.dataset_name == "custom"
+        assert loader.dataset_name == "custom_arc"
         assert loader.config == "ARC-Easy"
-        assert loader.split == "validation"
-        assert loader.limit == 50
+        assert loader.split == "test"
+        assert loader.limit == 10
+        assert loader.streaming is False
+
+    def test_rejects_empty_split(self) -> None:
+        """Test that ARCLoader raises DatasetValidationError for empty split."""
+        try:
+            ARCLoader(split="")
+        except DatasetValidationError:
+            assert True
+        else:
+            raise AssertionError
+
+    def test_rejects_negative_limit(self) -> None:
+        """Test that ARCLoader raises DatasetValidationError for negative limit."""
+        try:
+            ARCLoader(limit=-1)
+        except DatasetValidationError:
+            assert True
+        else:
+            raise AssertionError
 
 
-class TestARCDataloaderLoad:
-    """Test suite for ARC dataset loading.
+class TestARCLoaderLoad:
+    """Tests for ARC loader load behavior."""
 
-    Tests cover:
-    - Loading ARC dataset
-    - Data format and structure
-    - Metadata preservation
-    - Question formatting
-    - Limit handling
-    """
-
-    def test_arc_load_returns_list(self, arc_sample_rows) -> None:
-        """Test that load returns a list."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert isinstance(result, list)
-
-    def test_arc_load_correct_data_structure(self, arc_sample_rows) -> None:
-        """Test that loaded data has correct structure."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert len(result) > 0
-            assert "text" in result[0]
-            assert "metadata" in result[0]
-
-    def test_arc_load_preserves_question(self, arc_sample_rows) -> None:
-        """Test that question is preserved in metadata."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result[0]["metadata"]["question"] == "What is the capital of France?"
-
-    def test_arc_load_preserves_answer_key(self, arc_sample_rows) -> None:
-        """Test that answer key is preserved."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result[0]["metadata"]["answer_key"] == "A"
-
-    def test_arc_load_preserves_id(self, arc_sample_rows) -> None:
-        """Test that question ID is preserved."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result[0]["metadata"]["id"] == "arc_1"
-
-    def test_arc_load_formats_question_with_choices(self, arc_sample_rows) -> None:
-        """Test that question is formatted with choices."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            # Text should include question and choices
-            assert "What is the capital of France?" in result[0]["text"]
-            assert "Choices:" in result[0]["text"]
-            assert "A)" in result[0]["text"]
-
-    def test_arc_load_respects_limit(self, arc_sample_rows) -> None:
-        """Test that limit parameter is respected."""
-        loader = ARCDataloader(limit=1)
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert len(result) == 1
-
-    def test_arc_load_empty_dataset(self) -> None:
-        """Test loading empty ARC dataset."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter([]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result == []
-
-    def test_arc_load_multiple_rows(self, arc_sample_rows) -> None:
-        """Test loading multiple rows."""
-        loader = ARCDataloader()
-
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert len(result) == len(arc_sample_rows)
-
-    def test_arc_load_dataset_name_passed_to_load_dataset(
-        self, arc_sample_rows
+    def test_load_returns_loaded_dataset(
+        self, arc_sample_rows, make_streaming_dataset
     ) -> None:
-        """Test that dataset name is passed to load_dataset."""
-        loader = ARCDataloader(dataset_name="custom_arc")
+        """Test that load() returns a LoadedDataset instance."""
+        loader = ARCLoader()
 
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(arc_sample_rows)
+            dataset = loader.load()
 
+        assert isinstance(dataset, LoadedDataset)
+
+    def test_load_records_shape(self, arc_sample_rows, make_streaming_dataset) -> None:
+        """Test that loaded records have correct structure with text and metadata."""
+        loader = ARCLoader()
+
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(arc_sample_rows[:1])
+            dataset = loader.load()
+
+        record = dataset.records()[0]
+        assert record.text
+        assert "question" in record.metadata
+        assert "answers" in record.metadata
+
+    def test_load_formats_choices(
+        self, arc_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that answer choices are formatted in the record text."""
+        loader = ARCLoader()
+
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(arc_sample_rows[:1])
+            dataset = loader.load()
+
+        record = dataset.records()[0]
+        assert "Choices:" in record.text
+        assert "A)" in record.text
+
+    def test_load_maps_answer_key(
+        self, arc_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that answer key is correctly mapped to the answer text in metadata."""
+        loader = ARCLoader()
+
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(arc_sample_rows[:1])
+            dataset = loader.load()
+
+        record = dataset.records()[0]
+        assert record.metadata["answers"] == ["Paris"]
+
+    def test_load_respects_limit(self, arc_sample_rows, make_streaming_dataset) -> None:
+        """Test that load() respects the limit parameter."""
+        loader = ARCLoader(limit=1)
+
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(arc_sample_rows)
+            dataset = loader.load()
+
+        assert len(dataset.records()) == 1
+
+    def test_load_empty_dataset(self, make_streaming_dataset) -> None:
+        """Test that load() handles empty datasets correctly."""
+        loader = ARCLoader()
+
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset([])
+            dataset = loader.load()
+
+        assert dataset.records() == []
+
+    def test_load_streaming_enabled(
+        self, arc_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that load() passes streaming=True to the dataset loader."""
+        loader = ARCLoader()
+
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(arc_sample_rows[:1])
             loader.load()
 
-            mock_load.assert_called_once()
-            call_args = mock_load.call_args
-            assert "custom_arc" in call_args[0] or "custom_arc" in str(call_args)
+        mock_load.assert_called_once_with(
+            "ai2_arc",
+            "ARC-Challenge",
+            split="validation",
+            streaming=True,
+        )
 
-    def test_arc_load_config_passed_to_load_dataset(self, arc_sample_rows) -> None:
-        """Test that config is passed to load_dataset."""
-        loader = ARCDataloader(config="ARC-Easy")
 
-        with patch("vectordb.dataloaders.arc.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(arc_sample_rows[:1]))
-            mock_load.return_value = mock_dataset
+class TestARCLoaderEdgeCases:
+    """Tests for ARC loader edge cases."""
 
-            loader.load()
+    def test_load_invalid_answer_key(
+        self, arc_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that load() raises DatasetValidationError for invalid answer keys."""
+        loader = ARCLoader()
+        broken_rows = [dict(arc_sample_rows[0], answerKey="Z")]
 
-            mock_load.assert_called_once()
+        with patch("vectordb.dataloaders.datasets.arc.hf_load_dataset") as mock_load:
+            mock_load.return_value = make_streaming_dataset(broken_rows)
+            try:
+                loader.load()
+            except DatasetValidationError:
+                assert True
+            else:
+                raise AssertionError
+
+    def test_loader_is_base_subclass(self) -> None:
+        """Test that ARCLoader is a subclass of BaseDatasetLoader."""
+        assert issubclass(ARCLoader, BaseDatasetLoader)

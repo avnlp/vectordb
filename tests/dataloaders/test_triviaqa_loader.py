@@ -1,264 +1,142 @@
-"""Tests for TriviaQA dataset loader.
+"""Unit tests for TriviaQA loader."""
 
-This module tests the TriviaQADataloader class which loads the
-TriviaQA open-domain question answering dataset.
-"""
+from unittest.mock import patch
 
-from unittest.mock import MagicMock, patch
-
-from vectordb.dataloaders.triviaqa import TriviaQADataloader
+from vectordb.dataloaders.dataset import LoadedDataset
+from vectordb.dataloaders.datasets.triviaqa import TriviaQALoader
 
 
-class TestTriviaQADataloaderInitialization:
-    """Test suite for TriviaQADataloader initialization.
+class TestTriviaQALoaderInitialization:
+    """Tests for TriviaQA loader initialization."""
 
-    Tests cover:
-    - Default configuration
-    - Custom configuration
-    - Parameter handling
-    """
-
-    def test_triviaqa_dataloader_init_defaults(self) -> None:
-        """Test TriviaQA dataloader with default parameters."""
-        loader = TriviaQADataloader()
+    def test_defaults(self) -> None:
+        """Test that loader uses correct default values for all parameters."""
+        loader = TriviaQALoader()
 
         assert loader.dataset_name == "trivia_qa"
         assert loader.config == "rc"
         assert loader.split == "test"
         assert loader.limit is None
+        assert loader.streaming is True
 
-    def test_triviaqa_dataloader_init_custom_split(self) -> None:
-        """Test TriviaQA dataloader with custom split."""
-        loader = TriviaQADataloader(split="validation")
-
-        assert loader.split == "validation"
-
-    def test_triviaqa_dataloader_init_custom_dataset_name(self) -> None:
-        """Test TriviaQA dataloader with custom dataset name."""
-        loader = TriviaQADataloader(dataset_name="custom_trivia")
-
-        assert loader.dataset_name == "custom_trivia"
-
-    def test_triviaqa_dataloader_init_with_limit(self) -> None:
-        """Test TriviaQA dataloader with limit."""
-        loader = TriviaQADataloader(limit=100)
-
-        assert loader.limit == 100
-
-    def test_triviaqa_dataloader_init_all_params(self) -> None:
-        """Test TriviaQA dataloader with all custom parameters."""
-        loader = TriviaQADataloader(
+    def test_custom_values(self) -> None:
+        """Test that loader correctly applies custom parameter values."""
+        loader = TriviaQALoader(
             dataset_name="custom",
-            config="custom_config",
-            split="validation",
-            limit=50,
+            config="unfiltered",
+            split="train",
+            limit=5,
+            streaming=False,
         )
 
         assert loader.dataset_name == "custom"
-        assert loader.config == "custom_config"
-        assert loader.split == "validation"
-        assert loader.limit == 50
+        assert loader.config == "unfiltered"
+        assert loader.split == "train"
+        assert loader.limit == 5
+        assert loader.streaming is False
 
 
-class TestTriviaQADataloaderLoad:
-    """Test suite for TriviaQA dataset loading.
+class TestTriviaQALoaderLoad:
+    """Tests for TriviaQA loader load behavior."""
 
-    Tests cover:
-    - Loading TriviaQA dataset
-    - Data format and structure
-    - Metadata preservation
-    - Handling search results
-    - Limit handling
-    """
-
-    def test_triviaqa_load_returns_list(self, triviaqa_sample_rows) -> None:
-        """Test that load returns a list."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(triviaqa_sample_rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert isinstance(result, list)
-
-    def test_triviaqa_load_correct_data_structure(self, triviaqa_sample_rows) -> None:
-        """Test that loaded data has correct structure."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert len(result) > 0
-            assert "text" in result[0]
-            assert "metadata" in result[0]
-
-    def test_triviaqa_load_preserves_question(self, triviaqa_sample_rows) -> None:
-        """Test that question is preserved in metadata."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result[0]["metadata"]["question"] == "What is the capital of France?"
-
-    def test_triviaqa_load_preserves_answer(self, triviaqa_sample_rows) -> None:
-        """Test that answer is preserved in metadata."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result[0]["metadata"]["answer"] == "Paris"
-
-    def test_triviaqa_load_includes_search_context(self, triviaqa_sample_rows) -> None:
-        """Test that search context is included in text."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert "Paris is the capital of France." in result[0]["text"]
-
-    def test_triviaqa_load_preserves_rank(self, triviaqa_sample_rows) -> None:
-        """Test that search rank is preserved."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert "rank" in result[0]["metadata"]
-            assert result[0]["metadata"]["rank"] == 1
-
-    def test_triviaqa_load_handles_multiple_search_results(
-        self, triviaqa_sample_rows
+    def test_load_returns_loaded_dataset(
+        self, triviaqa_sample_rows, make_streaming_dataset
     ) -> None:
-        """Test that multiple search results are handled correctly."""
-        loader = TriviaQADataloader()
+        """Test that load() returns a LoadedDataset instance."""
+        loader = TriviaQALoader()
 
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(triviaqa_sample_rows))
-            mock_load.return_value = mock_dataset
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(triviaqa_sample_rows)
+            dataset = loader.load()
 
-            result = loader.load()
+        assert isinstance(dataset, LoadedDataset)
 
-            # First row has 2 search results, second has 1 = 3 total
-            assert len(result) == 3
+    def test_row_expansion(self, triviaqa_sample_rows, make_streaming_dataset) -> None:
+        """Test that each TriviaQA row expands to one record per answer source."""
+        loader = TriviaQALoader()
 
-    def test_triviaqa_load_respects_limit_across_questions(
-        self, triviaqa_sample_rows
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(triviaqa_sample_rows[:1])
+            dataset = loader.load()
+
+        assert len(dataset.records()) == 2
+
+    def test_context_precedence(
+        self, triviaqa_sample_rows, make_streaming_dataset
     ) -> None:
-        """Test that limit respects total items across all questions."""
-        loader = TriviaQADataloader(limit=1)
+        """Test that context field takes precedence over description when present."""
+        loader = TriviaQALoader()
 
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(triviaqa_sample_rows))
-            mock_load.return_value = mock_dataset
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(triviaqa_sample_rows[:1])
+            dataset = loader.load()
 
-            result = loader.load()
+        record = dataset.records()[0]
+        assert record.text == "Paris is the capital of France."
 
-            assert len(result) == 1
+    def test_description_fallback(
+        self, triviaqa_edge_missing_context, make_streaming_dataset
+    ) -> None:
+        """Test that description is used as fallback when context is missing."""
+        loader = TriviaQALoader()
 
-    def test_triviaqa_load_empty_dataset(self) -> None:
-        """Test loading empty TriviaQA dataset."""
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter([]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result == []
-
-    def test_triviaqa_load_missing_search_context(self) -> None:
-        """Test handling of missing search context."""
-        rows = [
-            {
-                "question": "Test?",
-                "answer": "Answer",
-                "search_results": {
-                    "rank": [1],
-                    "title": ["Title"],
-                    "search_context": [],
-                    "description": ["Description"],
-                },
-            }
-        ]
-
-        loader = TriviaQADataloader()
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            # Should fall back to description
-            assert len(result) > 0
-
-    def test_triviaqa_load_dataset_name_passed(self, triviaqa_sample_rows) -> None:
-        """Test that dataset name is passed to load_dataset."""
-        loader = TriviaQADataloader(dataset_name="custom_trivia")
-
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(
+                triviaqa_edge_missing_context
             )
-            mock_load.return_value = mock_dataset
+            dataset = loader.load()
 
-            loader.load()
+        record = dataset.records()[0]
+        assert record.text == "Fallback description"
 
-            mock_load.assert_called_once()
+    def test_rank_and_title_bounds(
+        self, triviaqa_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that rank and title are correctly extracted from answer sources."""
+        loader = TriviaQALoader()
 
-    def test_triviaqa_load_config_passed(self, triviaqa_sample_rows) -> None:
-        """Test that config is passed to load_dataset."""
-        loader = TriviaQADataloader(config="wikipedia")
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(triviaqa_sample_rows[:1])
+            dataset = loader.load()
 
-        with patch("vectordb.dataloaders.triviaqa.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(triviaqa_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
+        record = dataset.records()[1]
+        assert record.metadata["rank"] == 2
+        assert record.metadata["title"] == "Paris (Texas)"
 
-            loader.load()
+    def test_record_limit(self, triviaqa_sample_rows, make_streaming_dataset) -> None:
+        """Test that the limit parameter restricts the number of records returned."""
+        loader = TriviaQALoader(limit=1)
 
-            mock_load.assert_called_once()
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(triviaqa_sample_rows[:1])
+            dataset = loader.load()
+
+        assert len(dataset.records()) == 1
+
+
+class TestTriviaQALoaderEdgeCases:
+    """Tests for TriviaQA loader edge cases."""
+
+    def test_empty_dataset(self, make_streaming_dataset) -> None:
+        """Test that loader handles empty datasets gracefully."""
+        loader = TriviaQALoader()
+
+        with patch(
+            "vectordb.dataloaders.datasets.triviaqa.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset([])
+            dataset = loader.load()
+
+        assert dataset.records() == []

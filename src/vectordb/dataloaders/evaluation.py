@@ -1,147 +1,93 @@
-"""Evaluation data extraction utilities.
-
-This module provides tools for extracting query-answer pairs from datasets
-in a format suitable for RAG evaluation pipelines. The EvaluationExtractor
-handles the variations in how different datasets store questions and answers,
-providing a unified interface for evaluation.
-
-Design Rationale:
-    Different datasets use varying field names for questions ("question", "entity")
-    and answers ("answers", "answer", "possible_answers"). This module abstracts
-    these differences to provide consistent evaluation data.
-
-Supported Dataset Formats:
-    - TriviaQA: Uses "question" and "answers" (list of aliases)
-    - ARC: Uses "question" and "answer" (single correct choice)
-    - PopQA: Uses "question" and "possible_answers"
-    - FactScore: Uses "entity" as question proxy and facts as answers
-    - Earnings Calls: Uses "question" and "answer"
-
-Deduplication Strategy:
-    The extractor maintains a seen_questions set to avoid duplicate queries
-    in the evaluation set. This is important because some datasets may have
-    multiple documents per question, and we want unique queries for evaluation.
-
-Usage Patterns:
-    Direct extraction for evaluation:
-        >>> from vectordb.dataloaders import EvaluationExtractor
-        >>> queries = EvaluationExtractor.extract("triviaqa", split="test", limit=100)
-        >>> for q in queries:
-        ...     print(q["query"], q["answers"])
-
-    Integration with evaluation frameworks:
-        >>> queries = EvaluationExtractor.extract("popqa", limit=50)
-        >>> for query_data in queries:
-        ...     response = rag_pipeline.run(query_data["query"])
-        ...     score = evaluate_answer(response, query_data["answers"])
-"""
+"""Evaluation query extraction for normalized datasets."""
 
 from __future__ import annotations
 
-from typing import Any
-
-from vectordb.dataloaders.loaders import DatasetRegistry, DatasetType
+from vectordb.dataloaders.types import DatasetRecord, EvaluationQuery
 
 
 class EvaluationExtractor:
-    """Extracts query-answer pairs for evaluation pipelines.
+    """Extract deduplicated evaluation queries from normalized records."""
 
-    This utility class provides a standardized way to extract evaluation data
-    from various datasets. It handles field name variations and answer format
-    differences across datasets.
-
-    The extractor performs deduplication to ensure each query appears only
-    once in the evaluation set, even if the dataset contains multiple
-    documents per question.
-    """
-
-    @classmethod
+    @staticmethod
     def extract(
-        cls,
-        dataset_type: DatasetType,
-        dataset_name: str | None = None,
-        split: str = "test",
+        records: list[DatasetRecord],
         limit: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Extract queries and ground truth answers from a dataset.
+    ) -> list[EvaluationQuery]:
+        """Extract queries and answers for evaluation.
 
-        Loads the specified dataset and extracts query-answer pairs suitable
-        for RAG evaluation. Handles variations in field naming across
-        different datasets.
+        Iterates through dataset records and deduplicates queries by
+        normalizing whitespace and case, ensuring that evaluation metrics
+        are computed on unique queries. This prevents inflated metrics when
+        the same question appears multiple times in a dataset (e.g., with
+        different evidence documents in TriviaQA).
 
         Args:
-            dataset_type: Dataset type identifier (e.g., "triviaqa", "arc",
-                "popqa", "factscore", "earnings_calls")
-            dataset_name: HuggingFace dataset ID (optional, uses defaults
-                if not provided)
-            split: Dataset split to load (default: "test")
-            limit: Maximum number of queries to return (None for all)
+            records: Normalized dataset records.
+            limit: Optional limit applied after deduplication.
 
         Returns:
-            List of dicts with structure:
-            {
-                "query": str,  # The question text
-                "answers": list[str],  # Ground truth answers (always a list)
-                "metadata": dict  # Additional fields excluding query/answer
-            }
-
-        Raises:
-            ValueError: If dataset_type is not supported by DatasetRegistry
-
-        Example:
-            >>> queries = EvaluationExtractor.extract("triviaqa", limit=10)
-            >>> queries[0].keys()
-            dict_keys(['query', 'answers', 'metadata'])
+            List of evaluation queries deduplicated by query text.
         """
-        data = DatasetRegistry.load(
-            dataset_type,  # type: ignore[arg-type]
-            dataset_name=dataset_name,
-            split=split,
-        )
+        seen_queries: set[str] = set()
+        results: list[EvaluationQuery] = []
 
-        # Track seen questions to avoid duplicates in evaluation set
-        # Some datasets have multiple documents per question
-        seen_questions: set[str] = set()
-        result: list[dict[str, Any]] = []
-
-        for item in data:
-            meta = item["metadata"]
-
-            # Extract question text - different datasets use different field names
-            # Priority: "question" field, then "entity" (used by FactScore)
-            question = meta.get("question") or meta.get("entity")
-            if question is None or question in seen_questions:
-                # Skip if no question found or already processed
+        for record in records:
+            metadata = record.metadata
+            # Attempt to extract query from either "question" or "entity" field
+            # depending on the dataset format (e.g., PopQA uses entity).
+            raw_query = metadata.get("question") or metadata.get("entity")
+            if not raw_query:
                 continue
 
-            seen_questions.add(question)
+            # Normalize query by collapsing whitespace and converting to lowercase
+            # to enforce deterministic deduplication. Different question phrasings
+            # with identical meaning will be deduplicated as a single query.
+            normalized_query = " ".join(str(raw_query).split()).casefold()
+            if not normalized_query or normalized_query in seen_queries:
+                continue
 
-            # Extract answers - normalize to list format
-            # Priority: "answers" (list), then "answer" (single value)
-            answers = meta.get("answers") or meta.get("answer")
+            seen_queries.add(normalized_query)
+            # Extract answers, which may be stored under either "answers" (list)
+            # or "answer" (string) depending on the dataset schema.
+            answers = metadata.get("answers")
             if answers is None:
-                answers = []
-            # Normalize single answers to list for consistent evaluation interface
-            if isinstance(answers, str):
-                answers = [answers]
+                answers = metadata.get("answer")
 
-            # Build result with query, answers, and filtered metadata
-            result.append(
-                {
-                    "query": question,
-                    "answers": answers,
-                    "metadata": {
-                        # Include all metadata except query/answer fields
-                        # to avoid redundancy while preserving context
-                        k: v
-                        for k, v in meta.items()
-                        if k not in ("question", "answers", "entity", "answer")
-                    },
-                }
+            # Normalize answers to a consistent list format, filtering empty values.
+            normalized_answers: list[str] = []
+            if isinstance(answers, list):
+                normalized_answers = [
+                    value.strip()
+                    for value in answers
+                    if isinstance(value, str) and value.strip()
+                ]
+            elif isinstance(answers, str) and answers.strip():
+                normalized_answers = [answers.strip()]
+
+            # Extract document IDs when available for relevance evaluation.
+            # Some datasets (e.g., TriviaQA) track which documents are relevant.
+            relevant_doc_ids: list[str] = []
+            if "id" in metadata and metadata["id"] is not None:
+                relevant_doc_ids.append(str(metadata["id"]))
+
+            # Retain dataset-specific metadata while removing the fields
+            # that have been extracted and normalized into query/answers.
+            filtered_metadata = {
+                key: value
+                for key, value in metadata.items()
+                if key not in {"question", "answers", "answer", "entity"}
+            }
+
+            results.append(
+                EvaluationQuery(
+                    query=str(raw_query),
+                    answers=normalized_answers,
+                    relevant_doc_ids=relevant_doc_ids,
+                    metadata=filtered_metadata,
+                )
             )
 
-            # Early termination when limit is reached
-            if limit is not None and len(result) >= limit:
+            if limit is not None and len(results) >= limit:
                 break
 
-        return result
+        return results

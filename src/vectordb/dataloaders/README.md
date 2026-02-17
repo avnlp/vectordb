@@ -1,57 +1,57 @@
 # Dataloaders
 
-This module provides a unified system for loading, preprocessing, and converting datasets into formats suitable for vector database indexing and retrieval evaluation. The architecture follows a three-tier design: base loaders handle framework-agnostic data acquisition and normalization, framework-specific loaders extend them with Haystack or LangChain document types and text splitting, and shared infrastructure provides registry-based discovery, document conversion, and evaluation support.
-
-All loaders produce a standardized output format consisting of text and metadata dictionaries, regardless of the source dataset. This normalization ensures that any dataset can be used interchangeably across any supported vector database and framework combination.
+Dataset loaders for loading, normalizing, and converting HuggingFace datasets into framework-specific document formats for indexing and evaluation across the VectorDB toolkit.
 
 ## Overview
 
-- Five built-in dataset loaders covering open-domain QA, science reasoning, factoid QA, fact verification, and financial transcript analysis
-- Three-tier architecture: base loaders, framework-specific loaders, and shared infrastructure
-- Registry pattern for unified dataset discovery and instantiation
-- Optional LLM-based answer summarization during preprocessing
-- Recursive text splitting tuned to each framework's chunking components
-- Ground truth extraction for retrieval evaluation
-- Standardized output format of text and metadata dictionaries across all datasets
+This module provides a unified interface for loading five evaluation datasets from HuggingFace Hub. Each dataset loader normalizes raw rows into a common `DatasetRecord` format, which can then be converted to Haystack or LangChain documents for consumption by downstream pipelines. The module also extracts deduplicated evaluation queries from loaded records, enabling retrieval benchmarking without coupling to any specific framework or database.
 
-## Supported Datasets
-
-| Dataset | Domain | Description |
-|---------|--------|-------------|
-| TriviaQA | Open-domain QA | Trivia questions with supporting evidence documents |
-| ARC | Science reasoning | AI2 Reasoning Challenge science exam questions |
-| PopQA | Entity-centric factoid QA | Factoid questions about popular entities |
-| FactScore | Fact verification | Claims paired with supporting or refuting evidence |
-| Earnings Calls | Financial transcript QA | Question answering over corporate earnings call transcripts |
+- Abstract base class defining the dataset loading contract with validation, streaming, and record limiting
+- Five dataset-specific loaders, each handling schema differences and row expansion
+- Catalog-based factory for creating loaders by name without importing concrete classes
+- Bidirectional document converters producing Haystack and LangChain document objects
+- Evaluation query extraction with normalization and deduplication
 
 ## How It Works
 
-The loading pipeline proceeds through several stages. First, a base loader fetches raw data from the source dataset and normalizes it into text and metadata pairs. Optionally, an LLM generator can be injected to produce summarized answers during this stage, which is useful for datasets where raw answers need condensation. Next, the text is split into smaller chunks using recursive splitting strategies appropriate to the target framework. Finally, the chunks are wrapped in framework-specific document objects that are directly compatible with the corresponding indexing pipelines.
+All dataset loaders extend `BaseDatasetLoader`, which enforces a two-step contract: first load the raw dataset iterable from HuggingFace, then parse each row into one or more normalized `DatasetRecord` instances. The base class handles record limiting, error wrapping, and validation, while subclasses implement the dataset-specific parsing logic.
 
-The registry module provides a single entry point for discovering and instantiating any supported dataset loader by name. The factory module handles dependency injection of LLM generators and other configurable components. The evaluation module extracts ground truth query-answer pairs from loaded datasets to support retrieval metric computation.
+The `DataloaderCatalog` provides a factory interface for creating loaders by dataset name, removing the need to import individual loader classes. Once loaded, a `LoadedDataset` wrapper exposes conversion methods (`to_haystack()`, `to_langchain()`) and evaluation query extraction (`evaluation_queries()`), allowing pipelines to consume data in whatever format they require.
+
+The `EvaluationExtractor` scans loaded records for question or entity fields, normalizes and deduplicates them, and pairs each with its ground-truth answers and relevant document IDs. This produces a clean set of `EvaluationQuery` objects for retrieval benchmarking.
+
+## Supported Datasets
+
+| Dataset | Loader Class | HuggingFace ID | Default Split | Description |
+|---------|-------------|----------------|---------------|-------------|
+| TriviaQA | `TriviaQALoader` | `trivia_qa` | `test` | Question-answering with evidence documents; rows expand into multiple records |
+| ARC | `ARCLoader` | `ai2_arc` | `validation` | AI2 Reasoning Challenge with multiple-choice science questions |
+| PopQA | `PopQALoader` | `akariasai/PopQA` | `test` | Entity-centric factual questions from Wikipedia |
+| FactScore | `FactScoreLoader` | `dskar/FActScore` | `test` | Fact verification with entity-level knowledge passages |
+| EarningsCall | `EarningsCallsLoader` | `lamini/earnings-calls-qa` | `train` | Financial earnings call transcripts with question-answer pairs |
 
 ## Directory Structure
 
 ```
 dataloaders/
-    __init__.py            # Package exports
-    triviaqa.py            # Base loader for TriviaQA dataset
-    arc.py                 # Base loader for ARC dataset
-    popqa.py               # Base loader for PopQA dataset
-    factscore.py           # Base loader for FactScore dataset
-    earnings_calls.py      # Base loader for Earnings Calls dataset
-    loaders.py             # Registry pattern for unified dataset discovery and loading
-    converters.py          # Document conversion to Haystack or LangChain format
-    evaluation.py          # Ground truth query-answer pair extraction
-    prompts.py             # LLM prompts for answer summarization
-    factory.py             # Factory for creating framework-specific loaders with injected generators
-    utils.py               # Helper utilities for data preprocessing
-    haystack/              # Haystack-specific dataset loaders
-    langchain/             # LangChain-specific dataset loaders
+    __init__.py              # Package exports for all loaders, types, and exceptions
+    base.py                  # Abstract base class defining the dataset loading contract
+    catalog.py               # Factory for creating loaders by dataset name
+    converters.py            # Bidirectional converters to Haystack and LangChain documents
+    dataset.py               # LoadedDataset wrapper with conversion and evaluation methods
+    evaluation.py            # Deduplicated evaluation query extraction from records
+    types.py                 # Shared types (DatasetRecord, EvaluationQuery) and exceptions
+    datasets/
+        __init__.py
+        triviaqa.py          # TriviaQA loader with row-to-multi-record expansion
+        arc.py               # ARC Challenge loader with multiple-choice parsing
+        popqa.py             # PopQA loader with entity-centric normalization
+        factscore.py         # FactScore loader with knowledge passage extraction
+        earnings_calls.py    # Earnings call loader with transcript Q&A parsing
 ```
 
 ## Related Modules
 
-- [haystack/](haystack/) - Haystack-specific loaders that extend the base loaders
-- [langchain/](langchain/) - LangChain-specific loaders that extend the base loaders
-- [utils/](../utils/) - Shared configuration and evaluation utilities consumed by loaders
+- [`utils/`](../utils/) - Shared core utilities for configuration loading, document conversion, and logging
+- [`haystack/`](../haystack/) - Haystack integration pipelines that consume `to_haystack()` output
+- [`langchain/`](../langchain/) - LangChain integration pipelines that consume `to_langchain()` output

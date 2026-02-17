@@ -1,216 +1,132 @@
-"""Tests for FactScore dataset loader.
+"""Unit tests for FactScore loader."""
 
-This module tests the FactScoreDataloader class which loads the
-FactScore fact verification dataset.
-"""
+from unittest.mock import patch
 
-from unittest.mock import MagicMock, patch
-
-from vectordb.dataloaders.factscore import FactScoreDataloader
+from vectordb.dataloaders.dataset import LoadedDataset
+from vectordb.dataloaders.datasets.factscore import FactScoreLoader
 
 
-class TestFactScoreDataloaderInitialization:
-    """Test suite for FactScoreDataloader initialization.
+class TestFactScoreLoaderInitialization:
+    """Tests for FactScore loader initialization."""
 
-    Tests cover:
-    - Default configuration
-    - Custom configuration
-    - Parameter handling
-    """
-
-    def test_factscore_dataloader_init_defaults(self) -> None:
-        """Test FactScore dataloader with default parameters."""
-        loader = FactScoreDataloader()
+    def test_defaults(self) -> None:
+        """Test that FactScoreLoader initializes with correct default values."""
+        loader = FactScoreLoader()
 
         assert loader.dataset_name == "dskar/FActScore"
         assert loader.split == "test"
+        assert loader.limit is None
+        assert loader.streaming is True
 
-    def test_factscore_dataloader_init_custom_split(self) -> None:
-        """Test FactScore dataloader with custom split."""
-        loader = FactScoreDataloader(split="validation")
-
-        assert loader.split == "validation"
-
-    def test_factscore_dataloader_init_custom_dataset_name(self) -> None:
-        """Test FactScore dataloader with custom dataset name."""
-        loader = FactScoreDataloader(dataset_name="custom_factscore")
-
-        assert loader.dataset_name == "custom_factscore"
-
-    def test_factscore_dataloader_init_with_limit(self) -> None:
-        """Test FactScore dataloader with limit."""
-        loader = FactScoreDataloader(limit=50)
-
-        assert loader.limit == 50
-
-    def test_factscore_dataloader_init_all_params(self) -> None:
-        """Test FactScore dataloader with all custom parameters."""
-        loader = FactScoreDataloader(
-            dataset_name="custom",
-            split="validation",
-            limit=50,
-        )
+    def test_custom_values(self) -> None:
+        """Test that FactScoreLoader accepts and stores custom initialization values."""
+        loader = FactScoreLoader(dataset_name="custom", split="validation", limit=1)
 
         assert loader.dataset_name == "custom"
         assert loader.split == "validation"
-        assert loader.limit == 50
+        assert loader.limit == 1
 
 
-class TestFactScoreDataloaderLoad:
-    """Test suite for FactScore dataset loading.
+class TestFactScoreLoaderLoad:
+    """Tests for FactScore loader load behavior."""
 
-    Tests cover:
-    - Loading FactScore dataset
-    - Data format and structure
-    - Metadata preservation
-    - Fact decomposition handling
-    - Limit handling
-    """
+    def test_load_returns_loaded_dataset(
+        self, factscore_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that load() returns a LoadedDataset instance."""
+        loader = FactScoreLoader()
 
-    def test_factscore_load_returns_list(self, factscore_sample_rows) -> None:
-        """Test that load returns a list."""
-        loader = FactScoreDataloader()
+        with patch(
+            "vectordb.dataloaders.datasets.factscore.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(factscore_sample_rows)
+            dataset = loader.load()
 
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(factscore_sample_rows))
-            mock_load.return_value = mock_dataset
+        assert isinstance(dataset, LoadedDataset)
 
-            result = loader.load()
+    def test_wikipedia_text_mapping(
+        self, factscore_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that Wikipedia text is correctly mapped to record text field."""
+        loader = FactScoreLoader()
 
-            assert isinstance(result, list)
+        with patch(
+            "vectordb.dataloaders.datasets.factscore.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(factscore_sample_rows)
+            dataset = loader.load()
 
-    def test_factscore_load_correct_data_structure(self, factscore_sample_rows) -> None:
-        """Test that loaded data has correct structure."""
-        loader = FactScoreDataloader()
+        record = dataset.records()[0]
+        assert record.text == "Albert Einstein was a German-born physicist."
 
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(factscore_sample_rows[:1])
+    def test_topic_entity_mapping(
+        self, factscore_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that topic and entity are correctly mapped to metadata fields."""
+        loader = FactScoreLoader()
+
+        with patch(
+            "vectordb.dataloaders.datasets.factscore.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(factscore_sample_rows)
+            dataset = loader.load()
+
+        record = dataset.records()[0]
+        assert record.metadata["question"] == "Albert Einstein"
+        assert record.metadata["entity"] == "Albert Einstein"
+
+    def test_answers_fallback(
+        self, factscore_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that answers metadata field is populated from available data."""
+        loader = FactScoreLoader()
+
+        with patch(
+            "vectordb.dataloaders.datasets.factscore.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(factscore_sample_rows)
+            dataset = loader.load()
+
+        record = dataset.records()[0]
+        assert "Einstein was born in Germany" in record.metadata["answers"]
+
+    def test_defaults_for_optional(
+        self, factscore_edge_missing_optional, make_streaming_dataset
+    ) -> None:
+        """Test optional fields default to safe values when missing."""
+        loader = FactScoreLoader()
+
+        with patch(
+            "vectordb.dataloaders.datasets.factscore.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(
+                factscore_edge_missing_optional
             )
-            mock_load.return_value = mock_dataset
+            dataset = loader.load()
 
-            result = loader.load()
+        record = dataset.records()[0]
+        assert record.metadata["topic"] == "Ada Lovelace"
+        assert record.metadata["facts"] == []
+        assert record.metadata["decomposed_facts"] == []
 
-            assert len(result) > 0
-            assert "text" in result[0]
-            assert "metadata" in result[0]
 
-    def test_factscore_load_preserves_topic(self, factscore_sample_rows) -> None:
-        """Test that topic is preserved in metadata."""
-        loader = FactScoreDataloader()
+class TestFactScoreLoaderEdgeCases:
+    """Tests for FactScore loader edge cases."""
 
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(factscore_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
+    def test_load_streaming_enabled(
+        self, factscore_sample_rows, make_streaming_dataset
+    ) -> None:
+        """Test that streaming mode is enabled when loading the dataset."""
+        loader = FactScoreLoader()
 
-            result = loader.load()
-
-            assert result[0]["metadata"]["topic"] == "Albert Einstein"
-
-    def test_factscore_load_preserves_id(self, factscore_sample_rows) -> None:
-        """Test that ID is preserved."""
-        loader = FactScoreDataloader()
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(factscore_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result[0]["metadata"]["id"] == "fact_1"
-
-    def test_factscore_load_preserves_facts(self, factscore_sample_rows) -> None:
-        """Test that facts are preserved."""
-        loader = FactScoreDataloader()
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(factscore_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert "facts" in result[0]["metadata"]
-            assert len(result[0]["metadata"]["facts"]) > 0
-
-    def test_factscore_load_includes_fact_text(self, factscore_sample_rows) -> None:
-        """Test that fact text is included."""
-        loader = FactScoreDataloader()
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(factscore_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            # Text should include the fact content
-            assert (
-                "Einstein" in result[0]["text"] or "fact" in result[0]["text"].lower()
-            )
-
-    def test_factscore_load_respects_limit(self, factscore_sample_rows) -> None:
-        """Test that limit parameter is respected."""
-        loader = FactScoreDataloader(limit=1)
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(factscore_sample_rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert len(result) <= 1
-
-    def test_factscore_load_empty_dataset(self) -> None:
-        """Test loading empty FactScore dataset."""
-        loader = FactScoreDataloader()
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter([]))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert result == []
-
-    def test_factscore_load_multiple_rows(self, factscore_sample_rows) -> None:
-        """Test loading multiple rows."""
-        loader = FactScoreDataloader()
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(return_value=iter(factscore_sample_rows))
-            mock_load.return_value = mock_dataset
-
-            result = loader.load()
-
-            assert len(result) >= len(factscore_sample_rows)
-
-    def test_factscore_load_dataset_name_passed(self, factscore_sample_rows) -> None:
-        """Test that dataset name is passed to load_dataset."""
-        loader = FactScoreDataloader(dataset_name="custom_factscore")
-
-        with patch("vectordb.dataloaders.factscore.hf_load_dataset") as mock_load:
-            mock_dataset = MagicMock()
-            mock_dataset.__iter__ = MagicMock(
-                return_value=iter(factscore_sample_rows[:1])
-            )
-            mock_load.return_value = mock_dataset
-
+        with patch(
+            "vectordb.dataloaders.datasets.factscore.hf_load_dataset"
+        ) as mock_load:
+            mock_load.return_value = make_streaming_dataset(factscore_sample_rows)
             loader.load()
 
-            mock_load.assert_called_once()
+        mock_load.assert_called_once_with(
+            "dskar/FActScore",
+            split="test",
+            streaming=True,
+        )
