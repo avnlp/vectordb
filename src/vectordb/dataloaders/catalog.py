@@ -50,10 +50,10 @@ class DataloaderCatalog:
             raise UnsupportedDatasetError(f"Unsupported dataset: {name}")
 
         loader_cls = cls._REGISTRY[name]
-        dataset_name = dataset_id if dataset_id is not None else name
-        return loader_cls(dataset_name=dataset_name, split=split, limit=limit)
+        kwargs = {"dataset_name": dataset_id} if dataset_id is not None else {}
+        return loader_cls(split=split, limit=limit, **kwargs)
 
     @classmethod
     def supported_datasets(cls) -> tuple[DatasetType, ...]:
         """Return supported dataset identifiers."""
-        return ("triviaqa", "arc", "popqa", "factscore", "earnings_calls")
+        return tuple(cls._REGISTRY.keys())

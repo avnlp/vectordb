@@ -28,7 +28,7 @@ The `EvaluationExtractor` scans loaded records for question or entity fields, no
 | ARC | `ARCLoader` | `ai2_arc` | `validation` | AI2 Reasoning Challenge with multiple-choice science questions |
 | PopQA | `PopQALoader` | `akariasai/PopQA` | `test` | Entity-centric factual questions from Wikipedia |
 | FactScore | `FactScoreLoader` | `dskar/FActScore` | `test` | Fact verification with entity-level knowledge passages |
-| EarningsCall | `EarningsCallsLoader` | `lamini/earnings-calls-qa` | `train` | Financial earnings call transcripts with question-answer pairs |
+| Earnings Calls | `EarningsCallsLoader` | `lamini/earnings-calls-qa` | `train` | Financial earnings call transcripts with question-answer pairs |
 
 ## Directory Structure
 
