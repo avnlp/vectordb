@@ -153,7 +153,7 @@ class QdrantSemanticIndexingPipeline:
         recreate = self.config.get("qdrant", {}).get("recreate", False)
         self.db.create_collection(
             collection_name=self.collection_name,
-            vectors_size=self.dimension,
+            dimension=self.dimension,
             recreate=recreate,
         )
 

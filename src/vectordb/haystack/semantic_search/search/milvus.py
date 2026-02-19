@@ -163,7 +163,7 @@ class MilvusSemanticSearchPipeline:
             query_embedding=query_embedding,
             top_k=top_k * 2,
             collection_name=self.collection_name,
-            filter_expr=self._build_milvus_filter(filters) if filters else None,
+            filter_expr=self.db.build_filter_expression(filters) if filters else None,
         )
         logger.info("Retrieved %d documents", len(documents))
 
