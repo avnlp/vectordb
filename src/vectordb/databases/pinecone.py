@@ -1,7 +1,7 @@
-"""Pinecone Vector Database implementation for Haystack pipelines.
+"""Pinecone vector database wrapper for Haystack and LangChain integrations.
 
 This module provides a production-ready interface for Pinecone Cloud and Serverless,
-integrating seamlessly with Haystack Document stores and retrieval pipelines.
+integrating with Haystack and LangChain retrieval pipelines.
 
 Architecture:
     - Lazy client initialization to support configuration-based setups

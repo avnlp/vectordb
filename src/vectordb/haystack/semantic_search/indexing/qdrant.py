@@ -71,7 +71,7 @@ The url parameter determines the deployment mode.
 import logging
 from typing import Any
 
-from vectordb import QdrantVectorDB
+from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.dataloaders import DataloaderCatalog
 from vectordb.haystack.utils import ConfigLoader, EmbedderFactory
 
@@ -152,7 +152,6 @@ class QdrantSemanticIndexingPipeline:
 
         recreate = self.config.get("qdrant", {}).get("recreate", False)
         self.db.create_collection(
-            collection_name=self.collection_name,
             dimension=self.dimension,
             recreate=recreate,
         )

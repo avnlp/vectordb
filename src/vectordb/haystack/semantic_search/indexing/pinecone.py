@@ -71,7 +71,7 @@ Note:
 import logging
 from typing import Any
 
-from vectordb import PineconeVectorDB
+from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.dataloaders import DataloaderCatalog
 from vectordb.haystack.utils import ConfigLoader, EmbedderFactory
 

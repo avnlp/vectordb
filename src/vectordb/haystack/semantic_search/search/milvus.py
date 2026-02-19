@@ -71,7 +71,7 @@ database operations, ensuring consistent behavior across frameworks.
 import logging
 from typing import Any
 
-from vectordb import MilvusVectorDB
+from vectordb.databases.milvus import MilvusVectorDB
 from vectordb.haystack.utils import (
     ConfigLoader,
     DiversificationHelper,
@@ -184,41 +184,3 @@ class MilvusSemanticSearchPipeline:
             result["answer"] = gen_result.get("replies", [""])[0]
 
         return result
-
-    def _build_milvus_filter(self, filters: dict[str, Any]) -> str | None:
-        """Build Milvus filter expression.
-
-        Args:
-            filters: Filter criteria dict.
-
-        Returns:
-            Milvus filter expression or None.
-        """
-        if not filters:
-            return None
-
-        expressions = []
-        operator_map = {
-            "$eq": "==",
-            "$ne": "!=",
-            "$gt": ">",
-            "$gte": ">=",
-            "$lt": "<",
-            "$lte": "<=",
-        }
-        for field, value in filters.items():
-            if isinstance(value, dict):
-                for op, op_value in value.items():
-                    milvus_op = operator_map.get(op, "==")
-                    if isinstance(op_value, str):
-                        expr = f'metadata["{field}"] {milvus_op} "{op_value}"'
-                        expressions.append(expr)
-                    else:
-                        expr = f'metadata["{field}"] {milvus_op} {op_value}'
-                        expressions.append(expr)
-            elif isinstance(value, str):
-                expressions.append(f'metadata["{field}"] == "{value}"')
-            else:
-                expressions.append(f'metadata["{field}"] == {value}')
-
-        return " and ".join(expressions) if expressions else None

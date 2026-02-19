@@ -1,4 +1,4 @@
-"""Weaviate Vector Database integration for Haystack pipelines.
+"""Weaviate vector database wrapper for Haystack and LangChain integrations.
 
 This module provides a comprehensive interface for Weaviate Cloud and self-hosted
 instances, with native support for vector search, hybrid retrieval, and generative AI.
@@ -254,83 +254,106 @@ class WeaviateVectorDB:
         logger.info(f"Successfully upserted {len(data)} objects.")
 
     def _build_filter(self, filters: Dict[str, Any]) -> Optional[Filter]:
-        """Convert dictionary filters to Weaviate Filter objects.
+        """Convert MongoDB-style filter dictionaries to Weaviate Filter objects.
 
-        Recursively builds Weaviate filter expressions from nested dictionaries,
-        supporting both simple field comparisons and complex logical combinations.
+        Transforms filter dictionaries into Weaviate Filter objects, using
+        the same MongoDB-style format as Qdrant, Chroma, and Pinecone wrappers
+        for a consistent API across all vector database backends.
 
         Args:
-            filters: Filter specification with operator, field, value structure.
-                Simple: {"field": "category", "operator": "eq", "value": "fiction"}
-                Complex: {"operator": "AND", "conditions": [{...}, {...}]}
+            filters: Dictionary of field names to filter conditions.
+                Supports two formats:
+
+                - Implicit equality: ``{"field": "value"}``
+                - Explicit operators: ``{"field": {"$op": value}}``
+
+                Available operators:
+
+                - ``$eq``: Equal to value
+                - ``$ne``: Not equal to value
+                - ``$gt``: Greater than value
+                - ``$gte``: Greater than or equal to value
+                - ``$lt``: Less than value
+                - ``$lte``: Less than or equal to value
+                - ``$in``: Value matches any in provided list
+                - ``$like``: Wildcard pattern matching
+
+                Logical operators:
+
+                - ``$and``: List of conditions combined with AND
+                - ``$or``: List of conditions combined with OR
 
         Returns:
             Weaviate Filter object or None if filters dict is empty.
 
-        Supported Operators:
-            - eq, equal: Equality comparison
-            - neq, not_equal: Not equal
-            - gt, greater_than: Greater than
-            - gte, greater_than_equal: Greater than or equal
-            - lt, less_than: Less than
-            - lte, less_or_equal: Less than or equal
-            - like: Wildcard matching
-            - contains_any: Array contains any of values
+        Example:
+            Simple equality filter::
 
-        Note:
-            Lambda functions defer Weaviate Filter construction until lookup
-            time to avoid creating unused Filter objects for unsupported ops.
+                filter = self._build_filter({"category": "news"})
+
+            Range filter::
+
+                filter = self._build_filter({"score": {"$gte": 0.8}})
+
+            Combined filter::
+
+                filter = self._build_filter(
+                    {
+                        "category": "tech",
+                        "published": {"$gt": "2024-01-01"},
+                    }
+                )
+
+            Logical OR::
+
+                filter = self._build_filter(
+                    {"$or": [{"category": "tech"}, {"category": "science"}]}
+                )
         """
         if not filters:
             return None
 
-        operator = filters.get("operator", "").lower()
-        result = None
-
-        if "field" in filters:
-            field = filters["field"]
-            value = filters.get("value")
-
-            f = Filter.by_property(field)
-
-            # Mapping operator names to Weaviate filter factory methods
-            # Using lambdas to defer construction until validated
-            operator_map = {
-                "eq": lambda: f.equal(value),
-                "equal": lambda: f.equal(value),
-                "neq": lambda: f.not_equal(value),
-                "not_equal": lambda: f.not_equal(value),
-                "gt": lambda: f.greater_than(value),
-                "greater_than": lambda: f.greater_than(value),
-                "gte": lambda: f.greater_or_equal(value),
-                "greater_than_equal": lambda: f.greater_or_equal(value),
-                "lt": lambda: f.less_than(value),
-                "less_than": lambda: f.less_than(value),
-                "lte": lambda: f.less_or_equal(value),
-                "less_or_equal": lambda: f.less_or_equal(value),
-                "like": lambda: f.like(value),
-                "contains_any": lambda: f.contains_any(value),
-            }
-
-            if operator in operator_map:
-                result = operator_map[operator]()
+        conditions = []
+        for key, value in filters.items():
+            if key == "$and":
+                sub = [self._build_filter(c) for c in value]
+                sub = [c for c in sub if c is not None]
+                if sub:
+                    conditions.append(Filter.all_of(sub))
+            elif key == "$or":
+                sub = [self._build_filter(c) for c in value]
+                sub = [c for c in sub if c is not None]
+                if sub:
+                    conditions.append(Filter.any_of(sub))
+            elif isinstance(value, dict):
+                f = Filter.by_property(key)
+                for op, val in value.items():
+                    if op == "$eq":
+                        conditions.append(f.equal(val))
+                    elif op == "$ne":
+                        conditions.append(f.not_equal(val))
+                    elif op == "$gt":
+                        conditions.append(f.greater_than(val))
+                    elif op == "$gte":
+                        conditions.append(f.greater_or_equal(val))
+                    elif op == "$lt":
+                        conditions.append(f.less_than(val))
+                    elif op == "$lte":
+                        conditions.append(f.less_or_equal(val))
+                    elif op == "$in":
+                        conditions.append(f.contains_any(val))
+                    elif op == "$like":
+                        conditions.append(f.like(val))
+                    else:
+                        logger.warning(f"Unknown filter operator: {op}")
             else:
-                logger.warning(f"Unknown filter operator: {operator}")
+                conditions.append(Filter.by_property(key).equal(value))
 
-        elif "conditions" in filters:
-            # Recursively build sub-filters for logical combinations
-            conditions = [self._build_filter(c) for c in filters["conditions"]]
-            conditions = [c for c in conditions if c is not None]
-
-            if conditions:
-                if operator == "and":
-                    result = Filter.all_of(conditions)
-                elif operator == "or":
-                    result = Filter.any_of(conditions)
-                else:
-                    logger.warning(f"Unknown logical operator: {operator}")
-
-        return result
+        if not conditions:
+            return None
+        if len(conditions) == 1:
+            return conditions[0]
+        return Filter.all_of(conditions)
 
     def query(
         self,
@@ -351,7 +374,12 @@ class WeaviateVectorDB:
             query_string (Optional[str]): Text query.
             vector (Optional[List[float]]): Vector embedding of the query.
             limit (int): Maximum number of results.
-            filters (Optional[Dict]): Filter configuration.
+            filters (Optional[Dict]): MongoDB-style metadata filters.
+                Supports implicit equality (``{"field": "value"}``),
+                explicit operators (``{"field": {"$op": value}}``),
+                and logical combinators (``{"$and": [...]}``/``{"$or": [...]}``).
+                Operators: ``$eq``, ``$ne``, ``$gt``, ``$gte``, ``$lt``,
+                ``$lte``, ``$in``, ``$like``.
             hybrid (bool): Whether to use hybrid search.
             alpha (float): Hybrid search weight (1.0 = vector, 0.0 = keyword).
             rerank (Optional[Dict]): Reranker config, e.g., {"prop": "content"}.
@@ -517,7 +545,8 @@ class WeaviateVectorDB:
             vector: Optional dense vector for semantic component.
             top_k: Number of results.
             alpha: Balance (1.0 = vector only, 0.0 = BM25 only).
-            filters: Optional metadata filters.
+            filters: Optional MongoDB-style metadata filters.
+                See :meth:`_build_filter` for supported format and operators.
             include_vectors: Whether to return embeddings.
 
         Returns:
@@ -554,7 +583,8 @@ class WeaviateVectorDB:
             single_prompt (Optional[str]): Prompt to apply to each result individually.
             grouped_task (Optional[str]): Prompt to apply to all results combined.
             limit (int): Number of context documents to retrieve.
-            filters (Optional[Dict]): Filters for retrieval.
+            filters (Optional[Dict]): MongoDB-style metadata filters.
+                See :meth:`_build_filter` for supported format and operators.
 
         Returns:
             Any: Generation response from Weaviate containing the generated text.

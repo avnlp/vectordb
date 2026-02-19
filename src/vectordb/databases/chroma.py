@@ -1,8 +1,8 @@
-"""Chroma VectorDB implementation for Haystack integration.
+"""Chroma vector database wrapper for Haystack and LangChain integrations.
 
 This module provides a comprehensive interface to Chroma vector database,
 supporting both local persistent storage and cloud/remote deployments.
-It enables RAG (Retrieval Augmented Generation) workflows through Haystack
+It enables RAG (Retrieval Augmented Generation) workflows through Haystack and LangChain
 document integration, with support for multi-tenancy, hybrid search,
 and advanced metadata filtering.
 

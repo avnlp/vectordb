@@ -1,7 +1,8 @@
 """Milvus Vector Database interface for Zilliz Cloud and self-hosted Milvus.
 
 This module provides a high-level interface for interacting with Milvus and Zilliz
-Cloud vector databases through the Haystack framework. It supports dense vectors,
+Cloud vector databases, used by both Haystack and LangChain
+integrations. It supports dense vectors,
 sparse vectors, and hybrid search combining both approaches.
 
 Key Features:

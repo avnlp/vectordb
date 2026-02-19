@@ -1,7 +1,8 @@
-"""Qdrant Vector Database implementation for Haystack pipelines.
+"""Qdrant vector database wrapper for Haystack and LangChain integrations.
 
 This module provides a production-ready interface for Qdrant vector database,
-enabling advanced RAG (Retrieval-Augmented Generation) pipelines with Haystack.
+enabling advanced RAG (Retrieval-Augmented Generation) pipelines
+with Haystack and LangChain.
 
 Features:
     - Multi-tenancy: Payload-based tenant isolation using Qdrant's is_tenant
@@ -45,6 +46,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import (
     BinaryQuantization,
@@ -563,25 +565,37 @@ class QdrantVectorDB:
 
         # 2. Execute Search based on Type
         if search_type == "mmr":
-            # Maximal Marginal Relevance (Dense only usually)
+            # Maximal Marginal Relevance: fetch extra candidates, then re-rank
+            # for diversity using λ*relevance - (1-λ)*redundancy.
             if isinstance(query_vector, dict):
-                # Flatten if passed as dict but using single vector mmr
                 query_vector = query_vector.get(self.dense_vector_name, query_vector)
 
-            logger.info(
-                "Executing Search (MMR requested). Verify server supports MMR params via search_request."
-            )
+            # Retrieve more candidates than needed so MMR has room to diversify
+            candidate_multiplier = 4
+            candidate_limit = max(top_k * candidate_multiplier, 20)
 
-            results = self.client.search(
+            candidates = self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_vector,
                 query_filter=final_filter,
-                limit=top_k,
-                with_vectors=include_vectors,
-                search_params=models.SearchParams(
-                    quantization=models.QuantizationSearchParams(rescore=True)
-                ),
+                limit=candidate_limit,
+                with_vectors=True,
             )
+
+            if candidates:
+                results = self._mmr_rerank(
+                    query_vector=query_vector,
+                    candidates=candidates,
+                    top_k=top_k,
+                    lambda_mult=mmr_diversity,
+                )
+            else:
+                results = []
+
+            # Strip vectors from results if caller didn't request them
+            if not include_vectors:
+                for point in results:
+                    point.vector = None
 
         elif search_type == "hybrid":
             # RRF Fusion
@@ -644,6 +658,89 @@ class QdrantVectorDB:
             results,
             include_embeddings=include_vectors,
         )
+
+    @staticmethod
+    def _mmr_rerank(
+        query_vector: List[float],
+        candidates: List[ScoredPoint],
+        top_k: int,
+        lambda_mult: float = 0.5,
+    ) -> List[ScoredPoint]:
+        """Re-rank candidates using Maximal Marginal Relevance.
+
+        Greedily selects documents that balance relevance to the query with
+        diversity among already-selected documents.
+
+        Score = λ * sim(query, doc) - (1-λ) * max(sim(doc, selected))
+
+        Args:
+            query_vector: Query embedding vector.
+            candidates: ScoredPoint results with vectors from initial retrieval.
+            top_k: Number of documents to select.
+            lambda_mult: Trade-off between relevance (1.0) and diversity (0.0).
+
+        Returns:
+            Re-ranked list of ScoredPoint objects.
+        """
+        query_vec = np.array(query_vector, dtype=np.float64)
+        query_norm = np.linalg.norm(query_vec)
+        if query_norm == 0:
+            return candidates[:top_k]
+        query_vec = query_vec / query_norm
+
+        # Extract dense vectors from candidates
+        doc_vectors: List[np.ndarray] = []
+        for c in candidates:
+            vec = c.vector
+            if isinstance(vec, dict):
+                # Named vectors — pick the first list-type vector (dense)
+                for v in vec.values():
+                    if isinstance(v, list):
+                        vec = v
+                        break
+            if isinstance(vec, list):
+                doc_vectors.append(np.array(vec, dtype=np.float64))
+            else:
+                # Fallback: zero vector so this candidate scores poorly
+                doc_vectors.append(np.zeros_like(query_vec))
+
+        # Normalise document vectors for cosine similarity via dot product
+        doc_matrix = np.array(doc_vectors)
+        norms = np.linalg.norm(doc_matrix, axis=1, keepdims=True)
+        norms = np.where(norms == 0, 1.0, norms)
+        doc_matrix = doc_matrix / norms
+
+        # Query-document relevance (cosine similarity)
+        query_sims = doc_matrix @ query_vec  # shape (n_candidates,)
+
+        selected_indices: List[int] = []
+        remaining = set(range(len(candidates)))
+
+        for _ in range(min(top_k, len(candidates))):
+            best_idx = -1
+            best_score = -np.inf
+
+            for idx in remaining:
+                relevance = float(query_sims[idx])
+
+                # Max similarity to any already-selected document
+                if selected_indices:
+                    selected_vecs = doc_matrix[selected_indices]
+                    redundancy = float(np.max(selected_vecs @ doc_matrix[idx]))
+                else:
+                    redundancy = 0.0
+
+                mmr_score = lambda_mult * relevance - (1 - lambda_mult) * redundancy
+                if mmr_score > best_score:
+                    best_score = mmr_score
+                    best_idx = idx
+
+            if best_idx == -1:
+                break
+            selected_indices.append(best_idx)
+            remaining.discard(best_idx)
+
+        return [candidates[i] for i in selected_indices]
 
     def delete_documents(
         self,

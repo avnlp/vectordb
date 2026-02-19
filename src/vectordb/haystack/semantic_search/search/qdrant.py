@@ -71,7 +71,7 @@ database operations, ensuring consistent behavior across frameworks.
 import logging
 from typing import Any
 
-from vectordb import QdrantVectorDB
+from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.haystack.utils import (
     ConfigLoader,
     DiversificationHelper,

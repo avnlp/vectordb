@@ -1,28 +1,28 @@
-"""Pinecone Document Converter.
+"""Pinecone document converter for Haystack and LangChain integration.
 
-This module provides utilities for preparing and converting documents between
-different formats for use in vector store operations with Pinecone. It includes
-methods for handling Haystack and LangChain document formats and for converting
-query results into Haystack documents.
+This module provides bidirectional conversion between Haystack/LangChain document
+formats and Pinecone's native upsert/query formats. It handles dense embeddings,
+sparse embeddings for hybrid search, and metadata serialization.
 
-Classes:
-    - PineconeDocumentConverter: Contains static methods for preparing and
-      transforming documents.
+Key Responsibilities:
+    - Convert Haystack Documents to Pinecone upsert format (id, values, metadata,
+      sparse_values)
+    - Convert LangChain Documents to Pinecone upsert format
+    - Transform Pinecone query results (matches) back to Haystack/LangChain Documents
+    - Handle hybrid search with optional sparse_values for BM25-style retrieval
 
-Methods:
-    - prepare_haystack_documents_for_upsert: Prepares Haystack Document objects
-      for vector store upsertion.
-    - prepare_langchain_documents_for_upsert: Placeholder for preparing
-      LangChain Document objects for upsertion.
-    - convert_query_results_to_haystack_documents: Converts query results into
-      Haystack Document objects.
+Pinecone-Specific Behavior:
+    - Uses flat dictionary format with 'id', 'values', 'metadata', 'sparse_values'
+    - Document content stored in metadata['text'] field
+    - Sparse values use {"indices": [...], "values": [...]} format
+    - Score is returned directly from match results (higher is better)
+    - Query results nested under 'matches' key in response
 
-Logging:
-    - Uses a centralized logging utility to provide detailed logs for all
-      operations.
-
-Exceptions:
-    - Raises ValueError for invalid document inputs.
+Usage:
+    >>> from vectordb.utils import PineconeDocumentConverter
+    >>> converter = PineconeDocumentConverter()
+    >>> upsert_data = converter.prepare_haystack_documents_for_upsert(documents)
+    >>> # upsert_data is list of dicts with 'id', 'values', 'metadata' keys
 """
 
 import logging
@@ -33,7 +33,9 @@ from haystack.dataclasses import SparseEmbedding
 from langchain_core.documents import Document as LangchainDocument
 from langchain_qdrant.sparse_embeddings import SparseVector
 
+from vectordb.utils.ids import get_doc_id, set_doc_id
 from vectordb.utils.logging import LoggerFactory
+from vectordb.utils.sparse import get_doc_sparse_embedding
 
 
 logger_factory = LoggerFactory(logger_name=__name__, log_level=logging.INFO)
@@ -41,7 +43,29 @@ logger = logger_factory.get_logger()
 
 
 class PineconeDocumentConverter:
-    """Utility class for preparing and converting documents for vector store ops."""
+    """Bidirectional converter between Haystack/LangChain and Pinecone formats.
+
+    This converter handles the format transformation required for storing documents
+    in Pinecone and retrieving them back. Pinecone uses a flat dictionary format
+    with specific keys ('id', 'values', 'metadata', 'sparse_values') that differ
+    from Haystack's Document class structure.
+
+    Key Transformations:
+        - Haystack Document.id -> Pinecone 'id' field
+        - Haystack Document.embedding -> Pinecone 'values' field
+        - Haystack Document.content -> Pinecone metadata['text'] field
+        - Haystack Document.meta -> Pinecone metadata (merged with text)
+        - Haystack Document.sparse_embedding -> Pinecone 'sparse_values' field
+
+    Pinecone-Specific Notes:
+        - Document content is stored in metadata['text'] (not at top level)
+        - Sparse values use {"indices": [...], "values": [...]} format
+        - Query results are nested under 'matches' key in response
+        - Scores are returned directly (higher is better, no normalization needed)
+
+    The converter is stateless and all methods are static, allowing direct class
+    method calls without instantiation.
+    """
 
     @staticmethod
     def prepare_haystack_documents_for_upsert(
@@ -52,23 +76,17 @@ class PineconeDocumentConverter:
         This method takes a list of Haystack Document objects and prepares them
         for upsertion into a vector store. It ensures that each document has an
         ID and embeddings, and formats the data accordingly for the vector store.
-        The method also handles sparse embeddings if they are present in the
-        documents.
+        The method also handles sparse embeddings if present.
 
         Args:
             documents (List[HaystackDocument]): A list of Haystack Document
-                objects, each containing embeddings, sparse embeddings, and
-                metadata.
+                objects, each containing embeddings, sparse embeddings,
+                and metadata.
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries formatted for vector
-                store upsertion. Each dictionary includes:
-                - 'id': The document ID.
-                - 'values': The dense embedding of the document.
-                - 'sparse_values': (Optional) Sparse embedding data, with
-                  'indices' and 'values'.
-                - 'metadata': Metadata, including the document content and
-                  additional attributes.
+            List[Dict[str, Any]]: A list of dictionaries for vector store
+                upsertion. Includes 'id', 'values', 'sparse_values' (optional),
+                and 'metadata'.
 
         Raises:
             ValueError: If any document lacks an ID or embeddings.
@@ -76,27 +94,30 @@ class PineconeDocumentConverter:
         upsert_data: list[dict[str, Any]] = []
 
         for document in documents:
-            if not document.id or document.embedding is None:
-                logger.error(
-                    f"Document with missing ID or embedding detected: {document}"
-                )
-                msg = "Each document must have an ID and a dense embedding."
+            if document.embedding is None:
+                logger.error(f"Document with missing embedding detected: {document}")
+                msg = "Each document must have a dense embedding."
                 raise ValueError(msg)
 
+            # Use utility to get ID or generate one
+            doc_id = get_doc_id(document)
+
             prepared_doc = {
-                "id": document.id,
+                "id": doc_id,
                 "values": document.embedding,
-                "metadata": {"text": document.content, **document.meta},
+                "metadata": {"text": document.content, **(document.meta or {})},
             }
 
-            if document.sparse_embedding is not None:
+            # Use utility to get sparse embedding
+            sparse_emb = get_doc_sparse_embedding(document)
+            if sparse_emb is not None:
                 prepared_doc["sparse_values"] = {
-                    "indices": document.sparse_embedding.indices,
-                    "values": document.sparse_embedding.values,
+                    "indices": list(sparse_emb.indices),
+                    "values": list(sparse_emb.values),
                 }
 
             upsert_data.append(prepared_doc)
-            logger.info(f"Prepared document for upsert: {document.id}")
+            logger.info(f"Prepared document for upsert: {doc_id}")
 
         logger.info(
             f"Prepared {len(upsert_data)} documents for vector store upsertion."
@@ -112,16 +133,13 @@ class PineconeDocumentConverter:
         """Prepare LangChain Document objects for upserting into a vector store.
 
         Args:
-            documents (List[LangChainDocument]): A list of LangChain Document
-                objects.
-            embeddings (List[List[float]]): A list of embeddings corresponding
-                to the documents.
-            sparse_embeddings (Optional[List[Optional[SparseVector]]]): A list
-                of sparse embeddings, one per document. Defaults to None.
+            documents (List[LangChainDocument]): A list of LangChain Documents.
+            embeddings (List[List[float]]): Embeddings corresponding to docs.
+            sparse_embeddings (Optional[List[Optional[SparseVector]]]): Sparse
+                embeddings, one per document. Defaults to None.
 
         Returns:
-            List[Dict[str, Any]]: A list of dictionaries formatted for vector
-                store upsertion.
+            List[Dict[str, Any]]: Dictionaries formatted for vector store upsert.
         """
         if sparse_embeddings is None:
             sparse_embeddings = [None] * len(documents)
@@ -155,6 +173,7 @@ class PineconeDocumentConverter:
     @staticmethod
     def convert_query_results_to_haystack_documents(
         query_results: dict[str, Any],
+        include_embeddings: bool = False,
     ) -> list[HaystackDocument]:
         """Convert query results into a list of Haystack Document objects.
 
@@ -163,8 +182,8 @@ class PineconeDocumentConverter:
         they are present in the query results.
 
         Args:
-            query_results (Dict[str, Any]): Query results containing match
-                information.
+            query_results (Dict[str, Any]): Query results with match information.
+            include_embeddings (bool): Whether to include vectors in documents.
 
         Returns:
             List[HaystackDocument]: A list of Haystack Document objects.
@@ -193,9 +212,13 @@ class PineconeDocumentConverter:
                 id=result.get("id"),
                 meta=metadata,
                 score=result.get("score", 0),
-                embedding=result.get("values"),
                 sparse_embedding=sparse_embedding,
             )
+
+            set_doc_id(document, str(result.get("id")))
+
+            if include_embeddings and "values" in result:
+                document.embedding = result.get("values")
 
             haystack_docs.append(document)
             logger.info(f"Converted query result to HaystackDocument: {document.id}")
@@ -209,17 +232,28 @@ class PineconeDocumentConverter:
     def convert_query_results_to_langchain_documents(
         query_results: dict[str, Any],
     ) -> list[LangchainDocument]:
-        """Convert query results into a list of LangChain Document objects.
+        """Convert Pinecone query results to LangChain Documents.
 
-        This method extracts relevant information from the query results and
-        constructs LangChain Document objects.
+        Pinecone returns query results under the 'matches' key, where each match
+        contains 'id', 'values', 'metadata', and 'score'. This method extracts
+        the match information and constructs LangChain Document objects.
 
         Args:
-            query_results (Dict[str, Any]): Query results containing match
-                information.
+            query_results: Pinecone query result dictionary with 'matches' key.
+                Each match contains 'id', 'values' (embedding), 'metadata', and
+                'score' fields.
 
         Returns:
-            List[LangChainDocument]: A list of LangChain Document objects.
+            List of LangChain Documents with page_content and metadata. The
+            page_content is extracted from metadata['text'], which is where
+            the document content is stored during upsert. The document ID is
+            placed in metadata['id'] for LangChain compatibility.
+
+        Note:
+            Unlike the Haystack version, this method does not include embeddings,
+            sparse embeddings, or scores in the output, as LangChain Documents do
+            not have these fields by default. The ID is stored in metadata instead
+            of a top-level ID field.
         """
         langchain_docs: list[LangchainDocument] = []
 
@@ -232,14 +266,15 @@ class PineconeDocumentConverter:
             metadata = result.get("metadata", {}).copy()
             text = metadata.pop("text", "")
 
-            document = HaystackDocument(
-                content=text,
-                id=result.get("id"),
-                meta=metadata,
+            document = LangchainDocument(
+                page_content=text,
+                metadata={"id": result.get("id"), **metadata},
             )
 
             langchain_docs.append(document)
-            logger.info(f"Converted query result to LangChainDocument: {document.id}")
+            logger.info(
+                f"Converted query result to LangChainDocument: {document.metadata.get('id')}"
+            )
 
         logger.info(
             f"Converted {len(langchain_docs)} query results into LangChainDocument objects."

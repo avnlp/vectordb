@@ -74,7 +74,7 @@ Note:
 import logging
 from typing import Any
 
-from vectordb import ChromaVectorDB
+from vectordb.databases.chroma import ChromaVectorDB
 from vectordb.haystack.utils import (
     ConfigLoader,
     DiversificationHelper,

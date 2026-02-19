@@ -69,7 +69,7 @@ with properties for content and metadata, plus a vector index.
 import logging
 from typing import Any
 
-from vectordb import WeaviateVectorDB
+from vectordb.databases.weaviate import WeaviateVectorDB
 from vectordb.dataloaders import DataloaderCatalog
 from vectordb.haystack.utils import ConfigLoader, EmbedderFactory
 

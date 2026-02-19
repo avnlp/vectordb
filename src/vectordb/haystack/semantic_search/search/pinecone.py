@@ -71,7 +71,7 @@ database operations, ensuring consistent behavior across frameworks.
 import logging
 from typing import Any
 
-from vectordb import PineconeVectorDB
+from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.haystack.utils import (
     ConfigLoader,
     DiversificationHelper,

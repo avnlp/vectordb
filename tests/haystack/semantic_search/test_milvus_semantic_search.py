@@ -360,42 +360,64 @@ class TestMilvusSemanticSearch:
     @patch(
         "vectordb.haystack.semantic_search.search.milvus.EmbedderFactory.create_text_embedder"
     )
-    def test_build_milvus_filter_empty_returns_none(
+    def test_search_empty_filters_skips_filter_expression(
         self,
         mock_make_embedder: MagicMock,
         mock_db_class: MagicMock,
         milvus_config: dict,
+        sample_documents: list,
     ) -> None:
-        """Test building filters returns None for empty input."""
+        """Test that empty filters pass None as filter_expr."""
+        mock_embedder = MagicMock()
+        mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_make_embedder.return_value = mock_embedder
+
+        mock_db = MagicMock()
+        mock_db.search.return_value = sample_documents
+        mock_db_class.return_value = mock_db
+
         pipeline = MilvusSemanticSearchPipeline(milvus_config)
-        assert pipeline._build_milvus_filter({}) is None
+        pipeline.search("test query", top_k=5, filters={})
+
+        call_kwargs = mock_db.search.call_args.kwargs
+        assert call_kwargs["filter_expr"] is None
+        mock_db.build_filter_expression.assert_not_called()
 
     @patch("vectordb.haystack.semantic_search.search.milvus.MilvusVectorDB")
     @patch(
         "vectordb.haystack.semantic_search.search.milvus.EmbedderFactory.create_text_embedder"
     )
-    def test_build_milvus_filter_builds_expression(
+    def test_search_delegates_filter_building_to_db(
         self,
         mock_make_embedder: MagicMock,
         mock_db_class: MagicMock,
         milvus_config: dict,
+        sample_documents: list,
     ) -> None:
-        """Test filter expression building for mixed filter types."""
-        pipeline = MilvusSemanticSearchPipeline(milvus_config)
+        """Test that search delegates filter building to db.build_filter_expression."""
+        mock_embedder = MagicMock()
+        mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_make_embedder.return_value = mock_embedder
+
+        mock_db = MagicMock()
+        mock_db.search.return_value = sample_documents
+        mock_db.build_filter_expression.return_value = (
+            'metadata["source"] == "wiki" and metadata["views"] >= 10'
+        )
+        mock_db_class.return_value = mock_db
+
         filters = {
             "source": {"$eq": "wiki"},
             "views": {"$gte": 10},
-            "status": "active",
-            "count": 2,
         }
 
-        expression = pipeline._build_milvus_filter(filters)
+        pipeline = MilvusSemanticSearchPipeline(milvus_config)
+        pipeline.search("test query", top_k=5, filters=filters)
 
-        assert (
-            expression == 'metadata["source"] == "wiki" and '
-            'metadata["views"] >= 10 and '
-            'metadata["status"] == "active" and '
-            'metadata["count"] == 2'
+        mock_db.build_filter_expression.assert_called_once()
+        call_kwargs = mock_db.search.call_args.kwargs
+        assert call_kwargs["filter_expr"] == (
+            'metadata["source"] == "wiki" and metadata["views"] >= 10'
         )
 
     def test_search_init_invalid_config(self) -> None:

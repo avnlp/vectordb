@@ -40,13 +40,13 @@ Usage:
     >>> text_embedder = EmbedderFactory.create_text_embedder(config)
 """
 
-from vectordb.haystack.utils.config import ConfigLoader
 from vectordb.haystack.utils.diversification import DiversificationHelper
 from vectordb.haystack.utils.embeddings import EmbedderFactory
 from vectordb.haystack.utils.filters import DocumentFilter
 from vectordb.haystack.utils.fusion import ResultMerger
 from vectordb.haystack.utils.rag import RAGHelper
 from vectordb.haystack.utils.reranker import RerankerFactory
+from vectordb.utils.config_loader import ConfigLoader
 
 
 __all__ = [
