@@ -122,6 +122,7 @@ class ChromaRerankingIndexingPipeline:
 
         recreate = self.config.get("chroma", {}).get("recreate", False)
         self.db.create_collection(
+            name=self.collection_name,
             dimension=self.dimension,
             recreate=recreate,
         )

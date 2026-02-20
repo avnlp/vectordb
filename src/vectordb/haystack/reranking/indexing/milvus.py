@@ -120,6 +120,7 @@ class MilvusRerankingIndexingPipeline:
 
         recreate = self.config.get("milvus", {}).get("recreate", False)
         self.db.create_collection(
+            collection_name=self.collection_name,
             dimension=self.dimension,
             recreate=recreate,
         )

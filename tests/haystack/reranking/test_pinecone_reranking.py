@@ -319,11 +319,7 @@ class TestPineconeReranking:
         # Verify filters were passed to database
         mock_db.query.assert_called_once()
         call_args = mock_db.query.call_args
-        # The pipeline passes filter, not filters
-        assert (
-            call_args.kwargs.get("filter") == filters
-            or call_args.kwargs.get("filters") == filters
-        )
+        assert call_args.kwargs.get("filter") == filters
 
     @patch("vectordb.haystack.reranking.search.pinecone.PineconeVectorDB")
     @patch(

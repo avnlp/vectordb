@@ -124,7 +124,7 @@ class PineconeRerankingSearchPipeline:
         # Retrieve more candidates than needed (3x) to give reranker options
         retrieval_top_k = top_k * 3
         base_docs = self.db.query(
-            query_embedding=query_embedding,
+            vector=query_embedding,
             top_k=retrieval_top_k,
             namespace=self.namespace,
             filter=filters if filters else None,

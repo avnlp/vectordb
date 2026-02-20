@@ -12,7 +12,7 @@ Indexing for Reranking:
 Pipeline Steps:
     1. Load documents from configured data sources
     2. Generate dense embeddings using bi-encoder models
-    3. Create or recreate Weaviate collection with vector index
+    3. Create Weaviate collection with vector index
     4. Upsert embedded documents with metadata properties
 
 Weaviate Features:
@@ -119,10 +119,8 @@ class WeaviateRerankingIndexingPipeline:
         embedded_docs = self.embedder.run(documents=documents)["documents"]
         logger.info("Generated embeddings for %d documents", len(embedded_docs))
 
-        recreate = self.config.get("weaviate", {}).get("recreate", False)
         self.db.create_collection(
-            dimension=self.dimension,
-            recreate=recreate,
+            collection_name=self.collection_name,
         )
 
         self.db.upsert(documents=embedded_docs)

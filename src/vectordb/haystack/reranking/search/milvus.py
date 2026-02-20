@@ -117,7 +117,7 @@ class MilvusRerankingSearchPipeline:
         # Retrieve 3x candidates to maximize coverage for reranking stage
         retrieval_top_k = top_k * 3
         base_docs = self.db.search(
-            query_dense_embedding=query_embedding,
+            query_embedding=query_embedding,
             top_k=retrieval_top_k,
             filters=filters,
         )

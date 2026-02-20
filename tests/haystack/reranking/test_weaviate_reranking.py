@@ -131,7 +131,7 @@ class TestWeaviateReranking:
 
         # Setup mock database
         mock_db = MagicMock()
-        mock_db.search.return_value = sample_documents
+        mock_db.query.return_value = sample_documents
         mock_db_class.return_value = mock_db
 
         # Create pipeline and search
@@ -142,7 +142,7 @@ class TestWeaviateReranking:
         assert result["query"] == "test query"
         assert result["documents"] == sample_documents
         mock_embedder.run.assert_called_once_with(text="test query")
-        mock_db.search.assert_called_once()
+        mock_db.query.assert_called_once()
         mock_reranker.run.assert_called_once()
 
     @patch("vectordb.haystack.reranking.search.weaviate.WeaviateVectorDB")
@@ -170,7 +170,7 @@ class TestWeaviateReranking:
 
         # Setup mock database to return empty list
         mock_db = MagicMock()
-        mock_db.search.return_value = []
+        mock_db.query.return_value = []
         mock_db_class.return_value = mock_db
 
         # Create pipeline and search
@@ -209,7 +209,7 @@ class TestWeaviateReranking:
 
         # Setup mock database
         mock_db = MagicMock()
-        mock_db.search.return_value = sample_documents
+        mock_db.query.return_value = sample_documents
         mock_db_class.return_value = mock_db
 
         # Create pipeline and search with custom top_k
@@ -219,9 +219,9 @@ class TestWeaviateReranking:
         # Verify top_k was passed correctly
         assert result["documents"] == sample_documents[:3]
         # Verify retrieval uses 3x top_k for reranking
-        mock_db.search.assert_called_once()
-        call_args = mock_db.search.call_args
-        assert call_args.kwargs["top_k"] == 9  # 3 * 3
+        mock_db.query.assert_called_once()
+        call_args = mock_db.query.call_args
+        assert call_args.kwargs["limit"] == 9  # 3 * 3
 
     @patch("vectordb.haystack.reranking.search.weaviate.WeaviateVectorDB")
     @patch(
@@ -250,7 +250,7 @@ class TestWeaviateReranking:
 
         # Setup mock database
         mock_db = MagicMock()
-        mock_db.search.return_value = sample_documents
+        mock_db.query.return_value = sample_documents
         mock_db_class.return_value = mock_db
 
         # Create pipeline and search with filters
@@ -259,8 +259,8 @@ class TestWeaviateReranking:
         pipeline.search(query="test query", filters=filters)
 
         # Verify filters were passed to database
-        mock_db.search.assert_called_once()
-        call_args = mock_db.search.call_args
+        mock_db.query.assert_called_once()
+        call_args = mock_db.query.call_args
         assert call_args.kwargs["filters"] == filters
 
     @patch("vectordb.haystack.reranking.search.weaviate.WeaviateVectorDB")
@@ -290,7 +290,7 @@ class TestWeaviateReranking:
 
         # Setup mock database
         mock_db = MagicMock()
-        mock_db.search.return_value = sample_documents
+        mock_db.query.return_value = sample_documents
         mock_db_class.return_value = mock_db
 
         # Create pipeline and use run method

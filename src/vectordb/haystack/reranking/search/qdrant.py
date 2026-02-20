@@ -117,7 +117,7 @@ class QdrantRerankingSearchPipeline:
         # Retrieve 3x candidates to give reranker sufficient options for selection
         retrieval_top_k = top_k * 3
         base_docs = self.db.search(
-            query_dense_embedding=query_embedding,
+            query_vector=query_embedding,
             top_k=retrieval_top_k,
             filters=filters,
         )

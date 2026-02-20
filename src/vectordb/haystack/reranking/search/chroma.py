@@ -146,11 +146,12 @@ class ChromaRerankingSearchPipeline:
         # Retrieve 3x more than requested to give reranker sufficient candidates
         # This balances: coverage (find relevant docs) vs cost (reranking time)
         retrieval_top_k = top_k * 3
-        base_docs = self.db.search(
-            query_dense_embedding=query_embedding,
-            top_k=retrieval_top_k,
-            filters=filters,
+        results = self.db.query(
+            query_embedding=query_embedding,
+            n_results=retrieval_top_k,
+            where=filters,
         )
+        base_docs = self.db.query_to_documents(results)
         logger.info("Retrieved %d base documents", len(base_docs))
 
         # Handle empty results gracefully

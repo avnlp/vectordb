@@ -115,10 +115,11 @@ class WeaviateRerankingSearchPipeline:
 
         # Retrieve 3x candidates to give reranker sufficient options
         retrieval_top_k = top_k * 3
-        base_docs = self.db.search(
-            query_dense_embedding=query_embedding,
-            top_k=retrieval_top_k,
+        base_docs = self.db.query(
+            vector=query_embedding,
+            limit=retrieval_top_k,
             filters=filters,
+            return_documents=True,
         )
         logger.info("Retrieved %d base documents", len(base_docs))
 
