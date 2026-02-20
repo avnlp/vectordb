@@ -147,7 +147,7 @@ class WeaviateSemanticIndexingPipeline:
         logger.info("Generated embeddings for %d documents", len(embedded_docs))
 
         recreate = self.config.get("weaviate", {}).get("recreate", False)
-        self.db.create_class(
+        self.db.create_collection(
             class_name=self.class_name,
             recreate=recreate,
         )

@@ -500,7 +500,8 @@ class MilvusVectorDB:
         if effective_scope:
             # Partition key filtering is applied as pre-filter at the storage layer
             # This is more efficient than post-filtering as it limits search scope
-            ns_expr = f'{partition_key_field} == "{effective_scope}"'
+            sanitized_scope = self._escape_expr_string(effective_scope)
+            ns_expr = f'{partition_key_field} == "{sanitized_scope}"'
             filter_expr = f"({filter_expr}) and {ns_expr}" if filter_expr else ns_expr
 
         output_fields = ["content", "metadata"]
@@ -569,6 +570,11 @@ class MilvusVectorDB:
 
         return self._format_results(results, include_vectors=include_vectors)
 
+    @staticmethod
+    def _escape_expr_string(value: str) -> str:
+        """Escape a string value for safe use in Milvus filter expressions."""
+        return value.replace("\\", "\\\\").replace('"', '\\"')
+
     def _build_filter_expression(self, filters: Optional[Dict[str, Any]]) -> str:
         """Convert dictionary filters to Milvus boolean expression strings.
 
@@ -585,7 +591,8 @@ class MilvusVectorDB:
                 - Simple: {"field": value} for equality
                 - Operator: {"field": {"$eq": val, "$gt": val, "$lt": val,
                   "$in": [vals], "$contains": val}}
-                Values are automatically quoted for strings or converted for numbers.
+                String values are automatically quoted and escaped for safe
+                interpolation. Numeric values are converted directly.
 
         Returns:
             Milvus boolean expression string. Empty string if filters is None/empty.
@@ -603,28 +610,33 @@ class MilvusVectorDB:
             return ""
 
         expressions = []
+        esc = self._escape_expr_string
         for key, value in filters.items():
             # Metadata fields use JSON path syntax; reserved fields (id, content) don't
-            field_expr = f'metadata["{key}"]' if key not in ["id", "content"] else key
+            field_expr = (
+                f'metadata["{esc(key)}"]' if key not in ["id", "content"] else key
+            )
 
             if isinstance(value, dict):
                 for op, val in value.items():
                     if op == "$eq":
-                        expressions.append(f'{field_expr} == "{val}"')
+                        expressions.append(f'{field_expr} == "{esc(str(val))}"')
                     elif op == "$gt":
                         expressions.append(f"{field_expr} > {val}")
                     elif op == "$lt":
                         expressions.append(f"{field_expr} < {val}")
                     elif op == "$in":
                         val_list = [
-                            f'"{v}"' if isinstance(v, str) else str(v) for v in val
+                            f'"{esc(v)}"' if isinstance(v, str) else str(v) for v in val
                         ]
                         expressions.append(f"{field_expr} in [{', '.join(val_list)}]")
                     elif op == "$contains":
-                        expressions.append(f'json_contains({field_expr}, "{val}")')
+                        expressions.append(
+                            f'json_contains({field_expr}, "{esc(str(val))}")'
+                        )
             else:
                 # Dictionary value with no operator defaults to equality comparison
-                val_str = f'"{value}"' if isinstance(value, str) else str(value)
+                val_str = f'"{esc(value)}"' if isinstance(value, str) else str(value)
                 expressions.append(f"{field_expr} == {val_str}")
 
         return " and ".join(expressions)
@@ -666,9 +678,11 @@ class MilvusVectorDB:
         Extracts content, metadata, scores, and optionally vector embeddings.
 
         Milvus returns different result formats:
-        - Hybrid/dense/sparse search: List of hits with distance scores
-        - Metadata query: List of entity dictionaries without scores
-        - All results wrapped in an outer list
+        - Hybrid/dense/sparse search: List of Hit dicts, each containing "id",
+          "distance", and an "entity" dict with the output fields.
+        - Metadata query: List of flat dicts with fields at the top level
+          (no "entity" wrapper, no "distance" key).
+        - All results wrapped in an outer list.
 
         Args:
             milvus_results: Raw results from Milvus client operations (search,
@@ -693,15 +707,16 @@ class MilvusVectorDB:
         # Results can be from search (list of hits) or query (list of dicts)
         hits = milvus_results[0]
         for hit in hits:
-            # hit can be a dict (from query) or a search Hit object
-            if isinstance(hit, dict):
+            # search() returns Hit dicts with "entity" nested;
+            # query() returns flat dicts
+            if "entity" in hit:
+                entity = hit.get("entity", {})
+                score = hit.get("distance")
+                hit_id = hit.get("id")
+            else:
                 entity = hit
                 score = None
                 hit_id = entity.get("id")
-            else:
-                entity = hit.get("entity", {})
-                score = getattr(hit, "score", None)
-                hit_id = getattr(hit, "id", None)
 
             doc = Document(
                 content=entity.get("content", ""),

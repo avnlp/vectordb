@@ -697,6 +697,31 @@ class TestQdrantVectorDBSearch:
         mock_qdrant_db.client.search.assert_called_once()
 
     @patch("vectordb.databases.qdrant.QdrantDocumentConverter")
+    def test_search_with_scope_and_filters(
+        self, mock_converter, mock_qdrant_db
+    ) -> None:
+        """Test search with both scope and metadata filters combined.
+
+        Addresses coverage gap: Combined tenant + user filter (line 560).
+        When both scope and filters are provided, the user filter should be
+        appended to the existing tenant filter's must list.
+        """
+        mock_qdrant_db.client.search = MagicMock(return_value=[])
+        mock_converter.convert_query_results_to_haystack_documents.return_value = []
+
+        query_vector = [0.1, 0.2, 0.3]
+        filters = {"category": "tech", "score": {"$gt": 0.8}}
+        mock_qdrant_db.search(
+            query_vector, top_k=5, scope="tenant_123", filters=filters
+        )
+
+        mock_qdrant_db.client.search.assert_called_once()
+        call_kwargs = mock_qdrant_db.client.search.call_args.kwargs
+        # Filter should contain both tenant and user conditions
+        assert call_kwargs["query_filter"] is not None
+        assert len(call_kwargs["query_filter"].must) == 2
+
+    @patch("vectordb.databases.qdrant.QdrantDocumentConverter")
     def test_search_with_include_vectors(self, mock_converter, mock_qdrant_db) -> None:
         """Test search with include_vectors=True."""
         mock_qdrant_db.client.search = MagicMock(return_value=[])

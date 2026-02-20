@@ -34,16 +34,10 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Union
 
-from pinecone import ServerlessSpec
-from pinecone.grpc import PineconeGRPC as Pinecone
-
-
-try:
-    from pinecone.db_data import Index
-except ImportError:
-    from pinecone.data import Index
-
 from haystack.dataclasses import SparseEmbedding
+from pinecone import ServerlessSpec
+from pinecone.db_data import Index
+from pinecone.grpc import PineconeGRPC as Pinecone
 
 from vectordb.utils.config import load_config, resolve_env_vars
 from vectordb.utils.logging import LoggerFactory

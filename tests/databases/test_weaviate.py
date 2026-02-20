@@ -489,14 +489,18 @@ class TestWeaviateVectorDBBuildFilter:
     def test_build_filter_in_operator(
         self, mock_filter_class, mock_weaviate_db
     ) -> None:
-        """Test _build_filter with $in operator."""
+        """Test _build_filter with $in operator uses any_of with equal."""
         mock_filter_obj = MagicMock()
         mock_filter_class.by_property.return_value = mock_filter_obj
 
         filters = {"tags": {"$in": ["a", "b"]}}
         mock_weaviate_db._build_filter(filters)
 
-        mock_filter_obj.contains_any.assert_called_once_with(["a", "b"])
+        # $in on scalar properties should use Filter.any_of with .equal() calls
+        assert mock_filter_class.by_property.call_count >= 2
+        calls = mock_filter_obj.equal.call_args_list
+        assert [c.args[0] for c in calls] == ["a", "b"]
+        mock_filter_class.any_of.assert_called_once()
 
     @patch("vectordb.databases.weaviate.Filter")
     def test_build_filter_implicit_equality(
@@ -710,7 +714,7 @@ class TestWeaviateVectorDBQuery:
         """Test query with return_documents=True."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content", "meta": "value"}
+        mock_obj.properties = {"text": "test content", "meta": "value"}
         mock_obj.metadata = MagicMock()
         mock_obj.metadata.distance = 0.1
         mock_obj.vector = None
@@ -757,7 +761,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test basic document conversion."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content", "category": "fiction"}
+        mock_obj.properties = {"text": "test content", "category": "fiction"}
         mock_obj.metadata = None
         mock_obj.vector = None
 
@@ -777,7 +781,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with distance-based score."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = MagicMock()
         mock_obj.metadata.distance = 0.2
         mock_obj.metadata.score = None
@@ -796,7 +800,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with metadata score."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         # Create metadata without distance attribute to trigger elif branch
         mock_metadata = MagicMock()
         # Remove distance attribute to simulate it not existing
@@ -818,7 +822,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with vector as list."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = [0.1, 0.2, 0.3]
 
@@ -837,7 +841,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with vector as dict containing 'default'."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = {"default": [0.1, 0.2, 0.3]}
 
@@ -856,7 +860,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with vector as dict (first value)."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = {"custom": [0.4, 0.5, 0.6]}
 
@@ -875,7 +879,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with vector as empty dict."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = {}  # Empty dict - should fall through to else branch
 
@@ -893,7 +897,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion without including vectors."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = [0.1, 0.2, 0.3]
 
@@ -921,7 +925,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test document conversion with list response (not objects attribute)."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = None
 
@@ -938,7 +942,7 @@ class TestWeaviateVectorDBConvertToDocuments:
         """Test query_to_documents public wrapper."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = None
         mock_obj.vector = None
 
@@ -978,7 +982,7 @@ class TestWeaviateVectorDBHybridSearch:
         """Test hybrid_search wrapper calls query correctly."""
         mock_obj = MagicMock()
         mock_obj.uuid = "test-uuid"
-        mock_obj.properties = {"content": "test content"}
+        mock_obj.properties = {"text": "test content"}
         mock_obj.metadata = MagicMock()
         mock_obj.metadata.distance = 0.1
         mock_obj.vector = None

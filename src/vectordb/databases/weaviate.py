@@ -341,7 +341,11 @@ class WeaviateVectorDB:
                     elif op == "$lte":
                         conditions.append(f.less_or_equal(val))
                     elif op == "$in":
-                        conditions.append(f.contains_any(val))
+                        conditions.append(
+                            Filter.any_of(
+                                [Filter.by_property(key).equal(v) for v in val]
+                            )
+                        )
                     elif op == "$like":
                         conditions.append(f.like(val))
                     else:
@@ -471,7 +475,7 @@ class WeaviateVectorDB:
 
         for obj in objects:
             properties = dict(obj.properties) if obj.properties else {}
-            content = properties.pop("content", "")
+            content = properties.pop("text", "")
 
             doc = Document(
                 id=str(obj.uuid),
@@ -481,9 +485,12 @@ class WeaviateVectorDB:
 
             # Score from metadata
             if hasattr(obj, "metadata") and obj.metadata:
-                if hasattr(obj.metadata, "distance"):
+                if (
+                    hasattr(obj.metadata, "distance")
+                    and obj.metadata.distance is not None
+                ):
                     doc.score = 1 - obj.metadata.distance
-                elif hasattr(obj.metadata, "score"):
+                elif hasattr(obj.metadata, "score") and obj.metadata.score is not None:
                     doc.score = obj.metadata.score
 
             # Attach vector if requested

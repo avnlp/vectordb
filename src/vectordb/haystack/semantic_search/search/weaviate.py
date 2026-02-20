@@ -157,11 +157,12 @@ class WeaviateSemanticSearchPipeline:
 
         # Search Weaviate
         filters = DocumentFilter.normalize(filters)
-        documents = self.db.search(
-            query_embedding=query_embedding,
-            top_k=top_k * 2,
-            class_name=self.class_name,
-            where_filter=filters if filters else None,
+        self.db._select_collection(self.class_name)
+        documents = self.db.query(
+            vector=query_embedding,
+            limit=top_k * 2,
+            filters=filters if filters else None,
+            return_documents=True,
         )
         logger.info("Retrieved %d documents", len(documents))
 

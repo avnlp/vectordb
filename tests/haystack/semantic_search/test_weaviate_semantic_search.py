@@ -42,7 +42,7 @@ class TestWeaviateSemanticSearch:
     @patch(
         "vectordb.haystack.semantic_search.indexing.weaviate.DataloaderCatalog.create"
     )
-    def test_indexing_run_calls_create_class(
+    def test_indexing_run_calls_create_collection(
         self,
         mock_get_docs: MagicMock,
         mock_make_embedder: MagicMock,
@@ -50,7 +50,7 @@ class TestWeaviateSemanticSearch:
         weaviate_config: dict,
         sample_documents: list,
     ) -> None:
-        """Test indexing run method calls create_class."""
+        """Test indexing run method calls create_collection."""
         mock_dataset = MagicMock()
         mock_dataset.to_haystack.return_value = sample_documents
         mock_loader = MagicMock()
@@ -66,7 +66,7 @@ class TestWeaviateSemanticSearch:
         pipeline = WeaviateSemanticIndexingPipeline(weaviate_config)
         pipeline.run()
 
-        mock_db.create_class.assert_called_once()
+        mock_db.create_collection.assert_called_once()
 
     @patch("vectordb.haystack.semantic_search.indexing.weaviate.WeaviateVectorDB")
     @patch(
@@ -140,7 +140,7 @@ class TestWeaviateSemanticSearch:
         mock_make_embedder.return_value = mock_embedder
 
         mock_db = MagicMock()
-        mock_db.search.return_value = sample_documents
+        mock_db.query.return_value = sample_documents
         mock_db_class.return_value = mock_db
 
         pipeline = WeaviateSemanticSearchPipeline(weaviate_config)
@@ -165,7 +165,7 @@ class TestWeaviateSemanticSearch:
         mock_make_embedder.return_value = mock_embedder
 
         mock_db = MagicMock()
-        mock_db.search.return_value = sample_documents
+        mock_db.query.return_value = sample_documents
         mock_db_class.return_value = mock_db
 
         pipeline = WeaviateSemanticSearchPipeline(weaviate_config)

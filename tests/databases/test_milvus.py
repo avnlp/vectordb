@@ -15,6 +15,11 @@ from haystack.dataclasses import SparseEmbedding
 from vectordb.databases.milvus import MilvusVectorDB
 
 
+def _make_search_hit(entity: dict, distance: float, hit_id: str) -> dict:
+    """Create a dict matching the pymilvus Hit format (dict with entity nested)."""
+    return {"id": hit_id, "distance": distance, "entity": entity}
+
+
 class TestMilvusVectorDBInitialization:
     """Test suite for MilvusVectorDB initialization.
 
@@ -541,14 +546,8 @@ class TestMilvusVectorDBSearchAdvanced:
 
     def test_search_dense_only(self, mock_milvus_db, sample_embedding) -> None:
         """Test dense-only search."""
-        # Create a proper mock hit object with .get() method
         entity = {"content": "Test content", "metadata": {"id": "1"}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.95
-        hit.id = "1"
+        hit = _make_search_hit(entity, 0.95, "1")
 
         mock_milvus_db.client.search = MagicMock(return_value=[[hit]])
 
@@ -565,12 +564,7 @@ class TestMilvusVectorDBSearchAdvanced:
     def test_search_sparse_only(self, mock_milvus_db, sample_sparse_embedding) -> None:
         """Test sparse-only search."""
         entity = {"content": "Sparse result", "metadata": {}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.8
-        hit.id = "2"
+        hit = _make_search_hit(entity, 0.8, "2")
 
         mock_milvus_db.client.search = MagicMock(return_value=[[hit]])
 
@@ -588,12 +582,7 @@ class TestMilvusVectorDBSearchAdvanced:
     ) -> None:
         """Test hybrid search (dense + sparse)."""
         entity = {"content": "Hybrid result", "metadata": {}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.9
-        hit.id = "3"
+        hit = _make_search_hit(entity, 0.9, "3")
 
         mock_milvus_db.client.hybrid_search = MagicMock(return_value=[[hit]])
 
@@ -612,12 +601,7 @@ class TestMilvusVectorDBSearchAdvanced:
     ) -> None:
         """Test hybrid search with weighted ranker."""
         entity = {"content": "Weighted result", "metadata": {}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.85
-        hit.id = "4"
+        hit = _make_search_hit(entity, 0.85, "4")
 
         mock_milvus_db.client.hybrid_search = MagicMock(return_value=[[hit]])
 
@@ -636,12 +620,7 @@ class TestMilvusVectorDBSearchAdvanced:
     ) -> None:
         """Test search with namespace isolation."""
         entity = {"content": "Namespaced result", "metadata": {}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.88
-        hit.id = "5"
+        hit = _make_search_hit(entity, 0.88, "5")
 
         mock_milvus_db.client.search = MagicMock(return_value=[[hit]])
 
@@ -659,12 +638,7 @@ class TestMilvusVectorDBSearchAdvanced:
     def test_search_with_scope_alias(self, mock_milvus_db, sample_embedding) -> None:
         """Test search with scope parameter (alias for namespace)."""
         entity = {"content": "Scoped result", "metadata": {}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.9
-        hit.id = "6"
+        hit = _make_search_hit(entity, 0.9, "6")
 
         mock_milvus_db.client.search = MagicMock(return_value=[[hit]])
 
@@ -681,12 +655,7 @@ class TestMilvusVectorDBSearchAdvanced:
     ) -> None:
         """Test search with metadata filtering."""
         entity = {"content": "Filtered result", "metadata": {"category": "fiction"}}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.9
-        hit.id = "7"
+        hit = _make_search_hit(entity, 0.9, "7")
 
         mock_milvus_db.client.search = MagicMock(return_value=[[hit]])
 
@@ -701,12 +670,7 @@ class TestMilvusVectorDBSearchAdvanced:
     def test_search_include_vectors(self, mock_milvus_db, sample_embedding) -> None:
         """Test search returning vectors."""
         entity = {"content": "Vector result", "metadata": {}, "embedding": [0.1] * 384}
-        hit = MagicMock()
-        hit.get = MagicMock(
-            side_effect=lambda key, default=None: {"entity": entity}.get(key, default)
-        )
-        hit.score = 0.9
-        hit.id = "8"
+        hit = _make_search_hit(entity, 0.9, "8")
 
         mock_milvus_db.client.search = MagicMock(return_value=[[hit]])
 
@@ -774,13 +738,9 @@ class TestMilvusVectorDBResultFormatting:
 
     def test_format_results_from_search(self, mock_milvus_db) -> None:
         """Test formatting results from search."""
-        mock_hit = MagicMock()
-        mock_hit.get.return_value = {"content": "Test", "metadata": {"id": "1"}}
-        mock_hit.score = 0.95
-        mock_hit.id = "1"
-
-        # Use entity attribute for search results
-        mock_hit.entity = mock_hit.get.return_value
+        mock_hit = _make_search_hit(
+            {"content": "Test", "metadata": {"id": "1"}}, 0.95, "1"
+        )
 
         results = mock_milvus_db._format_results([[mock_hit]])
 
@@ -800,16 +760,16 @@ class TestMilvusVectorDBResultFormatting:
 
     def test_format_results_with_embeddings(self, mock_milvus_db) -> None:
         """Test formatting results with embeddings included."""
-        mock_hit = MagicMock()
-        mock_hit.get.return_value = {
-            "content": "Test",
-            "metadata": {},
-            "embedding": [0.1] * 384,
-            "sparse_embedding": {0: 0.5, 5: 0.3},
-        }
-        mock_hit.entity = mock_hit.get.return_value
-        mock_hit.score = 0.9
-        mock_hit.id = "1"
+        mock_hit = _make_search_hit(
+            {
+                "content": "Test",
+                "metadata": {},
+                "embedding": [0.1] * 384,
+                "sparse_embedding": {0: 0.5, 5: 0.3},
+            },
+            0.9,
+            "1",
+        )
 
         results = mock_milvus_db._format_results([[mock_hit]], include_vectors=True)
 
