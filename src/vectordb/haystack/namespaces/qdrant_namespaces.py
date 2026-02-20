@@ -1,4 +1,4 @@
-"""Pinecone namespace pipeline using native namespace isolation."""
+"""Qdrant namespace pipeline using payload-based filtering."""
 
 from __future__ import annotations
 
@@ -6,8 +6,9 @@ import logging
 from typing import Any
 
 from haystack import Document
+from qdrant_client import models
 
-from vectordb.databases.pinecone import PineconeVectorDB
+from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.haystack.namespaces.types import (
     CrossNamespaceComparison,
     CrossNamespaceResult,
@@ -27,14 +28,14 @@ from vectordb.haystack.namespaces.utils import (
 )
 
 
-class PineconeNamespacePipeline:
-    """Pinecone namespace pipeline using native namespace isolation.
+class QdrantNamespacePipeline:
+    """Qdrant namespace pipeline using payload-based filtering.
 
-    Uses PineconeVectorDB for all database operations.
-    Namespaces are a first-class concept in Pinecone with strong isolation.
+    Uses QdrantVectorDB wrapper for all database operations.
+    Implements namespace isolation using payload filters.
     """
 
-    ISOLATION_STRATEGY = IsolationStrategy.NAMESPACE
+    ISOLATION_STRATEGY = IsolationStrategy.PAYLOAD_FILTER
 
     def __init__(self, config_path: str) -> None:
         """Initialize the pipeline.
@@ -46,7 +47,7 @@ class PineconeNamespacePipeline:
         self.config_path = config_path
 
         # Lazy-initialized components
-        self._db: PineconeVectorDB | None = None
+        self._db: QdrantVectorDB | None = None
         self._doc_embedder = None
         self._text_embedder = None
         self._logger: logging.Logger | None = None
@@ -54,25 +55,24 @@ class PineconeNamespacePipeline:
         self._connect()
 
     def _connect(self) -> None:
-        """Connect to Pinecone via unified wrapper."""
-        self._db = PineconeVectorDB(config=self.config)
+        """Connect to Qdrant via unified wrapper."""
+        self._db = QdrantVectorDB(config=self.config)
 
         embedding_dim = self.config.get("embedding", {}).get("dimension", 1024)
-        metric = self.config.get("pinecone", {}).get("metric", "cosine")
-        self._db.create_index(dimension=embedding_dim, metric=metric)
+        self._db.create_index(dimension=embedding_dim)
 
     @property
-    def db(self) -> PineconeVectorDB:
+    def db(self) -> QdrantVectorDB:
         """Get the VectorDB wrapper."""
         if self._db is None:
-            raise RuntimeError("Not connected to Pinecone")
+            raise RuntimeError("Not connected to Qdrant")
         return self._db
 
     @property
     def logger(self) -> logging.Logger:
         """Get logger instance."""
         if self._logger is None:
-            name = self.config.get("pipeline", {}).get("name", "pinecone_namespaces")
+            name = self.config.get("pipeline", {}).get("name", "qdrant_namespaces")
             self._logger = logging.getLogger(name)
         return self._logger
 
@@ -85,9 +85,9 @@ class PineconeNamespacePipeline:
     def close(self) -> None:
         """Close connection."""
         self._db = None
-        self.logger.info("Closed Pinecone connection")
+        self.logger.info("Closed Qdrant connection")
 
-    def __enter__(self) -> "PineconeNamespacePipeline":
+    def __enter__(self) -> "QdrantNamespacePipeline":
         """Enter context manager."""
         return self
 
@@ -96,43 +96,83 @@ class PineconeNamespacePipeline:
         self.close()
 
     def create_namespace(self, namespace: str) -> NamespaceOperationResult:
-        """Create a namespace (auto-created on first upsert in Pinecone)."""
+        """Create a namespace (auto-created on first upsert in Qdrant)."""
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
             operation="create",
-            message="Namespace will be auto-created on first upsert (Pinecone behavior)",
+            message="Payload-based namespaces are auto-created on insert (Qdrant behavior)",
         )
 
     def delete_namespace(self, namespace: str) -> NamespaceOperationResult:
-        """Delete all vectors in a namespace."""
-        self.db.delete(delete_all=True, namespace=namespace)
+        """Delete all points with a specific namespace."""
+        # Use filters to delete documents in specific namespace
+        self.db.delete(filters={"namespace": namespace})
+        self.logger.info("Deleted namespace: %s", namespace)
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
             operation="delete",
-            message=f"Deleted all vectors in namespace '{namespace}'",
+            message=f"Deleted all points in namespace '{namespace}'",
         )
 
     def list_namespaces(self) -> list[str]:
-        """List all namespaces in the index."""
-        return self.db.list_namespaces()
+        """List all unique namespace values."""
+        # Scroll through all points to extract unique namespace values
+        namespaces: set[str] = set()
+        offset = None
+        while True:
+            records, offset = self.db.client.scroll(
+                collection_name=self.db.collection_name,
+                limit=256,
+                offset=offset,
+                with_payload=["namespace"],
+                with_vectors=False,
+            )
+            for record in records:
+                ns = (record.payload or {}).get("namespace")
+                if ns is not None:
+                    namespaces.add(ns)
+            if offset is None:
+                break
+        return list(namespaces)
 
     def namespace_exists(self, namespace: str) -> bool:
-        """Check if a namespace exists."""
-        return namespace in self.list_namespaces()
+        """Check if a namespace has any points."""
+        count = self.db.client.count(
+            collection_name=self.db.collection_name,
+            count_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="namespace",
+                        match=models.MatchValue(value=namespace),
+                    )
+                ]
+            ),
+            exact=False,
+        ).count
+        return count > 0
 
     def get_namespace_stats(self, namespace: str) -> NamespaceStats:
         """Get statistics for a namespace."""
-        stats = self.db.describe_index_stats()
-        ns_stats = stats.get("namespaces", {}).get(namespace, {})
-        vector_count = ns_stats.get("vector_count", 0)
+        count = self.db.client.count(
+            collection_name=self.db.collection_name,
+            count_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="namespace",
+                        match=models.MatchValue(value=namespace),
+                    )
+                ]
+            ),
+            exact=True,
+        ).count
 
         return NamespaceStats(
             namespace=namespace,
-            document_count=vector_count,
-            vector_count=vector_count,
-            status=TenantStatus.ACTIVE if vector_count > 0 else TenantStatus.UNKNOWN,
+            document_count=count,
+            vector_count=count,
+            status=TenantStatus.ACTIVE if count > 0 else TenantStatus.UNKNOWN,
         )
 
     def index_documents(
@@ -149,11 +189,16 @@ class PineconeNamespacePipeline:
             )
 
         self._init_embedders()
+
+        for doc in documents:
+            if doc.meta is None:
+                doc.meta = {}
+            doc.meta["namespace"] = namespace
+
         embedded_docs = self._doc_embedder.run(documents=documents)["documents"]
 
         count = self.db.upsert(
             data=embedded_docs,
-            namespace=namespace,
             batch_size=self.config.get("indexing", {}).get("batch_size", 100),
         )
 
@@ -181,10 +226,9 @@ class PineconeNamespacePipeline:
             query_embedding = self._text_embedder.run(text=query)["embedding"]
 
         with Timer() as search_timer:
+            # Apply namespace filter in the query
             results = self.db.query(
-                vector=query_embedding,
-                namespace=namespace,
-                top_k=top_k,
+                vector=query_embedding, top_k=top_k, filters={"namespace": namespace}
             )
 
         stats = self.get_namespace_stats(namespace)

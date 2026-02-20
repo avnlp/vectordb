@@ -1,4 +1,4 @@
-"""Pinecone namespace pipeline using native namespace isolation."""
+"""Weaviate namespace pipeline using native multi-tenancy."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 from haystack import Document
 
-from vectordb.databases.pinecone import PineconeVectorDB
+from vectordb.databases.weaviate import WeaviateVectorDB
 from vectordb.haystack.namespaces.types import (
     CrossNamespaceComparison,
     CrossNamespaceResult,
@@ -27,14 +27,14 @@ from vectordb.haystack.namespaces.utils import (
 )
 
 
-class PineconeNamespacePipeline:
-    """Pinecone namespace pipeline using native namespace isolation.
+class WeaviateNamespacePipeline:
+    """Weaviate namespace pipeline using native multi-tenancy.
 
-    Uses PineconeVectorDB for all database operations.
-    Namespaces are a first-class concept in Pinecone with strong isolation.
+    Uses WeaviateVectorDB wrapper for all database operations.
+    Implements namespace isolation using Weaviate's native multi-tenancy.
     """
 
-    ISOLATION_STRATEGY = IsolationStrategy.NAMESPACE
+    ISOLATION_STRATEGY = IsolationStrategy.TENANT
 
     def __init__(self, config_path: str) -> None:
         """Initialize the pipeline.
@@ -46,7 +46,7 @@ class PineconeNamespacePipeline:
         self.config_path = config_path
 
         # Lazy-initialized components
-        self._db: PineconeVectorDB | None = None
+        self._db: WeaviateVectorDB | None = None
         self._doc_embedder = None
         self._text_embedder = None
         self._logger: logging.Logger | None = None
@@ -54,25 +54,24 @@ class PineconeNamespacePipeline:
         self._connect()
 
     def _connect(self) -> None:
-        """Connect to Pinecone via unified wrapper."""
-        self._db = PineconeVectorDB(config=self.config)
+        """Connect to Weaviate via unified wrapper."""
+        self._db = WeaviateVectorDB(config=self.config)
 
         embedding_dim = self.config.get("embedding", {}).get("dimension", 1024)
-        metric = self.config.get("pinecone", {}).get("metric", "cosine")
-        self._db.create_index(dimension=embedding_dim, metric=metric)
+        self._db.create_index(dimension=embedding_dim)
 
     @property
-    def db(self) -> PineconeVectorDB:
+    def db(self) -> WeaviateVectorDB:
         """Get the VectorDB wrapper."""
         if self._db is None:
-            raise RuntimeError("Not connected to Pinecone")
+            raise RuntimeError("Not connected to Weaviate")
         return self._db
 
     @property
     def logger(self) -> logging.Logger:
         """Get logger instance."""
         if self._logger is None:
-            name = self.config.get("pipeline", {}).get("name", "pinecone_namespaces")
+            name = self.config.get("pipeline", {}).get("name", "weaviate_namespaces")
             self._logger = logging.getLogger(name)
         return self._logger
 
@@ -85,9 +84,9 @@ class PineconeNamespacePipeline:
     def close(self) -> None:
         """Close connection."""
         self._db = None
-        self.logger.info("Closed Pinecone connection")
+        self.logger.info("Closed Weaviate connection")
 
-    def __enter__(self) -> "PineconeNamespacePipeline":
+    def __enter__(self) -> "WeaviateNamespacePipeline":
         """Enter context manager."""
         return self
 
@@ -96,49 +95,54 @@ class PineconeNamespacePipeline:
         self.close()
 
     def create_namespace(self, namespace: str) -> NamespaceOperationResult:
-        """Create a namespace (auto-created on first upsert in Pinecone)."""
+        """Create a namespace (tenant) in Weaviate."""
+        self.db.create_tenant(tenant=namespace)
+        self.logger.info("Created tenant: %s", namespace)
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
             operation="create",
-            message="Namespace will be auto-created on first upsert (Pinecone behavior)",
+            message=f"Created tenant '{namespace}'",
         )
 
     def delete_namespace(self, namespace: str) -> NamespaceOperationResult:
-        """Delete all vectors in a namespace."""
-        self.db.delete(delete_all=True, namespace=namespace)
+        """Delete a namespace (tenant) from Weaviate."""
+        self.db.delete_tenant(tenant=namespace)
+        self.logger.info("Deleted tenant: %s", namespace)
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
             operation="delete",
-            message=f"Deleted all vectors in namespace '{namespace}'",
+            message=f"Deleted tenant '{namespace}'",
         )
 
     def list_namespaces(self) -> list[str]:
-        """List all namespaces in the index."""
-        return self.db.list_namespaces()
+        """List all tenants in the collection."""
+        return self.db.list_tenants()
 
     def namespace_exists(self, namespace: str) -> bool:
-        """Check if a namespace exists."""
+        """Check if a tenant exists."""
         return namespace in self.list_namespaces()
 
     def get_namespace_stats(self, namespace: str) -> NamespaceStats:
-        """Get statistics for a namespace."""
-        stats = self.db.describe_index_stats()
-        ns_stats = stats.get("namespaces", {}).get(namespace, {})
-        vector_count = ns_stats.get("vector_count", 0)
+        """Get statistics for a tenant."""
+        self.db.with_tenant(namespace)
+        aggregation = self.db.collection.aggregate.over_all(total_count=True)
+        count = aggregation.total_count
+
+        status = TenantStatus.ACTIVE if count > 0 else TenantStatus.UNKNOWN
 
         return NamespaceStats(
             namespace=namespace,
-            document_count=vector_count,
-            vector_count=vector_count,
-            status=TenantStatus.ACTIVE if vector_count > 0 else TenantStatus.UNKNOWN,
+            document_count=count,
+            vector_count=count,
+            status=status,
         )
 
     def index_documents(
         self, documents: list[Document], namespace: str
     ) -> NamespaceOperationResult:
-        """Index documents into a namespace."""
+        """Index documents into a namespace (tenant)."""
         if not documents:
             return NamespaceOperationResult(
                 success=True,
@@ -148,16 +152,25 @@ class PineconeNamespacePipeline:
                 data={"count": 0},
             )
 
+        if not self.namespace_exists(namespace):
+            self.create_namespace(namespace)
+
         self._init_embedders()
+
+        for doc in documents:
+            if doc.meta is None:
+                doc.meta = {}
+            doc.meta["namespace"] = namespace
+
         embedded_docs = self._doc_embedder.run(documents=documents)["documents"]
 
         count = self.db.upsert(
             data=embedded_docs,
-            namespace=namespace,
+            tenant=namespace,
             batch_size=self.config.get("indexing", {}).get("batch_size", 100),
         )
 
-        self.logger.info("Indexed %d documents into namespace '%s'", count, namespace)
+        self.logger.info("Indexed %d documents into tenant '%s'", count, namespace)
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
@@ -174,7 +187,7 @@ class PineconeNamespacePipeline:
     def query_namespace(
         self, query: str, namespace: str, top_k: int = 10
     ) -> list[NamespaceQueryResult]:
-        """Query a specific namespace."""
+        """Query a specific namespace (tenant)."""
         self._init_embedders()
 
         with Timer() as embed_timer:
@@ -182,9 +195,7 @@ class PineconeNamespacePipeline:
 
         with Timer() as search_timer:
             results = self.db.query(
-                vector=query_embedding,
-                namespace=namespace,
-                top_k=top_k,
+                vector=query_embedding, top_k=top_k, tenant=namespace
             )
 
         stats = self.get_namespace_stats(namespace)

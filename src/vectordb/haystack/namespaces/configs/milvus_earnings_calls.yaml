@@ -1,0 +1,76 @@
+# Milvus namespace pipeline for Earnings Calls dataset
+pipeline:
+  name: "milvus_earnings_calls_namespaces"
+  description: "Milvus namespace pipeline for Earnings Calls dataset using partition key"
+  database: "milvus"
+  dataset: "earnings_calls"
+
+milvus:
+  host: "${MILVUS_HOST}"
+  port: "${MILVUS_PORT}"
+  user: ""
+  password: ""
+
+collection:
+  name: "earnings_namespaces"
+  description: "Earnings calls dataset with ticker-based partition key isolation"
+
+namespaces:
+  strategy: "ticker"
+  prefix: "earnings"
+  definitions:
+    - name: "earnings_AAPL"
+      ticker: "AAPL"
+      description: "Apple Inc. earnings calls"
+    - name: "earnings_MSFT"
+      ticker: "MSFT"
+      description: "Microsoft Corp. earnings calls"
+    - name: "earnings_GOOGL"
+      ticker: "GOOGL"
+      description: "Alphabet Inc. earnings calls"
+    - name: "earnings_AMZN"
+      ticker: "AMZN"
+      description: "Amazon.com Inc. earnings calls"
+    - name: "earnings_META"
+      ticker: "META"
+      description: "Meta Platforms Inc. earnings calls"
+
+dataloader:
+  type: "haystack"
+  class: "EarningsCallDataloader"
+  dataset_name: "lamini/earnings-calls-qa"
+  filter_field: "ticker"
+  limit: 500
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "question"
+  custom_queries:
+    - "What was the revenue growth?"
+    - "How did margins perform this quarter?"
+    - "What is the guidance for next quarter?"
+
+cross_namespace:
+  enabled: true
+  compare_namespaces: ["earnings_AAPL", "earnings_MSFT", "earnings_GOOGL"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "milvus_earnings_calls_namespaces"

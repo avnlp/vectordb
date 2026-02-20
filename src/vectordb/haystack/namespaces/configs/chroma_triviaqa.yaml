@@ -1,0 +1,64 @@
+# Chroma namespace pipeline for TriviaQA dataset
+pipeline:
+  name: "chroma_triviaqa_namespaces"
+  description: "Chroma namespace pipeline for TriviaQA dataset using collection-per-namespace"
+  database: "chroma"
+  dataset: "triviaqa"
+
+chroma:
+  persist_directory: "${CHROMA_PERSIST_DIR}"
+  host: ""
+  port: ""
+
+collection:
+  name: "triviaqa"
+  description: "TriviaQA dataset with collection-per-namespace isolation"
+
+namespaces:
+  strategy: "split"
+  prefix: ""
+  definitions:
+    - name: "triviaqa_train"
+      split: "train"
+      description: "TriviaQA training set"
+    - name: "triviaqa_validation"
+      split: "validation"
+      description: "TriviaQA validation set"
+
+dataloader:
+  type: "haystack"
+  class: "TriviaQADataloader"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  subset: "rc.nocontext"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "question"
+  custom_queries: []
+
+cross_namespace:
+  enabled: true
+  compare_namespaces: ["triviaqa_train", "triviaqa_validation"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "chroma_triviaqa_namespaces"
