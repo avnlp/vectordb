@@ -36,13 +36,22 @@ def setup_chroma_mocks():
 
     sys.modules["weave"] = MockWeave()
 
-    # Mock chromadb and submodules
-    sys.modules["chromadb"] = MagicMock()
-    sys.modules["chromadb.api"] = MagicMock()
-    sys.modules["chromadb.api.configuration"] = MagicMock()
-    sys.modules["chromadb.api.types"] = MagicMock()
-    sys.modules["chromadb.utils"] = MagicMock()
-    sys.modules["chromadb.utils.embedding_functions"] = MagicMock()
+    # Mock chromadb and submodules using a single parent mock so that
+    # sys.modules entries and attribute navigation resolve to the same objects.
+    # This ensures patch("vectordb.databases.chroma.chromadb.X.Y") targets
+    # the same mock that "from chromadb.X import Y" resolves to.
+    chromadb_mock = MagicMock()
+    sys.modules["chromadb"] = chromadb_mock
+    sys.modules["chromadb.api"] = chromadb_mock.api
+    sys.modules["chromadb.api.configuration"] = chromadb_mock.api.configuration
+    sys.modules["chromadb.api.types"] = chromadb_mock.api.types
+    sys.modules["chromadb.config"] = chromadb_mock.config
+    sys.modules["chromadb.execution"] = chromadb_mock.execution
+    sys.modules["chromadb.execution.expression"] = chromadb_mock.execution.expression
+    sys.modules["chromadb.utils"] = chromadb_mock.utils
+    sys.modules["chromadb.utils.embedding_functions"] = (
+        chromadb_mock.utils.embedding_functions
+    )
 
 
 def pytest_configure(config):

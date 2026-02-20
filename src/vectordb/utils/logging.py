@@ -1,7 +1,24 @@
-"""Logging utilities for vectordb.
+"""Logging utilities for the vectordb package.
 
-This module provides a LoggerFactory class for configuring and managing
-loggers with customizable log levels and formats.
+This module provides a centralized logging factory that ensures consistent logger
+configuration across all vectordb components. The factory pattern guarantees that
+logging is initialized only once per application lifecycle, preventing duplicate
+handlers and log message proliferation.
+
+Key Features:
+    - Singleton-style initialization prevents duplicate log handlers
+    - Environment variable-based configuration via LOG_LEVEL
+    - Consistent formatting across all modules
+    - Thread-safe logger access
+
+Usage:
+    >>> from vectordb.utils.logging import LoggerFactory
+    >>> logger = LoggerFactory(__name__).get_logger()
+    >>> logger.info("Processing documents")
+
+    # Or configure from environment
+    >>> factory = LoggerFactory.configure_from_env(__name__)
+    >>> logger = factory.get_logger()
 """
 
 import logging
@@ -9,11 +26,11 @@ import os
 
 
 class LoggerFactory:
-    """Factory class to set up and configure a logger with customizable log level.
+    """Factory class to set up and configure a logger with customizable settings.
 
-    This class ensures that logging is configured only once during the application's
-    lifetime. It can configure the logger based on a given name, logging level, and
-    logging format.
+    This class ensures that logging is configured only once during the
+    application's lifetime. It can configure the logger based on a given
+    name, logging level, and logging format.
 
     Attributes:
         logger_name (str): The name of the logger to create.
@@ -25,8 +42,7 @@ class LoggerFactory:
         get_logger():
             Returns the configured logger instance.
         configure_from_env(logger_name, env_var="LOG_LEVEL"):
-            Configures the logger based on an environment variable for dynamic log
-            level setting.
+            Configures the logger based on an environment variable.
     """
 
     _is_logger_initialized: bool = False
@@ -37,14 +53,12 @@ class LoggerFactory:
         log_level: int = logging.INFO,
         log_format: str = "%(asctime)s - %(levelname)s - %(message)s",
     ) -> None:
-        """Initialize LoggerFactory instance with logger name, log level, and format.
+        """Initialize the LoggerFactory instance with the given configuration.
 
         Args:
             logger_name (str): The name of the logger to create.
-            log_level (int, optional): The logging level to use (default is
-                logging.INFO).
-            log_format (str, optional): The format for log messages (default is
-                "%(asctime)s - %(levelname)s - %(message)s").
+            log_level (int, optional): The logging level (default is logging.INFO).
+            log_format (str, optional): The format for log messages.
         """
         self.logger_name = logger_name
         self.log_level = log_level
@@ -77,17 +91,12 @@ class LoggerFactory:
     ) -> "LoggerFactory":
         """Configure the logger based on an environment variable.
 
-        Configure the logger based on an environment variable for dynamic
-        log level setting.
-
         Args:
             logger_name (str): The name of the logger to create.
-            env_var (str, optional): The environment variable to retrieve the log level
-                from (default is "LOG_LEVEL").
+            env_var (str, optional): The environment variable for log level.
 
         Returns:
-            LoggerFactory: A LoggerFactory instance with the log level set based on the
-                environment variable.
+            LoggerFactory: A LoggerFactory instance with the configured log level.
         """
         log_level_str = os.getenv(env_var, "INFO").upper()
         # Default to INFO if invalid level
