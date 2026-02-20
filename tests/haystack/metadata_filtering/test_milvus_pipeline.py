@@ -197,8 +197,8 @@ def test_run_pipeline(
     mock_hit = MagicMock()
     mock_hit.id = 1
     mock_hit.score = 0.95
-    mock_hit.entity.get.side_effect = (
-        lambda k, d: "content" if k == "content" else {"category": "news"}
+    mock_hit.entity.get.side_effect = lambda k, d: (
+        "content" if k == "content" else {"category": "news"}
     )
     mock_milvus_components["collection_instance"].search.return_value = [[mock_hit]]
 
@@ -328,8 +328,8 @@ def test_run_pipeline_multiple_results(
         mock_hit = MagicMock()
         mock_hit.id = i + 1
         mock_hit.score = 0.9 - (i * 0.1)
-        mock_hit.entity.get.side_effect = (
-            lambda k, d, idx=i: f"content_{idx}" if k == "content" else {"rank": idx}
+        mock_hit.entity.get.side_effect = lambda k, d, idx=i: (
+            f"content_{idx}" if k == "content" else {"rank": idx}
         )
         mock_hits.append(mock_hit)
 
