@@ -1,0 +1,67 @@
+# Pinecone metadata filtering configuration for FactScore dataset
+# Production config for fact verification with evidence retrieval
+
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "factscore-metadata-filtered"
+  environment: "${PINECONE_ENV:-us-west1-gcp}"
+
+collection:
+  name: "factscore_metadata_filtered"
+  description: "FactScore dataset with metadata filtering for fact verification"
+
+dataloader:
+  type: "haystack"
+  dataset_name: "dskar/FActScore"
+  split: "test"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 384
+  batch_size: 32
+
+metadata_filtering:
+  test_query: "Verify the facts about Albert Einstein"
+
+  schema:
+    - field: "question"
+      type: "string"
+      operators: ["eq", "contains"]
+      description: "Fact verification query"
+
+    - field: "id"
+      type: "string"
+      operators: ["eq", "in"]
+      description: "Context document ID"
+
+    - field: "title"
+      type: "string"
+      operators: ["eq", "contains", "in"]
+      description: "Wikipedia article title as evidence source"
+
+  test_filters:
+    - name: "by_person"
+      description: "Filter by person name in title"
+      conditions:
+        - field: "title"
+          operator: "eq"
+          value: "Albert Einstein"
+
+    - name: "by_topic"
+      description: "Filter by topic in title"
+      conditions:
+        - field: "title"
+          operator: "eq"
+          value: "Physics"
+
+    - name: "by_multiple_sources"
+      description: "Filter by multiple Wikipedia sources"
+      conditions:
+        - field: "title"
+          operator: "in"
+          value: ["Albert Einstein", "Theory of relativity", "Nobel Prize"]
+
+logging:
+  level: "INFO"
+  name: "pinecone_factscore_metadata_filtering"

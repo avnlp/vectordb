@@ -1,0 +1,39 @@
+# chroma hybrid search configuration for popqa dataset
+# Uses manual DocumentJoiner + RRF fusion (BM25) for dense + sparse combined search
+
+chroma:
+  persist_directory: "${{CHROMA_PERSIST_DIR:-./chroma_data}}"
+
+collection:
+  name: "popqa_hybrid"
+  description: "PopQA dataset for hybrid search with RRF fusion"
+
+dataloader:
+  type: "popqa"
+  dataset_name: "akariasai/PopQA"
+  split: "test"
+  limit: null
+
+generator:
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  batch_size: 32
+
+hybrid_search:
+  top_k: 10
+  method: "rrf"  # Reciprocal Rank Fusion
+
+evaluation:
+  enabled: true
+  metrics:
+    - contextual_recall
+    - contextual_precision
+    - answer_relevancy
+    - faithfulness
+
+logging:
+  level: "INFO"
+  name: "chroma_popqa_hybrid_search"
