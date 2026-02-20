@@ -409,7 +409,7 @@ class PineconeFilterExpressionBuilder(FilterExpressionBuilder):
         if condition.operator == "in":
             return {condition.field: {"$in": condition.value}}
         if condition.operator == "contains":
-            return {condition.field: {"$exists": True}}
+            return {condition.field: {"$in": [condition.value]}}
         if condition.operator == "range":
             if (
                 not isinstance(condition.value, (list, tuple))
@@ -607,7 +607,7 @@ class ChromaFilterExpressionBuilder(FilterExpressionBuilder):
         if condition.operator == "in":
             return {condition.field: {"$in": condition.value}}
         if condition.operator == "contains":
-            return {condition.field: {"$exists": True}}
+            return {condition.field: {"$contains": condition.value}}
         if condition.operator == "range":
             if (
                 not isinstance(condition.value, (list, tuple))

@@ -156,25 +156,27 @@ class ChromaHybridSearchPipeline:
         dense_embedding, sparse_embedding = self._embed_query(query)
 
         # Execute dense semantic search (always performed)
-        dense_docs = self.db.search(
+        dense_results = self.db.search(
             query_embedding=dense_embedding,
             collection_name=self.collection_name,
             top_k=top_k * 2,
             filter=filters,
             search_type="dense",
         )
+        dense_docs = self.db.query_to_documents(dense_results)
         logger.debug("Dense search retrieved %d documents", len(dense_docs))
 
         # Execute sparse lexical search if embedder configured
         sparse_docs = []
         if sparse_embedding and self.sparse_embedder:
-            sparse_docs = self.db.search(
+            sparse_results = self.db.search(
                 query_embedding=sparse_embedding,
                 collection_name=self.collection_name,
                 top_k=top_k * 2,
                 filter=filters,
                 search_type="sparse",
             )
+            sparse_docs = self.db.query_to_documents(sparse_results)
             logger.debug("Sparse search retrieved %d documents", len(sparse_docs))
 
         # Fuse results using RRF if sparse results available, else dense-only

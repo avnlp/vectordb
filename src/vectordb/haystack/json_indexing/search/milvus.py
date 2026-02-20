@@ -42,7 +42,11 @@ class MilvusJSONSearcher:
 
     def _connect(self) -> None:
         """Connect to Milvus using VectorDB wrapper."""
-        self.vector_db = MilvusVectorDB(config=self.config)
+        milvus_config = self.config.get("milvus", {})
+        self.vector_db = MilvusVectorDB(
+            uri=milvus_config.get("uri", "http://localhost:19530"),
+            token=milvus_config.get("token", ""),
+        )
         self.logger.info("Connected to Milvus")
 
     def _init_embedder(self) -> None:

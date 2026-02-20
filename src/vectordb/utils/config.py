@@ -34,8 +34,8 @@ from vectordb.utils.logging import LoggerFactory
 def resolve_env_vars(value: Any) -> Any:
     """Resolve environment variables in configuration values.
 
-    Supports both simple ${VAR} and ${VAR:-default} syntax for
-    environment variable substitution.
+    Supports both simple ${VAR} and ${VAR:-default} syntax, including
+    multiple substitutions within a single string (e.g., "http://${HOST}:${PORT}").
 
     Args:
         value: The value to resolve, can be a string, dict, or list.
@@ -44,13 +44,16 @@ def resolve_env_vars(value: Any) -> Any:
         The resolved value with environment variables expanded.
     """
     if isinstance(value, str):
-        pattern = r"\$\{([^}:]+)(?::-([^}]*))?\}"
-        match = re.match(pattern, value)
-        if match:
-            env_var = match.group(1)
-            default = match.group(2) if match.group(2) is not None else ""
-            return os.environ.get(env_var, default)
-        return value
+        pattern = r"\$\{([^}]+)\}"
+
+        def replacer(match: re.Match[str]) -> str:
+            expr = match.group(1)
+            if ":-" in expr:
+                var, default = expr.split(":-", 1)
+                return os.environ.get(var, default)
+            return os.environ.get(expr, "")
+
+        return re.sub(pattern, replacer, value)
     if isinstance(value, dict):
         return {k: resolve_env_vars(v) for k, v in value.items()}
     if isinstance(value, list):

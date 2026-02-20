@@ -17,38 +17,46 @@ def build_qdrant_filter(filters: dict[str, Any] | None) -> Filter | None:
     if not filters:
         return None
 
-    conditions = []
+    must_conditions = []
+    must_not_conditions = []
 
     for key, value in filters.items():
         if isinstance(value, dict):
             for op, op_value in value.items():
                 if op == "$eq":
-                    conditions.append(
+                    must_conditions.append(
                         FieldCondition(key=key, match=MatchValue(value=op_value))
                     )
                 elif op == "$ne":
-                    # Qdrant doesn't have native $ne, skip for now
-                    pass
+                    must_not_conditions.append(
+                        FieldCondition(key=key, match=MatchValue(value=op_value))
+                    )
                 elif op == "$gt":
-                    conditions.append(FieldCondition(key=key, range=Range(gt=op_value)))
+                    must_conditions.append(
+                        FieldCondition(key=key, range=Range(gt=op_value))
+                    )
                 elif op == "$gte":
-                    conditions.append(
+                    must_conditions.append(
                         FieldCondition(key=key, range=Range(gte=op_value))
                     )
                 elif op == "$lt":
-                    conditions.append(FieldCondition(key=key, range=Range(lt=op_value)))
+                    must_conditions.append(
+                        FieldCondition(key=key, range=Range(lt=op_value))
+                    )
                 elif op == "$lte":
-                    conditions.append(
+                    must_conditions.append(
                         FieldCondition(key=key, range=Range(lte=op_value))
                     )
         else:
             # Simple equality
-            conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+            must_conditions.append(
+                FieldCondition(key=key, match=MatchValue(value=value))
+            )
 
-    if not conditions:
+    if not must_conditions and not must_not_conditions:
         return None
 
-    if len(conditions) == 1:
-        return Filter(must=conditions)
-
-    return Filter(must=conditions)
+    return Filter(
+        must=must_conditions or None,
+        must_not=must_not_conditions or None,
+    )

@@ -53,7 +53,7 @@ class TestBuildQdrantFilter:
             mock_field_condition.assert_called_once_with(
                 key="category", match=mock_match
             )
-            mock_filter.assert_called_once_with(must=[mock_condition])
+            mock_filter.assert_called_once_with(must=[mock_condition], must_not=None)
             assert result == mock_filter_instance
 
     def test_eq_operator_filter(self) -> None:
@@ -78,21 +78,33 @@ class TestBuildQdrantFilter:
             mock_match_value.assert_called_once_with(value="active")
             mock_field_condition.assert_called_once_with(key="status", match=mock_match)
 
-    def test_ne_operator_skipped(self) -> None:
-        """Test that $ne operator is skipped (not natively supported)."""
+    def test_ne_operator_filter(self) -> None:
+        """Test $ne operator uses must_not clause."""
         with (
             patch(
                 "vectordb.haystack.json_indexing.common.filters.qdrant.FieldCondition"
             ) as mock_field_condition,
-            patch("vectordb.haystack.json_indexing.common.filters.qdrant.Filter"),
+            patch(
+                "vectordb.haystack.json_indexing.common.filters.qdrant.MatchValue"
+            ) as mock_match_value,
+            patch(
+                "vectordb.haystack.json_indexing.common.filters.qdrant.Filter"
+            ) as mock_filter,
         ):
-            # Only $ne filter should result in no conditions
+            mock_match = MagicMock()
+            mock_match_value.return_value = mock_match
+            mock_condition = MagicMock()
+            mock_field_condition.return_value = mock_condition
+            mock_filter_instance = MagicMock()
+            mock_filter.return_value = mock_filter_instance
+
             filters = {"status": {"$ne": "inactive"}}
             result = build_qdrant_filter(filters)
 
-            # Should return None since $ne is skipped
-            assert result is None
-            mock_field_condition.assert_not_called()
+            mock_match_value.assert_called_once_with(value="inactive")
+            mock_field_condition.assert_called_once_with(key="status", match=mock_match)
+            mock_filter.assert_called_once_with(must=None, must_not=[mock_condition])
+            assert result == mock_filter_instance
 
     def test_gt_operator_filter(self) -> None:
         """Test $gt operator filter."""
@@ -200,7 +212,9 @@ class TestBuildQdrantFilter:
 
             # Should have 2 conditions
             assert mock_field_condition.call_count == 2
-            mock_filter.assert_called_once_with(must=[mock_condition, mock_condition])
+            mock_filter.assert_called_once_with(
+                must=[mock_condition, mock_condition], must_not=None
+            )
             assert result == mock_filter_instance
 
     def test_numeric_values(self) -> None:
@@ -235,31 +249,31 @@ class TestBuildQdrantFilter:
 
             mock_match_value.assert_called_once_with(value=True)
 
-    def test_only_ne_operator_returns_none(self) -> None:
-        """Test that filter with only $ne returns None."""
-        filters = {"status": {"$ne": "deleted"}}
-        result = build_qdrant_filter(filters)
-        assert result is None
-
     def test_mixed_operators_with_ne(self) -> None:
-        """Test filter with mix of supported and unsupported operators."""
+        """Test filter with mix of $eq and $ne operators."""
         with (
             patch(
                 "vectordb.haystack.json_indexing.common.filters.qdrant.FieldCondition"
             ) as mock_field_condition,
             patch("vectordb.haystack.json_indexing.common.filters.qdrant.MatchValue"),
-            patch("vectordb.haystack.json_indexing.common.filters.qdrant.Filter"),
+            patch(
+                "vectordb.haystack.json_indexing.common.filters.qdrant.Filter"
+            ) as mock_filter,
         ):
             mock_condition = MagicMock()
             mock_field_condition.return_value = mock_condition
+            mock_filter_instance = MagicMock()
+            mock_filter.return_value = mock_filter_instance
 
-            # Has both $eq (supported) and $ne (skipped)
             filters = {
                 "type": {"$eq": "premium"},
                 "status": {"$ne": "banned"},
             }
             result = build_qdrant_filter(filters)
 
-            # Should only create one condition (for $eq)
-            assert mock_field_condition.call_count == 1
-            assert result is not None
+            # Should create two conditions: one must, one must_not
+            assert mock_field_condition.call_count == 2
+            mock_filter.assert_called_once_with(
+                must=[mock_condition], must_not=[mock_condition]
+            )
+            assert result == mock_filter_instance

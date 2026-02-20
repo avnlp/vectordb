@@ -128,15 +128,14 @@ class QdrantMetadataFilteringPipeline(BaseMetadataFilteringPipeline):
         if not self.client:
             return 0
 
-        # Count matching documents using scroll
-        results, _ = self.client.scroll(
+        points, _ = self.client.scroll(
             collection_name=self.collection_name,
             scroll_filter=filter_obj,
-            limit=10000,  # Count up to 10k
+            limit=10000,
             with_payload=False,
             with_vectors=False,
         )
-        return len(results)
+        return len(points)
 
     def _vector_search(
         self,

@@ -696,7 +696,7 @@ class TestPineconeFilterExpressionBuilder:
             ]
         )
         result = builder.build(spec)
-        assert result == {"text": {"$exists": True}}
+        assert result == {"text": {"$in": ["term"]}}
 
     def test_build_range_operator_invalid_value(self):
         """Test building range operator with invalid value raises error."""
@@ -1042,7 +1042,7 @@ class TestChromaFilterExpressionBuilder:
             ]
         )
         result = builder.build(spec)
-        assert result == {"category": {"$exists": True}}
+        assert result == {"category": {"$contains": "test"}}
 
     def test_build_range_operator(self):
         """Test building range operator."""
