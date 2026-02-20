@@ -1,0 +1,27 @@
+# Weaviate Hybrid Indexing Configuration
+# Indexes TriviaQA dataset with dense embeddings (BM25 handled by Weaviate)
+
+dataloader:
+  type: "triviaqa"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  sparse_model: null  # Weaviate handles BM25 internally
+  device: "cpu"
+  batch_size: 32
+
+weaviate:
+  url: "${WEAVIATE_URL:-http://localhost:8080}"
+  api_key: "${WEAVIATE_API_KEY:-}"
+  collection_name: "TriviaQA_Hybrid"
+  dimension: 384
+  batch_size: 100
+  alpha: 0.5  # Balance BM25 vs vector (for search)
+
+logging:
+  name: "weaviate_hybrid"
+  level: "INFO"

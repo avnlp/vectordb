@@ -1,0 +1,28 @@
+# Chroma JSON Indexing Configuration - PopQA Dataset
+
+chroma:
+  host: "${CHROMA_HOST:-localhost}"
+  port: 8000
+  api_key: "${CHROMA_API_KEY:-}"
+  tenant: "default_tenant"
+  database: "default_database"
+
+collection:
+  name: "popqa_json_indexed"
+
+dataloader:
+  type: "popqa"
+  dataset_name: "akariasai/PopQA"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  batch_size: 32
+
+search:
+  top_k: 10
+
+logging:
+  level: "INFO"
+  name: "chroma_popqa_json"

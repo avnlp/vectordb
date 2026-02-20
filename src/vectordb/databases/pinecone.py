@@ -421,6 +421,54 @@ class PineconeVectorDB:
             include_embeddings=include_vectors,
         )
 
+    def hybrid_search(
+        self,
+        query_embedding: List[float],
+        query_sparse_embedding: Union[Dict[str, Any], SparseEmbedding, None] = None,
+        index_name: Optional[str] = None,
+        namespace: str = "",
+        top_k: int = 10,
+        filter: Optional[Dict[str, Any]] = None,
+        alpha: Optional[float] = None,
+        include_metadata: bool = True,
+        include_vectors: bool = False,
+    ) -> List[Any]:
+        """Perform hybrid search combining dense and sparse vectors.
+
+        Convenience wrapper around :meth:`query_with_sparse` that provides a
+        consistent ``hybrid_search`` interface across all database backends.
+
+        Args:
+            query_embedding: Dense query embedding vector.
+            query_sparse_embedding: Sparse query embedding (indices + values).
+            index_name: Unused; kept for interface consistency.
+            namespace: Namespace to search in.
+            top_k: Number of results.
+            filter: Metadata filters.
+            alpha: Unused; kept for interface consistency with other backends.
+            include_metadata: Whether to include metadata.
+            include_vectors: Whether to include vector values.
+
+        Returns:
+            List of Haystack Documents.
+        """
+        if query_sparse_embedding is None:
+            return self.query(
+                vector=query_embedding,
+                top_k=top_k,
+                filter=filter,
+                namespace=namespace,
+            )
+        return self.query_with_sparse(
+            vector=query_embedding,
+            sparse_vector=query_sparse_embedding,
+            top_k=top_k,
+            filter=filter,
+            namespace=namespace,
+            include_metadata=include_metadata,
+            include_vectors=include_vectors,
+        )
+
     def fetch(self, ids: List[str], namespace: str = "") -> Dict[str, Any]:
         """Retrieve vectors by their unique identifiers.
 
