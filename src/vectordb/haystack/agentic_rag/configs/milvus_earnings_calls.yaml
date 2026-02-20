@@ -1,0 +1,60 @@
+# MILVUS Agentic RAG Pipeline - Earnings Calls Dataset
+
+milvus:
+  host: "${MILVUS_HOST:-localhost}"
+  port: "${MILVUS_PORT:-19530}"
+  uri: "${MILVUS_URI:-}"
+  token: "${MILVUS_TOKEN:-}"
+
+collection:
+  name: earnings_calls_agentic_rag
+
+dataloader:
+  type: earnings_calls
+  dataset_name: lamini/earnings-calls-qa
+  split: test
+  limit: null
+
+generator:
+  model: llama-3.3-70b-versatile
+  api_key: "${GROQ_API_KEY:-}"
+  max_tokens: 2048
+  temperature: 0.7
+
+embeddings:
+  model: Qwen/Qwen3-Embedding-0.6B
+  batch_size: 32
+
+agentic_rag:
+  model: llama-3.3-70b-versatile
+  api_key: "${GROQ_API_KEY:-}"
+  routing_enabled: true
+  self_reflection_enabled: true
+  max_iterations: 2
+  quality_threshold: 75
+  fallback_tool: retrieval
+  max_retries: 3
+  retry_delay_seconds: 0.5
+
+search:
+  top_k: 10
+
+evaluation:
+  enabled: true
+  metrics:
+  - contextual_recall
+  - contextual_precision
+  - answer_relevancy
+  - faithfulness
+
+logging:
+  name: milvus_agentic_rag_earnings_calls
+  level: INFO
+
+indexing:
+  chunk_size: 512
+  chunk_overlap: 50
+  batch_size: 32
+
+retrieval:
+  top_k_default: 10
