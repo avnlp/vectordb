@@ -1,4 +1,4 @@
-"""Pinecone namespace pipeline using native namespace isolation."""
+"""Chroma namespace pipeline using collection-per-namespace pattern."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 from haystack import Document
 
-from vectordb.databases.pinecone import PineconeVectorDB
+from vectordb.databases.chroma import ChromaVectorDB
 from vectordb.haystack.namespaces.types import (
     CrossNamespaceComparison,
     CrossNamespaceResult,
@@ -27,14 +27,14 @@ from vectordb.haystack.namespaces.utils import (
 )
 
 
-class PineconeNamespacePipeline:
-    """Pinecone namespace pipeline using native namespace isolation.
+class ChromaNamespacePipeline:
+    """Chroma namespace pipeline using collection-per-namespace.
 
-    Uses PineconeVectorDB for all database operations.
-    Namespaces are a first-class concept in Pinecone with strong isolation.
+    Uses ChromaVectorDB wrapper for all database operations.
+    Implements namespace isolation using separate collections per namespace.
     """
 
-    ISOLATION_STRATEGY = IsolationStrategy.NAMESPACE
+    ISOLATION_STRATEGY = IsolationStrategy.COLLECTION
 
     def __init__(self, config_path: str) -> None:
         """Initialize the pipeline.
@@ -46,7 +46,7 @@ class PineconeNamespacePipeline:
         self.config_path = config_path
 
         # Lazy-initialized components
-        self._db: PineconeVectorDB | None = None
+        self._db: ChromaVectorDB | None = None
         self._doc_embedder = None
         self._text_embedder = None
         self._logger: logging.Logger | None = None
@@ -54,25 +54,24 @@ class PineconeNamespacePipeline:
         self._connect()
 
     def _connect(self) -> None:
-        """Connect to Pinecone via unified wrapper."""
-        self._db = PineconeVectorDB(config=self.config)
+        """Connect to Chroma via unified wrapper."""
+        self._db = ChromaVectorDB(config=self.config)
 
         embedding_dim = self.config.get("embedding", {}).get("dimension", 1024)
-        metric = self.config.get("pinecone", {}).get("metric", "cosine")
-        self._db.create_index(dimension=embedding_dim, metric=metric)
+        self._db.create_index(dimension=embedding_dim)
 
     @property
-    def db(self) -> PineconeVectorDB:
+    def db(self) -> ChromaVectorDB:
         """Get the VectorDB wrapper."""
         if self._db is None:
-            raise RuntimeError("Not connected to Pinecone")
+            raise RuntimeError("Not connected to Chroma")
         return self._db
 
     @property
     def logger(self) -> logging.Logger:
         """Get logger instance."""
         if self._logger is None:
-            name = self.config.get("pipeline", {}).get("name", "pinecone_namespaces")
+            name = self.config.get("pipeline", {}).get("name", "chroma_namespaces")
             self._logger = logging.getLogger(name)
         return self._logger
 
@@ -85,9 +84,9 @@ class PineconeNamespacePipeline:
     def close(self) -> None:
         """Close connection."""
         self._db = None
-        self.logger.info("Closed Pinecone connection")
+        self.logger.info("Closed Chroma connection")
 
-    def __enter__(self) -> "PineconeNamespacePipeline":
+    def __enter__(self) -> "ChromaNamespacePipeline":
         """Enter context manager."""
         return self
 
@@ -96,49 +95,72 @@ class PineconeNamespacePipeline:
         self.close()
 
     def create_namespace(self, namespace: str) -> NamespaceOperationResult:
-        """Create a namespace (auto-created on first upsert in Pinecone)."""
+        """Create a collection for the namespace."""
+        collection_name = (
+            f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
+        )
+        self.db.create_collection(collection_name=collection_name)
+        self.logger.info("Created namespace collection: %s", collection_name)
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
             operation="create",
-            message="Namespace will be auto-created on first upsert (Pinecone behavior)",
+            message=f"Created collection '{collection_name}'",
         )
 
     def delete_namespace(self, namespace: str) -> NamespaceOperationResult:
-        """Delete all vectors in a namespace."""
-        self.db.delete(delete_all=True, namespace=namespace)
+        """Delete the collection for a namespace."""
+        collection_name = (
+            f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
+        )
+        self.db.delete_collection(collection_name=collection_name)
+        self.logger.info("Deleted namespace collection: %s", collection_name)
         return NamespaceOperationResult(
             success=True,
             namespace=namespace,
             operation="delete",
-            message=f"Deleted all vectors in namespace '{namespace}'",
+            message=f"Deleted collection '{collection_name}'",
         )
 
     def list_namespaces(self) -> list[str]:
-        """List all namespaces in the index."""
-        return self.db.list_namespaces()
+        """List all namespaces (collections with matching prefix)."""
+        all_collections = self.db.list_collections()
+        prefix = self.config.get("collection", {}).get("name", "ns")
+        namespaces = []
+        for coll in all_collections:
+            if coll.startswith(f"{prefix}_"):
+                namespaces.append(coll[len(f"{prefix}_") :])
+        return namespaces
 
     def namespace_exists(self, namespace: str) -> bool:
-        """Check if a namespace exists."""
-        return namespace in self.list_namespaces()
+        """Check if a namespace collection exists."""
+        collection_name = (
+            f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
+        )
+        return collection_name in self.db.list_collections()
 
     def get_namespace_stats(self, namespace: str) -> NamespaceStats:
         """Get statistics for a namespace."""
-        stats = self.db.describe_index_stats()
-        ns_stats = stats.get("namespaces", {}).get(namespace, {})
-        vector_count = ns_stats.get("vector_count", 0)
+        collection_name = (
+            f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
+        )
+
+        results = self.db.query(
+            vector=[0.0] * 1024, top_k=10000, collection_name=collection_name
+        )  # dummy query
+        count = len(results)
 
         return NamespaceStats(
             namespace=namespace,
-            document_count=vector_count,
-            vector_count=vector_count,
-            status=TenantStatus.ACTIVE if vector_count > 0 else TenantStatus.UNKNOWN,
+            document_count=count,
+            vector_count=count,
+            status=TenantStatus.ACTIVE if count > 0 else TenantStatus.UNKNOWN,
         )
 
     def index_documents(
         self, documents: list[Document], namespace: str
     ) -> NamespaceOperationResult:
-        """Index documents into a namespace."""
+        """Index documents into a namespace collection."""
         if not documents:
             return NamespaceOperationResult(
                 success=True,
@@ -148,12 +170,24 @@ class PineconeNamespacePipeline:
                 data={"count": 0},
             )
 
+        if not self.namespace_exists(namespace):
+            self.create_namespace(namespace)
+
         self._init_embedders()
+
+        for doc in documents:
+            if doc.meta is None:
+                doc.meta = {}
+            doc.meta["namespace"] = namespace
+
         embedded_docs = self._doc_embedder.run(documents=documents)["documents"]
 
+        collection_name = (
+            f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
+        )
         count = self.db.upsert(
             data=embedded_docs,
-            namespace=namespace,
+            collection_name=collection_name,
             batch_size=self.config.get("indexing", {}).get("batch_size", 100),
         )
 
@@ -174,17 +208,18 @@ class PineconeNamespacePipeline:
     def query_namespace(
         self, query: str, namespace: str, top_k: int = 10
     ) -> list[NamespaceQueryResult]:
-        """Query a specific namespace."""
+        """Query a specific namespace collection."""
         self._init_embedders()
 
         with Timer() as embed_timer:
             query_embedding = self._text_embedder.run(text=query)["embedding"]
 
+        collection_name = (
+            f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
+        )
         with Timer() as search_timer:
             results = self.db.query(
-                vector=query_embedding,
-                namespace=namespace,
-                top_k=top_k,
+                vector=query_embedding, top_k=top_k, collection_name=collection_name
             )
 
         stats = self.get_namespace_stats(namespace)
