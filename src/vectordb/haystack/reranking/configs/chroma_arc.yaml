@@ -1,0 +1,37 @@
+# CHROMA Reranking Pipeline - ARC Challenge Dataset
+
+chroma:
+  persist_dir: "${CHROMA_PERSIST_DIR:-./chroma_data}"
+
+collection:
+  name: "arc_reranking"
+
+dataloader:
+  type: "arc"
+  dataset_name: "ai2_arc"
+  config: "ARC-Challenge"
+  split: "test"
+  limit: null
+
+# No generator needed for this dataset
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  batch_size: 32
+
+reranker:
+  type: "cross_encoder"
+  model: "BAAI/bge-reranker-v2-m3"
+  top_k: 5
+
+evaluation:
+  enabled: true
+  metrics:
+    - contextual_recall
+    - contextual_precision
+    - answer_relevancy
+    - faithfulness
+
+logging:
+  name: "chroma_reranking"
+  level: "INFO"
