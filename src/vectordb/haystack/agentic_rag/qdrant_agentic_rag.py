@@ -132,7 +132,7 @@ class QdrantAgenticRAGPipeline(BaseAgenticRAGPipeline):
         # Upsert documents in batches
         from qdrant_client.models import PointStruct
 
-        batch_size = 100
+        batch_size = self.config.get("indexing", {}).get("batch_size", 100)
         indexed_count = 0
 
         for i in range(0, len(embedded_docs), batch_size):

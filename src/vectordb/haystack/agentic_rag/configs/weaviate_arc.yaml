@@ -37,9 +37,6 @@ agentic_rag:
   max_retries: 3
   retry_delay_seconds: 0.5
 
-search:
-  top_k: 10
-
 evaluation:
   enabled: true
   metrics:

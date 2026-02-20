@@ -255,9 +255,9 @@ class TestWeaviateAgenticRAGPipeline:
 
         assert len(objects) == 2
         assert objects[0]["properties"]["content"] == "Document 1"
-        assert objects[0]["properties"]["metadata"] == str({"source": "test1"})
+        assert objects[0]["properties"]["metadata"] == {"source": "test1"}
         assert objects[1]["properties"]["content"] == "Document 2"
-        assert objects[1]["properties"]["metadata"] == str({"source": "test2"})
+        assert objects[1]["properties"]["metadata"] == {"source": "test2"}
         assert result == 2
 
     def test_index_documents_in_batches(self, mock_weaviate_pipeline):

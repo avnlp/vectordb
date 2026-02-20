@@ -49,7 +49,7 @@ class MilvusAgenticRAGPipeline(BaseAgenticRAGPipeline):
         1. _retrieve(): Invoked when router selects "retrieval" tool
         2. Embeds query using dense_embedder
         3. Searches Milvus collection with approximate nearest neighbors
-        4. Returns Document objects with metadata and distance scores
+        4. Returns Document objects with metadata and similarity scores
         5. Supports multiple retrieval cycles for multi-hop queries
 
     Scalability Features:
@@ -155,7 +155,7 @@ class MilvusAgenticRAGPipeline(BaseAgenticRAGPipeline):
             )
 
         # Insert documents in batches
-        batch_size = 100
+        batch_size = self.config.get("indexing", {}).get("batch_size", 100)
         indexed_count = 0
 
         for i in range(0, len(embedded_docs), batch_size):
@@ -224,7 +224,7 @@ class MilvusAgenticRAGPipeline(BaseAgenticRAGPipeline):
                     doc = Document(
                         content=str(content),
                         meta=metadata,
-                        score=hit.get("distance", 0.0),
+                        score=1.0 - hit.get("distance", 1.0),
                     )
                     documents.append(doc)
 

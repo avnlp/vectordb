@@ -11,9 +11,9 @@ Capabilities:
     - Fallback Handling: Graceful degradation when tools fail
 
 Architecture:
-    The router uses Groq API (Llama models) for fast LLM inference. It maintains
-    state across iterations and can trigger refinement loops until quality
-    thresholds are met.
+    The router uses any OpenAI-compatible API (defaults to Groq) for LLM
+    inference. It maintains state across iterations and can trigger refinement
+    loops until quality thresholds are met.
 
 Design Notes:
     - Temperature is set to 0 for deterministic routing decisions
@@ -30,7 +30,7 @@ Usage:
 Note:
     This component is part of the Haystack integration layer and uses
     Haystack's OpenAIChatGenerator for LLM interactions, configured to
-    use Groq's fast inference API.
+    use any OpenAI-compatible API (Groq by default).
 """
 
 import json
@@ -54,13 +54,14 @@ class AgenticRouter:
     - Self-reflection: Evaluate answer quality and iterate
     - Fallback mechanisms: Graceful degradation
 
-    The router uses an LLM (via Groq API) to make routing decisions and
-    evaluate answer quality. It maintains no persistent state between calls,
-    making it suitable for stateless pipeline integration.
+    The router uses an LLM (via any OpenAI-compatible API, defaulting to Groq)
+    to make routing decisions and evaluate answer quality. It maintains no
+    persistent state between calls, making it suitable for stateless pipeline
+    integration.
 
     Attributes:
-        generator: Haystack OpenAIChatGenerator configured for Groq's fast
-            inference API.
+        generator: Haystack OpenAIChatGenerator configured for the specified
+            OpenAI-compatible API.
         available_tools: List of tool names the router can select from.
     """
 
@@ -68,12 +69,14 @@ class AgenticRouter:
         self,
         model: str = "llama-3.3-70b-versatile",
         api_key: str | None = None,
+        api_base_url: str = "https://api.groq.com/openai/v1",
     ) -> None:
         """Initialize agentic router.
 
         Args:
-            model: LLM model name (Groq API).
-            api_key: Groq API key (or set GROQ_API_KEY env var).
+            model: LLM model name.
+            api_key: API key (or set GROQ_API_KEY env var).
+            api_base_url: Base URL for the OpenAI-compatible API.
         """
         resolved_api_key = api_key or os.environ.get("GROQ_API_KEY")
         if not resolved_api_key:
@@ -81,12 +84,12 @@ class AgenticRouter:
             raise ValueError(msg)
 
         try:
-            # Use OpenAIChatGenerator with Groq's OpenAI-compatible API
+            # Use OpenAIChatGenerator with an OpenAI-compatible API
             # Temperature=0 ensures deterministic routing decisions
             self.generator = OpenAIChatGenerator(
                 api_key=Secret.from_token(resolved_api_key),
                 model=model,
-                api_base_url="https://api.groq.com/openai/v1",
+                api_base_url=api_base_url,
                 generation_kwargs={"temperature": 0, "max_tokens": 1024},
             )
             logger.info("Initialized AgenticRouter with model: %s", model)

@@ -134,7 +134,7 @@ class PineconeAgenticRAGPipeline(BaseAgenticRAGPipeline):
             self.index = self.client.Index(self.index_name)
 
         # Upsert documents in batches
-        batch_size = 100
+        batch_size = self.config.get("indexing", {}).get("batch_size", 100)
         indexed_count = 0
 
         for i in range(0, len(embedded_docs), batch_size):

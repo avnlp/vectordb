@@ -134,7 +134,7 @@ class WeaviateAgenticRAGPipeline(BaseAgenticRAGPipeline):
             )
 
         collection = self.client.collections.get(self.collection_name)
-        batch_size = 100
+        batch_size = self.config.get("indexing", {}).get("batch_size", 100)
         indexed_count = 0
 
         for i in range(0, len(embedded_docs), batch_size):
@@ -143,7 +143,7 @@ class WeaviateAgenticRAGPipeline(BaseAgenticRAGPipeline):
                 {
                     "properties": {
                         "content": doc.content,
-                        "metadata": str(doc.meta),
+                        "metadata": doc.meta,
                     },
                     "vector": doc.embedding,
                 }

@@ -283,10 +283,10 @@ class TestMilvusAgenticRAGPipeline:
         assert len(documents) == 2
         assert documents[0].content == "Content 1"
         assert documents[0].meta == {"field": "value1"}
-        assert documents[0].score == 0.1  # distance value
+        assert documents[0].score == 0.9  # 1.0 - distance
         assert documents[1].content == "Content 2"
         assert documents[1].meta == {"field": "value2"}
-        assert documents[1].score == 0.2  # distance value
+        assert documents[1].score == 0.8  # 1.0 - distance
 
     def test_retrieve_with_empty_results(self, mock_milvus_pipeline):
         """Test retrieving documents with empty results."""

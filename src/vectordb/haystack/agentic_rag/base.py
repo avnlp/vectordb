@@ -37,6 +37,7 @@ Subclasses must implement:
     - _retrieve(): Vector similarity search
 """
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -205,14 +206,14 @@ class BaseAgenticRAGPipeline(ABC):
         api_key = generator_config.get("api_key")
         max_tokens = generator_config.get("max_tokens", 2048)
 
-        import os
-
         api_key = api_key or os.getenv("GROQ_API_KEY")
 
         try:
             self.generator = OpenAIGenerator(
                 api_key=Secret.from_token(api_key) if api_key else None,
-                api_base_url="https://api.groq.com/openai/v1",
+                api_base_url=generator_config.get(
+                    "api_base_url", "https://api.groq.com/openai/v1"
+                ),
                 model=model,
                 generation_kwargs={"max_tokens": max_tokens},
             )
@@ -424,8 +425,9 @@ class BaseAgenticRAGPipeline(ABC):
         if not documents:
             return "No relevant documents found."
 
-        # Build context from top 5 documents (truncation for LLM context limits)
-        context = "\n\n".join([doc.content for doc in documents[:5]])
+        # Build context from top documents (truncation for LLM context limits)
+        context_top_k = self.config.get("retrieval", {}).get("context_top_k", 5)
+        context = "\n\n".join([doc.content for doc in documents[:context_top_k]])
 
         # Construct standard RAG prompt with context and question
         prompt = f"""Based on the following context, answer the question.
@@ -541,8 +543,9 @@ Provide the calculation steps and final answer."""
         # Retrieve initial context for reasoning
         documents = self._retrieve(query, top_k)
 
-        # Build context string from top 5 most relevant documents
-        context = "\n\n".join([doc.content for doc in documents[:5]])
+        # Build context string from top most relevant documents
+        context_top_k = self.config.get("retrieval", {}).get("context_top_k", 5)
+        context = "\n\n".join([doc.content for doc in documents[:context_top_k]])
 
         # Construct reasoning prompt with explicit step-by-step instructions
         # This guides the LLM to break down complex queries logically
@@ -577,7 +580,7 @@ Answer:"""
     def run(
         self,
         query: str,
-        top_k: int = 10,
+        top_k: int | None = None,
         enable_routing: bool | None = None,
         enable_self_reflection: bool | None = None,
     ) -> dict[str, Any]:
@@ -610,7 +613,8 @@ Answer:"""
 
         Args:
             query: User query text to process.
-            top_k: Maximum documents to retrieve per query.
+            top_k: Maximum documents to retrieve per query. If None,
+                uses retrieval.top_k_default from config (default: 10).
             enable_routing: Override config to force enable/disable routing.
             enable_self_reflection: Override config for reflection.
 
@@ -621,6 +625,9 @@ Answer:"""
             - tool: Tool name used (retrieval/web_search/calculation/reasoning)
             - refined: True if answer went through reflection iteration
         """
+        if top_k is None:
+            top_k = self.config.get("retrieval", {}).get("top_k_default", 10)
+
         # Check runtime overrides or fall back to config settings
         routing = (
             enable_routing
@@ -659,9 +666,12 @@ Answer:"""
 
             # AGENT STEP 3: Self-reflection and iterative refinement
             if reflection and result.get("answer"):
-                # Build context string from top 3 retrieved docs
+                # Build context string from top retrieved docs for reflection
+                reflection_top_k = self.config.get("agentic_rag", {}).get(
+                    "reflection_context_top_k", 3
+                )
                 context = "\n".join(
-                    [d.content for d in result.get("documents", [])[:3]]
+                    [d.content for d in result.get("documents", [])[:reflection_top_k]]
                 )
                 # Run reflection loop: score → (refine if needed) → repeat
                 refined_answer = self.router.self_reflect_loop(

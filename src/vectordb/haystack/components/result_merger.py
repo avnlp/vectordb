@@ -247,7 +247,9 @@ class ResultMerger:
                     if max_score > min_score
                     else 0.5
                 )
-                doc_id = doc.id or doc.meta.get("doc_id", hash(doc.content))
+                doc_id = doc.id or doc.meta.get(
+                    "doc_id", ResultMerger.stable_doc_id(doc)
+                )
                 result_map[doc_id] = (doc, normalized)
 
             return result_map
@@ -309,10 +311,12 @@ class ResultMerger:
             return []
 
         unique_docs: list[Document] = []
-        seen_contents: set[int] = set()
+        seen_contents: set[str] = set()
 
         for doc in docs:
-            content_hash = hash(doc.content.lower().strip())
+            content_hash = hashlib.sha1(
+                (doc.content or "").lower().strip().encode(), usedforsecurity=False
+            ).hexdigest()
 
             if content_hash not in seen_contents:
                 unique_docs.append(doc)
