@@ -117,33 +117,33 @@ class MilvusNamespacePipeline:
 
     def list_namespaces(self) -> list[str]:
         """List all namespace values in the collection."""
-        # Query all documents to extract unique namespace values
-        # This is a simplified approach - in practice, you might want
-        # to use distinct queries
-        all_docs = self.db.query(
-            vector=[0.0] * 1024, top_k=10000
-        )  # dummy query to get all
-        namespaces = set()
-        for doc in all_docs:
-            if "namespace" in doc.meta:
-                namespaces.add(doc.meta["namespace"])
-        return list(namespaces)
+        results = self.db.client.query(
+            collection_name=self.db.collection_name,
+            filter="",
+            output_fields=["namespace"],
+            limit=10000,
+        )
+        return list({r["namespace"] for r in results if "namespace" in r})
 
     def namespace_exists(self, namespace: str) -> bool:
         """Check if a namespace has any documents."""
-        # Query with a filter for the specific namespace
-        results = self.db.query(
-            vector=[0.0] * 1024, top_k=1, filters={"namespace": namespace}
-        )  # dummy query
-        return len(results) > 0
+        escaped = self.db._escape_expr_string(namespace)
+        results = self.db.client.query(
+            collection_name=self.db.collection_name,
+            filter=f'namespace == "{escaped}"',
+            output_fields=["count(*)"],
+        )
+        return results[0]["count(*)"] > 0 if results else False
 
     def get_namespace_stats(self, namespace: str) -> NamespaceStats:
         """Get statistics for a namespace."""
-        # Query with filter to get count of documents in namespace
-        results = self.db.query(
-            vector=[0.0] * 1024, top_k=10000, filters={"namespace": namespace}
-        )  # dummy query
-        count = len(results)
+        escaped = self.db._escape_expr_string(namespace)
+        results = self.db.client.query(
+            collection_name=self.db.collection_name,
+            filter=f'namespace == "{escaped}"',
+            output_fields=["count(*)"],
+        )
+        count = results[0]["count(*)"] if results else 0
 
         return NamespaceStats(
             namespace=namespace,

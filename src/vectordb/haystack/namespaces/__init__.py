@@ -20,6 +20,7 @@ from vectordb.haystack.namespaces.types import (
     CrossNamespaceResult,
     IsolationStrategy,
     NamespaceConfig,
+    NamespaceConnectionError,
     NamespaceError,
     NamespaceExistsError,
     NamespaceNameGenerator,
@@ -58,6 +59,7 @@ __all__ = [
     "NamespaceError",
     "NamespaceNotFoundError",
     "NamespaceExistsError",
+    "NamespaceConnectionError",
     "NamespaceOperationNotSupportedError",
     # Utilities
     "Timer",

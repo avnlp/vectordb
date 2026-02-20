@@ -51,6 +51,7 @@ def mock_milvus_db():
     mock_db.delete = MagicMock()
     mock_db.query = MagicMock(return_value=[])
     mock_db.upsert = MagicMock(return_value=3)
+    mock_db._escape_expr_string = MagicMock(side_effect=lambda v: v)
     return mock_db
 
 
@@ -273,12 +274,11 @@ class TestMilvusNamespacePipelineNamespaceOperations:
 
     def test_list_namespaces(self, sample_config, mock_milvus_db):
         """Test list_namespaces returns unique namespace values."""
-        mock_docs = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-            Document(content="doc2", meta={"namespace": "ns2"}),
-            Document(content="doc3", meta={"namespace": "ns1"}),  # Duplicate namespace
+        mock_milvus_db.client.query.return_value = [
+            {"namespace": "ns1"},
+            {"namespace": "ns2"},
+            {"namespace": "ns1"},  # Duplicate namespace
         ]
-        mock_milvus_db.query.return_value = mock_docs
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -291,12 +291,12 @@ class TestMilvusNamespacePipelineNamespaceOperations:
             assert "ns1" in namespaces
             assert "ns2" in namespaces
             assert len(namespaces) == 2  # Unique values only
-            mock_milvus_db.query.assert_called_once()
+            mock_milvus_db.client.query.assert_called_once()
             pipeline.close()
 
     def test_list_namespaces_empty(self, sample_config, mock_milvus_db):
         """Test list_namespaces with no documents."""
-        mock_milvus_db.query.return_value = []
+        mock_milvus_db.client.query.return_value = []
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -312,14 +312,12 @@ class TestMilvusNamespacePipelineNamespaceOperations:
     def test_list_namespaces_docs_without_namespace(
         self, sample_config, mock_milvus_db
     ):
-        """Test list_namespaces ignores docs without namespace metadata."""
-        # The source code has a bug where it doesn't handle None meta properly
-        # We test with only valid docs that have meta with namespace
-        mock_docs = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-            Document(content="doc2", meta={"namespace": "ns2"}),
+        """Test list_namespaces ignores rows without namespace field."""
+        mock_milvus_db.client.query.return_value = [
+            {"namespace": "ns1"},
+            {"namespace": "ns2"},
+            {"other_field": "value"},  # No namespace key
         ]
-        mock_milvus_db.query.return_value = mock_docs
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -331,11 +329,12 @@ class TestMilvusNamespacePipelineNamespaceOperations:
 
             assert "ns1" in namespaces
             assert "ns2" in namespaces
+            assert len(namespaces) == 2
             pipeline.close()
 
     def test_namespace_exists_true(self, sample_config, mock_milvus_db):
         """Test namespace_exists returns True when documents exist."""
-        mock_milvus_db.query.return_value = [Document(content="doc1")]
+        mock_milvus_db.client.query.return_value = [{"count(*)": 5}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -346,14 +345,16 @@ class TestMilvusNamespacePipelineNamespaceOperations:
             exists = pipeline.namespace_exists("test_ns")
 
             assert exists is True
-            mock_milvus_db.query.assert_called_once_with(
-                vector=[0.0] * 1024, top_k=1, filters={"namespace": "test_ns"}
+            mock_milvus_db.client.query.assert_called_once_with(
+                collection_name=mock_milvus_db.collection_name,
+                filter='namespace == "test_ns"',
+                output_fields=["count(*)"],
             )
             pipeline.close()
 
     def test_namespace_exists_false(self, sample_config, mock_milvus_db):
         """Test namespace_exists returns False when no documents exist."""
-        mock_milvus_db.query.return_value = []
+        mock_milvus_db.client.query.return_value = [{"count(*)": 0}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -368,10 +369,7 @@ class TestMilvusNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats(self, sample_config, mock_milvus_db):
         """Test get_namespace_stats returns correct stats."""
-        mock_milvus_db.query.return_value = [
-            Document(content="doc1"),
-            Document(content="doc2"),
-        ]
+        mock_milvus_db.client.query.return_value = [{"count(*)": 2}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -390,7 +388,7 @@ class TestMilvusNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats_empty(self, sample_config, mock_milvus_db):
         """Test get_namespace_stats with empty namespace."""
-        mock_milvus_db.query.return_value = []
+        mock_milvus_db.client.query.return_value = [{"count(*)": 0}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -598,6 +596,7 @@ class TestMilvusNamespacePipelineQuery:
             Document(content="Result 2", score=0.8),
         ]
         mock_milvus_db.query.return_value = mock_results
+        mock_milvus_db.client.query.return_value = [{"count(*)": 2}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -632,6 +631,7 @@ class TestMilvusNamespacePipelineQuery:
     ):
         """Test query_namespace calls text embedder."""
         mock_doc_embedder, mock_text_embedder = mock_embedders
+        mock_milvus_db.client.query.return_value = [{"count(*)": 0}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -660,6 +660,7 @@ class TestMilvusNamespacePipelineQuery:
     ):
         """Test query_namespace applies namespace filter."""
         mock_doc_embedder, mock_text_embedder = mock_embedders
+        mock_milvus_db.client.query.return_value = [{"count(*)": 0}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -680,11 +681,9 @@ class TestMilvusNamespacePipelineQuery:
 
                 pipeline.query_namespace("test query", "my_namespace", top_k=10)
 
-                # query_namespace calls db.query twice:
-                # 1. For the actual search with the query embedding
-                # 2. For get_namespace_stats with a dummy query
-                assert mock_milvus_db.query.call_count >= 1
-                # Check the first call was the search query
+                # query_namespace calls db.query once for the search,
+                # and client.query once for get_namespace_stats
+                assert mock_milvus_db.query.call_count == 1
                 first_call_kwargs = mock_milvus_db.query.call_args_list[0][1]
                 assert first_call_kwargs.get("filters") == {"namespace": "my_namespace"}
                 assert first_call_kwargs.get("top_k") == 10
@@ -704,6 +703,7 @@ class TestMilvusNamespacePipelineQuery:
             return []
 
         mock_milvus_db.query.side_effect = mock_query_side_effect
+        mock_milvus_db.client.query.return_value = [{"count(*)": 1}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -740,7 +740,7 @@ class TestMilvusNamespacePipelineQuery:
         mock_doc_embedder, mock_text_embedder = mock_embedders
 
         # Mock list_namespaces to return known values
-        mock_docs = [
+        [
             Document(content="doc1", meta={"namespace": "ns1"}),
             Document(content="doc2", meta={"namespace": "ns2"}),
         ]
@@ -763,17 +763,20 @@ class TestMilvusNamespacePipelineQuery:
                 pipeline = MilvusNamespacePipeline(sample_config)
 
                 # query_cross_namespace calls:
-                # 1. list_namespaces() which calls db.query once
-                # 2. For each namespace, query_namespace() which calls:
+                # 1. list_namespaces() uses client.query (scalar)
+                # 2. For each namespace, query_namespace() calls:
                 #    - db.query for the search
-                #    - db.query for get_namespace_stats
-                # So for 2 namespaces, we need: 1 + (2 * 2) = 5 calls
+                #    - client.query for get_namespace_stats
+                # So db.query: 2 calls (search per ns)
+                #    client.query: 1 (list) + 2 (stats per ns) = 3 calls
+                mock_milvus_db.client.query.side_effect = [
+                    [{"namespace": "ns1"}, {"namespace": "ns2"}],  # list_namespaces
+                    [{"count(*)": 1}],  # ns1 stats
+                    [{"count(*)": 1}],  # ns2 stats
+                ]
                 mock_milvus_db.query.side_effect = [
-                    mock_docs,  # list_namespaces query
                     [Document(content="Result 1")],  # ns1 search query
-                    [Document(content="doc")],  # ns1 stats query
                     [Document(content="Result 2")],  # ns2 search query
-                    [Document(content="doc")],  # ns2 stats query
                 ]
 
                 result = pipeline.query_cross_namespace("test query")
@@ -790,6 +793,7 @@ class TestMilvusNamespacePipelineQuery:
         mock_doc_embedder, mock_text_embedder = mock_embedders
         mock_results = [Document(content="Result", score=0.9)]
         mock_milvus_db.query.return_value = mock_results
+        mock_milvus_db.client.query.return_value = [{"count(*)": 1}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -826,6 +830,7 @@ class TestMilvusNamespacePipelineQuery:
         """Test query_cross_namespace handles empty results."""
         mock_doc_embedder, mock_text_embedder = mock_embedders
         mock_milvus_db.query.return_value = []
+        mock_milvus_db.client.query.return_value = [{"count(*)": 0}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"
@@ -861,9 +866,7 @@ class TestMilvusNamespacePipelineRun:
 
     def test_run_method(self, sample_config, mock_milvus_db):
         """Test run method returns pipeline status."""
-        mock_milvus_db.query.return_value = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-        ]
+        mock_milvus_db.client.query.return_value = [{"namespace": "ns1"}]
 
         with patch(
             "vectordb.haystack.namespaces.milvus_namespaces.MilvusVectorDB"

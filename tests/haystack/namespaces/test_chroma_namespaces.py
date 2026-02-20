@@ -52,6 +52,7 @@ def mock_chroma_db():
     mock_db.list_collections = MagicMock(return_value=["test_ns_ns1", "test_ns_ns2"])
     mock_db.query = MagicMock(return_value=[])
     mock_db.upsert = MagicMock(return_value=3)
+    mock_db._get_collection.return_value.count.return_value = 0
     return mock_db
 
 
@@ -330,10 +331,9 @@ class TestChromaNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats(self, sample_config, mock_chroma_db):
         """Test get_namespace_stats returns correct stats."""
-        mock_chroma_db.query.return_value = [
-            Document(content="doc1"),
-            Document(content="doc2"),
-        ]
+        mock_collection = MagicMock()
+        mock_collection.count.return_value = 2
+        mock_chroma_db._get_collection.return_value = mock_collection
 
         with patch(
             "vectordb.haystack.namespaces.chroma_namespaces.ChromaVectorDB"
@@ -352,7 +352,9 @@ class TestChromaNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats_empty(self, sample_config, mock_chroma_db):
         """Test get_namespace_stats with empty collection."""
-        mock_chroma_db.query.return_value = []
+        mock_collection = MagicMock()
+        mock_collection.count.return_value = 0
+        mock_chroma_db._get_collection.return_value = mock_collection
 
         with patch(
             "vectordb.haystack.namespaces.chroma_namespaces.ChromaVectorDB"

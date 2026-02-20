@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from haystack import Document
+from qdrant_client import models
 
 from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.haystack.namespaces.types import (
@@ -117,31 +118,55 @@ class QdrantNamespacePipeline:
 
     def list_namespaces(self) -> list[str]:
         """List all unique namespace values."""
-        # Query all documents to extract unique namespace values
-        all_docs = self.db.query(
-            vector=[0.0] * 1024, top_k=10000
-        )  # dummy query to get all
-        namespaces = set()
-        for doc in all_docs:
-            if "namespace" in doc.meta:
-                namespaces.add(doc.meta["namespace"])
+        # Scroll through all points to extract unique namespace values
+        namespaces: set[str] = set()
+        offset = None
+        while True:
+            records, offset = self.db.client.scroll(
+                collection_name=self.db.collection_name,
+                limit=256,
+                offset=offset,
+                with_payload=["namespace"],
+                with_vectors=False,
+            )
+            for record in records:
+                ns = (record.payload or {}).get("namespace")
+                if ns is not None:
+                    namespaces.add(ns)
+            if offset is None:
+                break
         return list(namespaces)
 
     def namespace_exists(self, namespace: str) -> bool:
         """Check if a namespace has any points."""
-        # Query with a filter for the specific namespace
-        results = self.db.query(
-            vector=[0.0] * 1024, top_k=1, filters={"namespace": namespace}
-        )  # dummy query
-        return len(results) > 0
+        count = self.db.client.count(
+            collection_name=self.db.collection_name,
+            count_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="namespace",
+                        match=models.MatchValue(value=namespace),
+                    )
+                ]
+            ),
+            exact=False,
+        ).count
+        return count > 0
 
     def get_namespace_stats(self, namespace: str) -> NamespaceStats:
         """Get statistics for a namespace."""
-        # Query with filter to get count of documents in namespace
-        results = self.db.query(
-            vector=[0.0] * 1024, top_k=10000, filters={"namespace": namespace}
-        )  # dummy query
-        count = len(results)
+        count = self.db.client.count(
+            collection_name=self.db.collection_name,
+            count_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="namespace",
+                        match=models.MatchValue(value=namespace),
+                    )
+                ]
+            ),
+            exact=True,
+        ).count
 
         return NamespaceStats(
             namespace=namespace,

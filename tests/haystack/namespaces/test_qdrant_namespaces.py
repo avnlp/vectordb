@@ -51,6 +51,10 @@ def mock_qdrant_db():
     mock_db.delete = MagicMock()
     mock_db.query = MagicMock(return_value=[])
     mock_db.upsert = MagicMock(return_value=3)
+    mock_db.collection_name = "test_collection"
+    # Default: scroll returns empty, count returns 0
+    mock_db.client.scroll.return_value = ([], None)
+    mock_db.client.count.return_value = MagicMock(count=0)
     return mock_db
 
 
@@ -273,12 +277,12 @@ class TestQdrantNamespacePipelineNamespaceOperations:
 
     def test_list_namespaces(self, sample_config, mock_qdrant_db):
         """Test list_namespaces returns unique namespace values."""
-        mock_docs = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-            Document(content="doc2", meta={"namespace": "ns2"}),
-            Document(content="doc3", meta={"namespace": "ns1"}),  # Duplicate namespace
+        mock_records = [
+            MagicMock(payload={"namespace": "ns1"}),
+            MagicMock(payload={"namespace": "ns2"}),
+            MagicMock(payload={"namespace": "ns1"}),  # Duplicate namespace
         ]
-        mock_qdrant_db.query.return_value = mock_docs
+        mock_qdrant_db.client.scroll.return_value = (mock_records, None)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -291,12 +295,12 @@ class TestQdrantNamespacePipelineNamespaceOperations:
             assert "ns1" in namespaces
             assert "ns2" in namespaces
             assert len(namespaces) == 2  # Unique values only
-            mock_qdrant_db.query.assert_called_once()
+            mock_qdrant_db.client.scroll.assert_called_once()
             pipeline.close()
 
     def test_list_namespaces_empty(self, sample_config, mock_qdrant_db):
         """Test list_namespaces with no documents."""
-        mock_qdrant_db.query.return_value = []
+        mock_qdrant_db.client.scroll.return_value = ([], None)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -313,12 +317,12 @@ class TestQdrantNamespacePipelineNamespaceOperations:
         self, sample_config, mock_qdrant_db
     ):
         """Test list_namespaces ignores docs without namespace metadata."""
-        mock_docs = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-            Document(content="doc2", meta={"other": "value"}),  # No namespace
-            Document(content="doc3", meta={"namespace": "ns2"}),
+        mock_records = [
+            MagicMock(payload={"namespace": "ns1"}),
+            MagicMock(payload={"other": "value"}),  # No namespace
+            MagicMock(payload={"namespace": "ns2"}),
         ]
-        mock_qdrant_db.query.return_value = mock_docs
+        mock_qdrant_db.client.scroll.return_value = (mock_records, None)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -335,7 +339,7 @@ class TestQdrantNamespacePipelineNamespaceOperations:
 
     def test_namespace_exists_true(self, sample_config, mock_qdrant_db):
         """Test namespace_exists returns True when documents exist."""
-        mock_qdrant_db.query.return_value = [Document(content="doc1")]
+        mock_qdrant_db.client.count.return_value = MagicMock(count=5)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -346,14 +350,12 @@ class TestQdrantNamespacePipelineNamespaceOperations:
             exists = pipeline.namespace_exists("test_ns")
 
             assert exists is True
-            mock_qdrant_db.query.assert_called_once_with(
-                vector=[0.0] * 1024, top_k=1, filters={"namespace": "test_ns"}
-            )
+            mock_qdrant_db.client.count.assert_called_once()
             pipeline.close()
 
     def test_namespace_exists_false(self, sample_config, mock_qdrant_db):
         """Test namespace_exists returns False when no documents exist."""
-        mock_qdrant_db.query.return_value = []
+        mock_qdrant_db.client.count.return_value = MagicMock(count=0)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -368,10 +370,7 @@ class TestQdrantNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats(self, sample_config, mock_qdrant_db):
         """Test get_namespace_stats returns correct stats."""
-        mock_qdrant_db.query.return_value = [
-            Document(content="doc1"),
-            Document(content="doc2"),
-        ]
+        mock_qdrant_db.client.count.return_value = MagicMock(count=2)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -390,7 +389,7 @@ class TestQdrantNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats_empty(self, sample_config, mock_qdrant_db):
         """Test get_namespace_stats with empty namespace."""
-        mock_qdrant_db.query.return_value = []
+        mock_qdrant_db.client.count.return_value = MagicMock(count=0)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -739,11 +738,13 @@ class TestQdrantNamespacePipelineQuery:
         """Test query_cross_namespace queries all namespaces when none specified."""
         mock_doc_embedder, mock_text_embedder = mock_embedders
 
-        # Mock list_namespaces to return known values
-        mock_docs = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-            Document(content="doc2", meta={"namespace": "ns2"}),
+        # Mock list_namespaces via scroll, and get_namespace_stats via count
+        mock_records = [
+            MagicMock(payload={"namespace": "ns1"}),
+            MagicMock(payload={"namespace": "ns2"}),
         ]
+        mock_qdrant_db.client.scroll.return_value = (mock_records, None)
+        mock_qdrant_db.client.count.return_value = MagicMock(count=1)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"
@@ -763,17 +764,13 @@ class TestQdrantNamespacePipelineQuery:
                 pipeline = QdrantNamespacePipeline(sample_config)
 
                 # query_cross_namespace calls:
-                # 1. list_namespaces() which calls db.query once
+                # 1. list_namespaces() which uses client.scroll
                 # 2. For each namespace, query_namespace() which calls:
                 #    - db.query for the search
-                #    - db.query for get_namespace_stats
-                # So for 2 namespaces, we need: 1 + (2 * 2) = 5 calls
+                #    - client.count for get_namespace_stats
                 mock_qdrant_db.query.side_effect = [
-                    mock_docs,  # list_namespaces query
                     [Document(content="Result 1")],  # ns1 search query
-                    [Document(content="doc")],  # ns1 stats query
                     [Document(content="Result 2")],  # ns2 search query
-                    [Document(content="doc")],  # ns2 stats query
                 ]
 
                 result = pipeline.query_cross_namespace("test query")
@@ -917,9 +914,8 @@ class TestQdrantNamespacePipelineRun:
 
     def test_run_method(self, sample_config, mock_qdrant_db):
         """Test run method returns pipeline status."""
-        mock_qdrant_db.query.return_value = [
-            Document(content="doc1", meta={"namespace": "ns1"}),
-        ]
+        mock_records = [MagicMock(payload={"namespace": "ns1"})]
+        mock_qdrant_db.client.scroll.return_value = (mock_records, None)
 
         with patch(
             "vectordb.haystack.namespaces.qdrant_namespaces.QdrantVectorDB"

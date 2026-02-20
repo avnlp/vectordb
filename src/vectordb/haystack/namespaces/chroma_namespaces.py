@@ -145,10 +145,7 @@ class ChromaNamespacePipeline:
             f"{self.config.get('collection', {}).get('name', 'ns')}_{namespace}"
         )
 
-        results = self.db.query(
-            vector=[0.0] * 1024, top_k=10000, collection_name=collection_name
-        )  # dummy query
-        count = len(results)
+        count = self.db._get_collection(collection_name).count()
 
         return NamespaceStats(
             namespace=namespace,

@@ -53,6 +53,7 @@ def mock_weaviate_db():
     mock_db.list_tenants = MagicMock(return_value=[])
     mock_db.query = MagicMock(return_value=[])
     mock_db.upsert = MagicMock(return_value=3)
+    mock_db.collection.aggregate.over_all.return_value.total_count = 0
     return mock_db
 
 
@@ -339,10 +340,7 @@ class TestWeaviateNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats(self, sample_config, mock_weaviate_db):
         """Test get_namespace_stats returns correct stats."""
-        mock_weaviate_db.query.return_value = [
-            Document(content="doc1"),
-            Document(content="doc2"),
-        ]
+        mock_weaviate_db.collection.aggregate.over_all.return_value.total_count = 2
 
         with patch(
             "vectordb.haystack.namespaces.weaviate_namespaces.WeaviateVectorDB"
@@ -361,8 +359,6 @@ class TestWeaviateNamespacePipelineNamespaceOperations:
 
     def test_get_namespace_stats_empty(self, sample_config, mock_weaviate_db):
         """Test get_namespace_stats with empty namespace."""
-        mock_weaviate_db.query.return_value = []
-
         with patch(
             "vectordb.haystack.namespaces.weaviate_namespaces.WeaviateVectorDB"
         ) as mock_db_class:
@@ -690,9 +686,8 @@ class TestWeaviateNamespacePipelineQuery:
 
                 pipeline.query_namespace("test query", "my_namespace", top_k=10)
 
-                # query_namespace calls db.query twice:
-                # 1. For the actual search with the query embedding
-                # 2. For get_namespace_stats with a dummy query
+                # query_namespace calls db.query for the search,
+                # then get_namespace_stats uses aggregate (not a query call)
                 assert mock_weaviate_db.query.call_count >= 1
                 # Check the first call was the search query
                 first_call_kwargs = mock_weaviate_db.query.call_args_list[0][1]

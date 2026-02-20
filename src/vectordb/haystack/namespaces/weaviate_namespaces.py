@@ -126,10 +126,9 @@ class WeaviateNamespacePipeline:
 
     def get_namespace_stats(self, namespace: str) -> NamespaceStats:
         """Get statistics for a tenant."""
-        results = self.db.query(
-            vector=[0.0] * 1024, top_k=10000, tenant=namespace
-        )  # dummy query
-        count = len(results)
+        self.db.with_tenant(namespace)
+        aggregation = self.db.collection.aggregate.over_all(total_count=True)
+        count = aggregation.total_count
 
         status = TenantStatus.ACTIVE if count > 0 else TenantStatus.UNKNOWN
 
