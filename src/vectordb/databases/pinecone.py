@@ -518,10 +518,7 @@ class PineconeVectorDB:
             counts for filtered queries. The returned value represents the total
             vectors in the namespace, not those matching the filter.
         """
-        # We need the dimension of the index to provide a valid zero vector
         stats = self.describe_index_stats()
-        dimension = stats["dimension"]
-        [0.0] * dimension
 
         self._get_index()
         # Query with top_k=1 just to get the search initiated,
