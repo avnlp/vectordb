@@ -14,7 +14,8 @@ Pipeline Flow:
     1. Load documents from configured data source (TriviaQA, ARC, PopQA, etc.)
     2. Generate dense embeddings using configured embedding model
     3. Create or use existing Milvus collection
-    4. Upsert documents with embeddings and metadata
+    4. Create collection with matching vector dimension
+    5. Insert documents with embeddings and metadata
 
 Milvus as Vector Store:
     Milvus is a cloud-native vector database designed for high-performance
@@ -38,7 +39,8 @@ Configuration:
       host: "localhost"  # Milvus server host
       port: 19530  # Milvus server port
       collection_name: "semantic_search"  # Collection name
-      dimension: 384  # Vector dimension
+      dimension: 384  # Vector dimension (must match embedder output)
+      recreate: false  # Whether to recreate collection if exists
 
     embedder:
       model: "sentence-transformers/all-MiniLM-L6-v2"
@@ -141,8 +143,9 @@ class MilvusSemanticIndexingPipeline:
         """Execute indexing pipeline.
 
         Performs the complete indexing workflow: loads documents from the
-        configured data source, generates embeddings, and upserts all
-        documents with their vectors to Milvus.
+        configured data source, generates embeddings, creates the Milvus
+        collection with the correct vector dimension, and inserts all
+        documents with their vectors.
 
         Returns:
             Dictionary containing:
@@ -170,11 +173,18 @@ class MilvusSemanticIndexingPipeline:
         docs, embeddings = EmbedderHelper.embed_documents(self.embedder, documents)
         logger.info("Generated embeddings for %d documents", len(docs))
 
-        num_indexed = self.db.upsert(
+        recreate = self.config.get("milvus", {}).get("recreate", False)
+        self.db.create_collection(
+            collection_name=self.collection_name,
+            dimension=self.dimension,
+            recreate=recreate,
+        )
+
+        self.db.insert_documents(
             documents=docs,
-            embeddings=embeddings,
             collection_name=self.collection_name,
         )
+        num_indexed = len(docs)
         logger.info("Indexed %d documents to Milvus", num_indexed)
 
         return {"documents_indexed": num_indexed}

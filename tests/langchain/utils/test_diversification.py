@@ -163,17 +163,24 @@ class TestDiversify:
         )
         assert len(result) == 3
 
-    def test_mismatched_embeddings_count(self, sample_documents):
-        """Test diversify with mismatched embeddings count returns all documents."""
-        # The diversify function returns early when documents <= max_documents
-        # without checking embeddings count
+    def test_max_documents_zero(self, sample_documents):
+        """Test diversify with max_documents=0 returns empty list."""
+        embeddings = [[0.5, 0.5, 0.5]] * 3
         result = DiversificationHelper.diversify(
             documents=sample_documents[:3],
-            embeddings=[[0.5, 0.5, 0.5], [0.6, 0.6, 0.6]],  # Only 2 embeddings
-            max_documents=5,
+            embeddings=embeddings,
+            max_documents=0,
         )
-        # Returns all 3 documents since 3 <= 5
-        assert len(result) == 3
+        assert len(result) == 0
+
+    def test_mismatched_embeddings_count(self, sample_documents):
+        """Test diversify with mismatched embeddings count raises ValueError."""
+        with pytest.raises(ValueError, match="Number of embeddings must match"):
+            DiversificationHelper.diversify(
+                documents=sample_documents[:3],
+                embeddings=[[0.5, 0.5, 0.5], [0.6, 0.6, 0.6]],  # Only 2 embeddings
+                max_documents=5,
+            )
 
     def test_first_document_always_included(self, sample_documents):
         """Test that first document is always included in results."""
@@ -275,6 +282,25 @@ class TestClusteringBasedDiversity:
                 documents=sample_documents[:3],
                 embeddings=[[0.5, 0.5, 0.5], [0.6, 0.6, 0.6]],
             )
+
+    def test_clustering_max_documents_zero(self, sample_documents):
+        """Test clustering with 0 clusters or samples returns empty list."""
+        embeddings = [[0.5, 0.5, 0.5]] * 3
+        result = DiversificationHelper.clustering_based_diversity(
+            documents=sample_documents[:3],
+            embeddings=embeddings,
+            num_clusters=0,
+            samples_per_cluster=2,
+        )
+        assert len(result) == 0
+
+        result = DiversificationHelper.clustering_based_diversity(
+            documents=sample_documents[:3],
+            embeddings=embeddings,
+            num_clusters=3,
+            samples_per_cluster=0,
+        )
+        assert len(result) == 0
 
     def test_clusters_less_than_documents(self, sample_documents):
         """Test clustering with num_clusters less than document count."""

@@ -413,7 +413,7 @@ class TestDocumentFilterEdgeCases:
     Edge Cases Covered:
         - None metadata values
         - Numeric strings vs integers
-        - Case-insensitive contains matching
+        - Case-insensitive string matching (contains, startswith, endswith)
         - Empty metadata dicts
         - Lists as metadata values
         - Missing deeply nested paths
@@ -450,6 +450,42 @@ class TestDocumentFilterEdgeCases:
         ]
         result = DocumentFilter.filter_by_metadata(
             docs, key="text", value="hello", operator="contains"
+        )
+        assert len(result) == 2
+
+    def test_case_insensitive_startswith(self):
+        """Test case-insensitive startswith operator."""
+        docs = [
+            Document(page_content="Doc 1", metadata={"text": "HELLO WORLD"}),
+            Document(page_content="Doc 2", metadata={"text": "hello world"}),
+            Document(page_content="Doc 3", metadata={"text": "World"}),
+        ]
+        result = DocumentFilter.filter_by_metadata(
+            docs, key="text", value="hello", operator="startswith"
+        )
+        assert len(result) == 2
+
+    def test_case_insensitive_endswith(self):
+        """Test case-insensitive endswith operator."""
+        docs = [
+            Document(page_content="Doc 1", metadata={"text": "HELLO WORLD"}),
+            Document(page_content="Doc 2", metadata={"text": "hello world"}),
+            Document(page_content="Doc 3", metadata={"text": "Hello"}),
+        ]
+        result = DocumentFilter.filter_by_metadata(
+            docs, key="text", value="world", operator="endswith"
+        )
+        assert len(result) == 2
+
+    def test_case_insensitive_json_startswith(self):
+        """Test case-insensitive startswith operator for JSON path."""
+        docs = [
+            Document(page_content="Doc 1", metadata={"info": {"text": "HELLO WORLD"}}),
+            Document(page_content="Doc 2", metadata={"info": {"text": "hello world"}}),
+            Document(page_content="Doc 3", metadata={"info": {"text": "World"}}),
+        ]
+        result = DocumentFilter.filter_by_metadata_json(
+            docs, json_path="info.text", value="hello", operator="startswith"
         )
         assert len(result) == 2
 

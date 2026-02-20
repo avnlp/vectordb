@@ -6,9 +6,10 @@ documents contain similar or overlapping information.
 
 Diversification Strategies:
     Greedy Selection (diversify):
-        Iteratively selects documents that are least similar to already-selected
-        documents. Uses a similarity threshold to reject documents that are too
-        similar to any selected document.
+        Iteratively selects documents that have the lowest maximum similarity
+        to any already-selected document (MMR-style). Uses a similarity
+        threshold to reject documents that are too similar to any selected
+        document.
 
     Clustering-Based (clustering_based_diversity):
         Groups documents into semantic clusters using K-Means, then selects
@@ -21,9 +22,10 @@ When to Use Diversification:
     - Exploratory search where topic coverage matters
 
 Comparison with MMR:
-    - MMR balances relevance and diversity during selection
+    - Greedy selection uses MMR-style max-similarity for diversity scoring
+    - MMR balances relevance and diversity during retrieval
     - Diversification focuses purely on diversity among already-retrieved docs
-    - Use MMR when you want relevance-aware diversity
+    - Use MMR when you want relevance-aware diversity during retrieval
     - Use diversification for post-processing already-ranked results
 
 Usage:
@@ -75,10 +77,11 @@ class DiversificationHelper:
         max_documents: int = 5,
         similarity_threshold: float = 0.7,
     ) -> list[Document]:
-        """Select diverse documents based on semantic similarity.
+        """Select diverse documents using MMR-style max-similarity scoring.
 
-        Removes documents that are too similar to already-selected ones,
-        keeping only those that add diversity.
+        Iteratively selects the document with the lowest maximum similarity
+        to any already-selected document, rejecting candidates above the
+        similarity threshold.
 
         Args:
             documents: List of documents to diversify.
@@ -89,12 +92,19 @@ class DiversificationHelper:
 
         Returns:
             List of diverse documents.
-        """
-        if not documents or len(documents) <= max_documents:
-            return documents
 
+        Raises:
+            ValueError: If the number of embeddings does not match the number
+                of documents.
+        """
         if len(embeddings) != len(documents):
             raise ValueError("Number of embeddings must match number of documents")
+
+        if not documents or max_documents <= 0:
+            return []
+
+        if len(documents) <= max_documents:
+            return documents
 
         selected_indices = []
         selected_embeddings = []
@@ -111,18 +121,17 @@ class DiversificationHelper:
             min_similarity = 2.0
 
             for idx in remaining_indices:
-                # Calculate average similarity to selected documents
-                similarities = [
+                # Calculate max similarity to any selected document (MMR-style)
+                max_sim = max(
                     DiversificationHelper.cosine_similarity(
                         embeddings[idx], selected_emb
                     )
                     for selected_emb in selected_embeddings
-                ]
-                avg_similarity = sum(similarities) / len(similarities)
+                )
 
-                # Select document with minimum average similarity
-                if avg_similarity < min_similarity:
-                    min_similarity = avg_similarity
+                # Select document with minimum max similarity
+                if max_sim < min_similarity:
+                    min_similarity = max_sim
                     best_idx = idx
 
             # Only add if below threshold
@@ -155,12 +164,16 @@ class DiversificationHelper:
 
         Returns:
             List of diverse documents selected from clusters.
-        """
-        if not documents:
-            return []
 
+        Raises:
+            ValueError: If the number of embeddings does not match the number
+                of documents.
+        """
         if len(embeddings) != len(documents):
             raise ValueError("Number of embeddings must match number of documents")
+
+        if not documents or num_clusters <= 0 or samples_per_cluster <= 0:
+            return []
 
         n_docs = len(documents)
         actual_clusters = min(num_clusters, n_docs)

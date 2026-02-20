@@ -25,7 +25,7 @@ The dense embedding helper wraps HuggingFace sentence-transformer models to prod
 
 The document filter supports ten comparison operators (equals, contains, starts-with, ends-with, greater-than, less-than, greater-or-equal, less-or-equal, in, and not-in) and can traverse nested JSON paths within document metadata. It also supports arbitrary predicate functions for custom filtering logic.
 
-The result merger implements two fusion strategies for combining results from multiple retrieval passes: reciprocal rank fusion and weighted merge scoring. Both strategies support per-result-set weighting and include deduplication by document content or metadata key.
+The result merger implements two fusion strategies for combining results from multiple retrieval passes: reciprocal rank fusion and weighted merge scoring. Both strategies support per-result-set weighting and include deduplication by document content or metadata key. The `dedup_key` parameter allows specifying a metadata field (e.g., document ID) for more robust deduplication when documents have similar content but different identifiers.
 
 The maximal marginal relevance helper iteratively selects documents that balance query relevance against redundancy with already-selected documents, controlled by a lambda trade-off parameter. The diversification helper provides both a greedy similarity-threshold approach and a clustering-based approach (using k-means) for selecting diverse document subsets.
 

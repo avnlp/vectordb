@@ -129,8 +129,8 @@ class WeaviateSemanticSearchPipeline:
                 Must contain weaviate and embedder sections.
 
         Raises:
-            ValueError: If required configuration is missing.
-            KeyError: If weaviate.url is not provided in configuration.
+            ValueError: If required configuration sections or weaviate.url
+                is missing.
         """
         self.config = ConfigLoader.load(config_or_path)
         ConfigLoader.validate(self.config, "weaviate")
@@ -138,6 +138,9 @@ class WeaviateSemanticSearchPipeline:
         self.embedder = EmbedderHelper.create_embedder(self.config)
 
         weaviate_config = self.config["weaviate"]
+        if "url" not in weaviate_config:
+            msg = "Missing required 'url' in weaviate config"
+            raise ValueError(msg)
         self.db = WeaviateVectorDB(
             url=weaviate_config["url"],
             api_key=weaviate_config.get("api_key"),

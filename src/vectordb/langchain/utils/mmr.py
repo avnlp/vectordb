@@ -91,7 +91,7 @@ class MMRHelper:
         Returns:
             List of (Document, MMR_score) tuples sorted by MMR score.
         """
-        if not documents:
+        if not documents or k == 0:
             return []
 
         k = min(k, len(documents))
@@ -119,19 +119,18 @@ class MMRHelper:
                 # Calculate relevance to query
                 relevance = relevance_scores[idx]
 
-                # Calculate diversity: average distance to already-selected documents
-                diversity = 0.0
+                # Calculate redundancy: max similarity to any selected doc
+                redundancy = 0.0
                 if selected_indices:
-                    distances = [
+                    redundancy = max(
                         MMRHelper.cosine_similarity(
                             embeddings[idx], embeddings[selected_idx]
                         )
                         for selected_idx in selected_indices
-                    ]
-                    diversity = 1.0 - (sum(distances) / len(distances))
+                    )
 
                 # Calculate MMR score
-                mmr_score = lambda_param * relevance + (1 - lambda_param) * diversity
+                mmr_score = lambda_param * relevance - (1 - lambda_param) * redundancy
                 mmr_scores[idx] = mmr_score
 
             # Select document with highest MMR score

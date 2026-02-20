@@ -32,12 +32,11 @@ Embedding Model Considerations:
     - Model choice affects retrieval quality and inference speed
     - Dimension must match the vector store's expected size
 
-Configuration:
+    Configuration:
     chroma:
-      persist_dir: "./chroma_data"  # Directory for local storage
+      path: "./chroma_data"  # Directory for local storage
       collection_name: "documents"  # Collection name
       recreate: false  # Whether to recreate collection
-
     embedder:
       model: "sentence-transformers/all-MiniLM-L6-v2"
       device: "cpu"  # or "cuda" for GPU
@@ -92,7 +91,7 @@ class ChromaSemanticIndexingPipeline:
     Example:
         >>> config = {
         ...     "chroma": {
-        ...         "persist_dir": "./chroma_data",
+        ...         "path": "./chroma_data",
         ...         "collection_name": "documents",
         ...     },
         ...     "embedder": {"model": "all-MiniLM-L6-v2"},

@@ -283,7 +283,7 @@ class TestMMRRerank:
             query_embedding=query_embedding,
         )
         for _, score in result:
-            assert -0.1 <= score <= 1.1  # Valid MMR score range
+            assert -1.1 <= score <= 1.1  # Valid MMR score range [-1, 1]
 
     def test_all_similar_items(self, sample_documents, query_embedding):
         """Test MMR when all items are similar to query."""
@@ -579,42 +579,30 @@ class TestMMRHelperEdgeCases:
         assert len(result) == 10
 
     def test_k_is_zero(self, query_embedding):
-        """Test MMR with k=0 returns empty list.
-
-        Note: The implementation always selects at least one document
-        (the first most relevant one), even when k=0.
-        """
+        """Test MMR with k=0 returns empty list."""
         documents = [
             Document(page_content="Doc 1", metadata={"id": "1"}),
             Document(page_content="Doc 2", metadata={"id": "2"}),
         ]
         embeddings = [[0.5, 0.5, 0.5], [0.6, 0.6, 0.6]]
-        # k=0 is treated as minimum 1 in the implementation
         result = MMRHelper.mmr_rerank(
             documents=documents,
             embeddings=embeddings,
             query_embedding=query_embedding,
             k=0,
         )
-        # Implementation selects at least one document
-        assert len(result) == 1
+        assert len(result) == 0
 
     def test_mmr_simple_k_is_zero(self, query_embedding):
-        """Test mmr_rerank_simple with k=0.
-
-        Note: The implementation always selects at least one document
-        (the first most relevant one), even when k=0.
-        """
+        """Test mmr_rerank_simple with k=0 returns empty list."""
         documents = [
             Document(page_content="Doc 1", metadata={"id": "1"}),
         ]
         embeddings = [[0.5, 0.5, 0.5]]
-        # k=0 is treated as minimum 1 in the implementation
         result = MMRHelper.mmr_rerank_simple(
             documents=documents,
             embeddings=embeddings,
             query_embedding=query_embedding,
             k=0,
         )
-        # Implementation selects at least one document
-        assert len(result) == 1
+        assert len(result) == 0

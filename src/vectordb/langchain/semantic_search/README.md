@@ -19,6 +19,8 @@ Each database has a dedicated indexing and search pipeline. The search pipeline 
 
 The indexing pipeline loads a dataset through the dataloader, converts each record into a LangChain document, and passes the documents through a dense embedding model. The resulting vectors and associated metadata are then upserted into the target vector database. Each database-specific indexing module handles the connection setup, index or collection creation, and batch insertion according to that database's native protocol.
 
+When `use_text_splitter` is set to `true` in the dataloader configuration, documents are split into smaller chunks using a `RecursiveCharacterTextSplitter` before embedding. This is useful for long-form documents that exceed the embedding model's token limit. When set to `false` (the default), documents are indexed as-is without any chunking.
+
 ### Search
 
 The search pipeline embeds the incoming query text using the same dense model used during indexing. It then issues a nearest-neighbor search against the vector database, retrieving the top-k most similar documents by cosine similarity. If metadata filters are provided, they are passed to the database to narrow results server-side. When RAG is enabled, the retrieved documents are passed as context to an LLM, which generates a concise answer to the original query.

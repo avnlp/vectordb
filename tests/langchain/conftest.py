@@ -177,7 +177,7 @@ def cost_optimized_rag_config() -> dict:
         },
         "search": {"top_k": 5, "score_threshold": 0.5},
         "chroma": {
-            "persist_directory": "./test_chroma_data",
+            "path": "./test_chroma_data",
             "collection_name": "test_cost_optimized_rag",
         },
         "sparse_embeddings": {

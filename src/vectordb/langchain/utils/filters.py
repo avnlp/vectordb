@@ -22,7 +22,8 @@ class DocumentFilter:
             key: Metadata key to filter on.
             value: Value to match.
             operator: Filter operator (equals, contains, startswith, endswith,
-                gt, lt, gte, lte).
+                gt, lt, gte, lte, in, not_in). Note: string operators
+                (contains, startswith, endswith) are case-insensitive.
 
         Returns:
             Filtered list of documents.
@@ -41,9 +42,9 @@ class DocumentFilter:
                 case "contains":
                     return str(value).lower() in str(metadata_value).lower()
                 case "startswith":
-                    return str(metadata_value).startswith(str(value))
+                    return str(metadata_value).lower().startswith(str(value).lower())
                 case "endswith":
-                    return str(metadata_value).endswith(str(value))
+                    return str(metadata_value).lower().endswith(str(value).lower())
                 case "gt":
                     return metadata_value > value
                 case "lt":
@@ -91,7 +92,9 @@ class DocumentFilter:
             documents: List of documents to filter.
             json_path: Dot-separated path (e.g., "author.name").
             value: Value to match.
-            operator: Filter operator.
+            operator: Filter operator (equals, contains, startswith, endswith,
+                gt, lt, gte, lte, in, not_in). Note: string operators
+                (contains, startswith, endswith) are case-insensitive.
 
         Returns:
             Filtered list of documents.
@@ -118,9 +121,9 @@ class DocumentFilter:
                 case "contains":
                     return str(value).lower() in str(nested_value).lower()
                 case "startswith":
-                    return str(nested_value).startswith(str(value))
+                    return str(nested_value).lower().startswith(str(value).lower())
                 case "endswith":
-                    return str(nested_value).endswith(str(value))
+                    return str(nested_value).lower().endswith(str(value).lower())
                 case "gt":
                     return nested_value > value
                 case "lt":

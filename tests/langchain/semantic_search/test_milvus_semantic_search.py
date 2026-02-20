@@ -46,8 +46,9 @@ class TestMilvusSemanticIndexing:
         1. Load documents from configured dataloader with limit
         2. Embed documents using EmbedderHelper with specified model
         3. Initialize MilvusVectorDB with URI and collection name
-        4. Upsert embeddings and metadata into Milvus collection
-        5. Return indexing statistics
+        4. Create Milvus collection with correct vector dimension
+        5. Insert embeddings and metadata into Milvus collection
+        6. Return indexing statistics
     """
 
     @patch("vectordb.langchain.semantic_search.indexing.milvus.MilvusVectorDB")
@@ -110,14 +111,15 @@ class TestMilvusSemanticIndexing:
             1. Documents are loaded via dataloader helper
             2. Documents are embedded into 384-dimensional vectors
             3. MilvusVectorDB is initialized with config parameters
-            4. Embeddings are upserted into Milvus collection
-            5. Returns count of indexed documents
+            4. Collection is created with correct vector dimension
+            5. Documents are inserted into Milvus collection
+            6. Returns count of indexed documents
 
         Args:
             mock_get_docs: Mock returning sample documents from dataloader
             mock_embed_docs: Mock returning embedded documents with vectors
             mock_embedder_helper: Mock for embedder initialization
-            mock_db: Mock for MilvusVectorDB with upsert tracking
+            mock_db: Mock for MilvusVectorDB with insert tracking
             sample_documents: Pytest fixture providing test documents
         """
         mock_dataset = MagicMock()
@@ -128,7 +130,6 @@ class TestMilvusSemanticIndexing:
         mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -144,7 +145,8 @@ class TestMilvusSemanticIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.create_collection.assert_called_once()
+        mock_db_inst.insert_documents.assert_called_once()
 
     @patch("vectordb.langchain.semantic_search.indexing.milvus.MilvusVectorDB")
     @patch(

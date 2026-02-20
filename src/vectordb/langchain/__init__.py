@@ -21,6 +21,11 @@ Features:
 
 Usage:
     >>> from langchain_openai import OpenAIEmbeddings
-    >>> from vectordb.langchain import ChromaVectorStore
-    >>> from vectordb.langchain.mmr import ChromaMmrRetriever
+    >>> from vectordb.langchain.semantic_search import ChromaSemanticSearchPipeline
+    >>> from vectordb.langchain.utils import MMRHelper
+    >>> # Semantic search pipeline
+    >>> pipeline = ChromaSemanticSearchPipeline("config.yaml")
+    >>> results = pipeline.search("What is machine learning?", top_k=5)
+    >>> # MMR reranking for diversity
+    >>> reranked = MMRHelper.mmr_rerank(documents, embeddings, query_embedding, k=10)
 """

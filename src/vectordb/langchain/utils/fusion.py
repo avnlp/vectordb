@@ -24,7 +24,10 @@ When to Use Each Strategy:
 
 Deduplication:
     ResultMerger provides deduplication to remove documents that appear in
-    multiple source lists. Uses page_content or metadata keys for uniqueness.
+    multiple source lists. By default, uses page_content for uniqueness.
+    For more robust deduplication, specify a metadata key (e.g., document ID)
+    using the dedup_key parameter to handle semantically identical documents
+    with minor content differences.
 
 Usage:
     >>> from vectordb.langchain.utils import ResultMerger
@@ -32,6 +35,14 @@ Usage:
     >>> fused = ResultMerger.reciprocal_rank_fusion([dense_results, sparse_results])
     >>> # Weighted fusion with dense emphasis
     >>> fused = ResultMerger.weighted_merge([dense, sparse], weights=[0.7, 0.3])
+    >>> # Use metadata ID for robust deduplication
+    >>> fused = ResultMerger.reciprocal_rank_fusion(
+    ...     [dense_results, sparse_results], dedup_key="id"
+    ... )
+    >>> # Merge and deduplicate with custom metadata key
+    >>> fused = ResultMerger.merge_and_deduplicate(
+    ...     [results1, results2], method="rrf", dedup_key="doc_id"
+    ... )
 """
 
 from langchain_core.documents import Document
@@ -50,6 +61,7 @@ class ResultMerger:
         results_list: list[list[Document]],
         k: int = 60,
         weights: list[float] | None = None,
+        dedup_key: str | None = None,
     ) -> list[Document]:
         """Merge results using Reciprocal Rank Fusion (RRF).
 
@@ -57,6 +69,9 @@ class ResultMerger:
             results_list: List of result sets from multiple searches.
             k: RRF parameter (default 60).
             weights: Optional weights for each result set (default equal weights).
+            dedup_key: Optional metadata key for deduplication. If provided, uses
+                doc.metadata[dedup_key] for uniqueness. Otherwise falls back to
+                page_content.
 
         Returns:
             Merged list of documents sorted by RRF score.
@@ -77,8 +92,14 @@ class ResultMerger:
 
         for result_set, weight in zip(results_list, weights):
             for rank, doc in enumerate(result_set, 1):
-                # Use page_content as unique key
-                key = doc.page_content
+                # Use metadata key for uniqueness if provided, otherwise page_content
+                if dedup_key:
+                    key = doc.metadata.get(dedup_key)
+                    if key is None:
+                        key = doc.page_content
+                else:
+                    key = doc.page_content
+
                 doc_map[key] = doc
 
                 rrf_score = (weight * 1.0) / (k + rank)
@@ -94,12 +115,16 @@ class ResultMerger:
     def weighted_merge(
         results_list: list[list[Document]],
         weights: list[float] | None = None,
+        dedup_key: str | None = None,
     ) -> list[Document]:
         """Merge results with weighted scoring.
 
         Args:
             results_list: List of result sets from multiple searches.
             weights: Weights for each result set (default equal weights).
+            dedup_key: Optional metadata key for deduplication. If provided, uses
+                doc.metadata[dedup_key] for uniqueness. Otherwise falls back to
+                page_content.
 
         Returns:
             Merged list of documents sorted by weighted score.
@@ -121,8 +146,14 @@ class ResultMerger:
         for result_set, weight in zip(results_list, weights):
             # Normalize ranks: first document gets max score
             for rank, doc in enumerate(result_set):
-                # Use page_content as unique key
-                key = doc.page_content
+                # Use metadata key for uniqueness if provided, otherwise page_content
+                if dedup_key:
+                    key = doc.metadata.get(dedup_key)
+                    if key is None:
+                        key = doc.page_content
+                else:
+                    key = doc.page_content
+
                 doc_map[key] = doc
 
                 # Score decreases with rank
@@ -171,7 +202,7 @@ class ResultMerger:
         results_list: list[list[Document]],
         method: str = "rrf",
         weights: list[float] | None = None,
-        dedup_key: str = "page_content",
+        dedup_key: str | None = None,
     ) -> list[Document]:
         """Merge results, deduplicate, and sort.
 
@@ -179,17 +210,26 @@ class ResultMerger:
             results_list: List of result sets from multiple searches.
             method: Merging method ("rrf" or "weighted").
             weights: Optional weights for each result set.
-            dedup_key: Key to use for deduplication.
+            dedup_key: Optional metadata key for deduplication. If provided, uses
+                doc.metadata[dedup_key] for uniqueness. Otherwise falls back to
+                page_content.
 
         Returns:
             Merged and deduplicated list of documents.
         """
         if method == "rrf":
-            merged = ResultMerger.reciprocal_rank_fusion(results_list, weights=weights)
+            merged = ResultMerger.reciprocal_rank_fusion(
+                results_list, weights=weights, dedup_key=dedup_key
+            )
         elif method == "weighted":
-            merged = ResultMerger.weighted_merge(results_list, weights=weights)
+            merged = ResultMerger.weighted_merge(
+                results_list, weights=weights, dedup_key=dedup_key
+            )
         else:
             msg = f"Unknown merge method: {method}"
             raise ValueError(msg)
 
-        return ResultMerger.deduplication(merged, key=dedup_key)
+        # Additional deduplication pass if a different key is needed
+        if dedup_key:
+            return ResultMerger.deduplication(merged, key=dedup_key)
+        return merged
