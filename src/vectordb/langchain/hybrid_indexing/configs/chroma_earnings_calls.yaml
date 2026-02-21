@@ -1,0 +1,30 @@
+dataloader:
+  type: "earnings_calls"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+chroma:
+  host: "localhost"
+  port: 8000
+  collection_name: "lc_hybrid_earnings_calls"
+  dimension: 384
+
+search:
+  top_k: 10
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+logging:
+  name: "lc_hybrid_indexing_chroma"
+  level: "INFO"
