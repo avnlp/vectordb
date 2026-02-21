@@ -1,1 +1,3 @@
-"""Metadata filtering examples for various vector databases."""
+"""LangChain metadata filtering feature."""
+
+__all__ = []
