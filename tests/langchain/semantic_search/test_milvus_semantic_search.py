@@ -200,12 +200,12 @@ class TestMilvusSemanticSearch:
 
     Pipeline Flow (RAG disabled):
         1. Embed user query using configured embedding model
-        2. Query MilvusVectorDB with embedded query vector
+        2. Search MilvusVectorDB with embedded query vector
         3. Return retrieved documents with relevance scores
 
     Pipeline Flow (RAG enabled):
         1. Embed user query using configured embedding model
-        2. Query MilvusVectorDB with embedded query vector
+        2. Search MilvusVectorDB with embedded query vector
         3. Generate answer using LLM with retrieved documents as context
         4. Return both documents and generated answer
     """
@@ -266,7 +266,7 @@ class TestMilvusSemanticSearch:
 
         Validates the search flow without answer generation:
             1. Query is embedded into 384-dimensional vector
-            2. MilvusVectorDB.query is called with embedded query
+            2. MilvusVectorDB.search is called with embedded query
             3. Documents are returned in result with query text
             4. Answer field is not present in result
 
@@ -283,7 +283,7 @@ class TestMilvusSemanticSearch:
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm.return_value = None
 
@@ -326,7 +326,7 @@ class TestMilvusSemanticSearch:
 
         Validates the search flow with answer generation:
             1. Query is embedded into 384-dimensional vector
-            2. MilvusVectorDB.query retrieves relevant documents
+            2. MilvusVectorDB.search retrieves relevant documents
             3. LLM is initialized via RAGHelper.create_llm
             4. RAGHelper.generate produces answer using query and context
             5. Result contains both documents and generated answer
@@ -346,7 +346,7 @@ class TestMilvusSemanticSearch:
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()

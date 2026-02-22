@@ -189,7 +189,7 @@ class QdrantSemanticSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        documents = self.db.query(
+        documents = self.db.search(
             query_embedding=query_embedding,
             top_k=top_k,
             filters=filters,
