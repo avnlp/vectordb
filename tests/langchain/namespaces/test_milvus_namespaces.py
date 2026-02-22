@@ -378,4 +378,5 @@ class TestMilvusNamespaceQuery:
             filter="",
             output_fields=["namespace"],
             limit=10000,
+            offset=0,
         )

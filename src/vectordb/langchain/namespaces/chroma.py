@@ -12,16 +12,12 @@ from vectordb.databases.chroma import ChromaVectorDB
 
 from .base import NamespacePipeline
 from .types import (
-    CrossNamespaceComparison,
-    CrossNamespaceResult,
     IsolationStrategy,
     NamespaceOperationResult,
     NamespaceQueryResult,
     NamespaceStats,
-    NamespaceTimingMetrics,
     TenantStatus,
 )
-from .utils import Timer
 
 
 logger = logging.getLogger(__name__)
@@ -157,43 +153,3 @@ class ChromaNamespacePipeline(NamespacePipeline):
     ) -> list[NamespaceQueryResult]:
         """Query a specific namespace collection."""
         return []
-
-    def query_cross_namespace(
-        self,
-        query: str,
-        namespaces: list[str] | None = None,
-        top_k: int = 10,
-    ) -> CrossNamespaceResult:
-        """Query across multiple namespaces with timing comparison."""
-        if namespaces is None:
-            namespaces = self.list_namespaces()
-
-        namespace_results: dict[str, list[NamespaceQueryResult]] = {}
-        timing_comparisons: list[CrossNamespaceComparison] = []
-
-        with Timer() as total_timer:
-            for ns in namespaces:
-                results = self.query_namespace(query, ns, top_k)
-                namespace_results[ns] = results
-
-                timing = NamespaceTimingMetrics(
-                    namespace_lookup_ms=0.0,
-                    vector_search_ms=0.0,
-                    total_ms=0.0,
-                    documents_searched=0,
-                    documents_returned=len(results),
-                )
-                comparison = CrossNamespaceComparison(
-                    namespace=ns,
-                    timing=timing,
-                    result_count=len(results),
-                    top_score=results[0].relevance_score if results else 0.0,
-                )
-                timing_comparisons.append(comparison)
-
-        return CrossNamespaceResult(
-            query=query,
-            namespace_results=namespace_results,
-            timing_comparison=timing_comparisons,
-            total_time_ms=total_timer.elapsed_ms,
-        )

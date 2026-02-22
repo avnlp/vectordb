@@ -25,7 +25,6 @@ from langchain_core.documents import Document
 
 from vectordb.langchain.namespaces.base import NamespacePipeline
 from vectordb.langchain.namespaces.types import (
-    CrossNamespaceResult,
     NamespaceOperationResult,
     NamespaceQueryResult,
     NamespaceStats,
@@ -135,27 +134,6 @@ class InMemoryNamespacePipeline(NamespacePipeline):
             for idx, doc in enumerate(matched[:top_k])
         ]
 
-    def query_cross_namespace(
-        self,
-        query: str,
-        namespaces: list[str] | None = None,
-        top_k: int = 10,
-    ) -> CrossNamespaceResult:
-        """Run namespace queries and aggregate into a cross-namespace result."""
-        target_namespaces = (
-            namespaces if namespaces is not None else self.list_namespaces()
-        )
-        namespace_results = {
-            namespace: self.query_namespace(query, namespace, top_k)
-            for namespace in target_namespaces
-        }
-        return CrossNamespaceResult(
-            query=query,
-            namespace_results=namespace_results,
-            timing_comparison=[],
-            total_time_ms=0.0,
-        )
-
 
 class TestNamespacePipelineABC:
     """Tests for NamespacePipeline abstract base class compliance."""
@@ -180,7 +158,6 @@ class TestNamespacePipelineABC:
             "get_namespace_stats",
             "index_documents",
             "query_namespace",
-            "query_cross_namespace",
         }
         assert required_methods.issubset(abstract_methods)
 

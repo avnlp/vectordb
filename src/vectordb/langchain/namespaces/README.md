@@ -24,7 +24,7 @@ Each database uses its native mechanism for data isolation: Pinecone provides na
 
 The module is organized into three layers:
 
-1. **Core namespace pipelines** (`pinecone.py`, `weaviate.py`, `chroma.py`, `milvus.py`, `qdrant.py`) -- Each extends the `NamespacePipeline` abstract base class and implements the seven namespace operations using the database's native isolation mechanism. These handle low-level namespace CRUD, document upsert with namespace routing, and cross-namespace querying.
+1. **Core namespace pipelines** (`pinecone.py`, `weaviate.py`, `chroma.py`, `milvus.py`, `qdrant.py`) -- Each extends the `NamespacePipeline` abstract base class and implements the seven abstract namespace operations using the database's native isolation mechanism. These handle low-level namespace CRUD and document upsert with namespace routing. Cross-namespace querying is provided by the base class.
 
 2. **Indexing pipelines** (`indexing/`) -- Each wraps a core namespace pipeline and adds end-to-end document loading, embedding generation, and index creation. Initialized with a YAML config and a target namespace, the `run()` method loads documents via `DataloaderCatalog`, embeds them with `EmbedderHelper`, and indexes them into the specified namespace.
 
@@ -41,7 +41,10 @@ All database implementations extend `NamespacePipeline`, which defines the follo
 - `get_namespace_stats(namespace)` -- Returns a `NamespaceStats` object with document count, vector count, and status
 - `index_documents(documents, embeddings, namespace)` -- Indexes LangChain documents with pre-computed embeddings into a namespace
 - `query_namespace(query, namespace, top_k)` -- Queries a single namespace, returning a list of `NamespaceQueryResult`
-- `query_cross_namespace(query, namespaces, top_k)` -- Queries multiple namespaces and returns a `CrossNamespaceResult` with per-namespace timing comparisons
+
+The base class also provides a concrete method:
+
+- `query_cross_namespace(query, namespaces, top_k)` -- Queries multiple namespaces and returns a `CrossNamespaceResult` with per-namespace timing comparisons. This is implemented in the base class using `list_namespaces()` and `query_namespace()`, so subclasses inherit it automatically.
 
 ### Namespace Creation and Management
 
@@ -50,7 +53,7 @@ Each database pipeline provides methods to create, list, check existence of, and
 - **Pinecone** auto-creates namespaces on first upsert; `create_namespace` is a no-op that returns a success result
 - **Weaviate** explicitly creates tenants via `create_tenant()` on the database client
 - **Chroma** creates a prefixed collection (e.g., `ns_arc_train`) for each namespace; `list_namespaces` strips the prefix when returning names
-- **Milvus** auto-creates partition key namespaces on insert; `delete_namespace` removes all documents matching the namespace filter expression
+- **Milvus** auto-creates partition key namespaces on insert; `list_namespaces` paginates through all entities to collect unique namespace values; `delete_namespace` removes all documents matching the namespace filter expression
 - **Qdrant** auto-creates payload-based namespaces on insert; `list_namespaces` scrolls through all points to collect unique namespace payload values
 
 ### Indexing Pipelines
@@ -88,7 +91,7 @@ Each database routes the namespace scope differently during search: Pinecone pas
 
 ### Cross-Namespace Search
 
-The `query_cross_namespace` method on each core pipeline runs the same query against multiple namespaces and collects per-namespace timing metrics. If no namespaces are specified, it queries all available namespaces. Results are returned as a `CrossNamespaceResult` containing:
+The `query_cross_namespace` method on the base `NamespacePipeline` class runs the same query against multiple namespaces and collects per-namespace timing metrics. If no namespaces are specified, it queries all available namespaces. Results are returned as a `CrossNamespaceResult` containing:
 
 - `namespace_results` -- a dict mapping each namespace to its list of `NamespaceQueryResult` objects
 - `timing_comparison` -- a list of `CrossNamespaceComparison` objects with per-namespace timing, result count, and top relevance score
@@ -179,7 +182,7 @@ All indexing and search pipelines accept either a path to a YAML file or a pre-l
 namespaces/
 ├── __init__.py                        # Package exports for pipelines, types, and utilities
 ├── README.md                          # This file
-├── base.py                            # Abstract NamespacePipeline base class (7 abstract methods)
+├── base.py                            # Abstract NamespacePipeline base class (7 abstract methods + concrete query_cross_namespace)
 ├── types.py                           # Enums, dataclasses, exceptions, and utility classes
 ├── pinecone.py                        # Pinecone native namespace pipeline
 ├── weaviate.py                        # Weaviate tenant-based namespace pipeline

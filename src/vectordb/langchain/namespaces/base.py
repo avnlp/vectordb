@@ -12,11 +12,14 @@ from abc import ABC, abstractmethod
 from langchain_core.documents import Document
 
 from .types import (
+    CrossNamespaceComparison,
     CrossNamespaceResult,
     NamespaceOperationResult,
     NamespaceQueryResult,
     NamespaceStats,
+    NamespaceTimingMetrics,
 )
+from .utils import Timer
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +124,6 @@ class NamespacePipeline(ABC):
         """
         raise NotImplementedError("Subclasses must implement query_namespace()")
 
-    @abstractmethod
     def query_cross_namespace(
         self,
         query: str,
@@ -138,4 +140,37 @@ class NamespacePipeline(ABC):
         Returns:
             Cross-namespace result with results and timing comparison.
         """
-        raise NotImplementedError("Subclasses must implement query_cross_namespace()")
+        if namespaces is None:
+            namespaces = self.list_namespaces()
+
+        namespace_results: dict[str, list[NamespaceQueryResult]] = {}
+        timing_comparisons: list[CrossNamespaceComparison] = []
+
+        with Timer() as total_timer:
+            for ns in namespaces:
+                with Timer() as ns_timer:
+                    results = self.query_namespace(query, ns, top_k)
+
+                namespace_results[ns] = results
+
+                timing = NamespaceTimingMetrics(
+                    namespace_lookup_ms=0.0,
+                    vector_search_ms=0.0,
+                    total_ms=ns_timer.elapsed_ms,
+                    documents_searched=0,
+                    documents_returned=len(results),
+                )
+                comparison = CrossNamespaceComparison(
+                    namespace=ns,
+                    timing=timing,
+                    result_count=len(results),
+                    top_score=results[0].relevance_score if results else 0.0,
+                )
+                timing_comparisons.append(comparison)
+
+        return CrossNamespaceResult(
+            query=query,
+            namespace_results=namespace_results,
+            timing_comparison=timing_comparisons,
+            total_time_ms=total_timer.elapsed_ms,
+        )

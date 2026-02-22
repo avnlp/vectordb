@@ -7,8 +7,8 @@ from .timing import Timer
 
 __all__ = [
     "Timer",
-    "load_config",
-    "resolve_env_vars",
-    "load_documents_from_config",
     "get_namespace_configs",
+    "load_config",
+    "load_documents_from_config",
+    "resolve_env_vars",
 ]
