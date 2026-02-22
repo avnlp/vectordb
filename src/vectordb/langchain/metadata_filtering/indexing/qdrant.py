@@ -76,7 +76,10 @@ See Also:
 """
 
 import logging
+import uuid
 from typing import Any
+
+from qdrant_client.models import PointStruct
 
 from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.dataloaders import DataloaderCatalog
@@ -158,13 +161,18 @@ class QdrantMetadataFilteringIndexingPipeline:
         self.embedder = EmbedderHelper.create_embedder(self.config)
 
         qdrant_config = self.config["qdrant"]
-        self.db = QdrantVectorDB(
-            url=qdrant_config.get("url", "http://localhost:6333"),
-            api_key=qdrant_config.get("api_key"),
-        )
-
         self.collection_name = qdrant_config.get(
             "collection_name", "metadata_filtering"
+        )
+
+        self.db = QdrantVectorDB(
+            config={
+                "qdrant": {
+                    "url": qdrant_config.get("url", "http://localhost:6333"),
+                    "api_key": qdrant_config.get("api_key"),
+                    "collection_name": self.collection_name,
+                }
+            }
         )
 
         logger.info(
@@ -218,14 +226,31 @@ class QdrantMetadataFilteringIndexingPipeline:
 
         recreate = self.config.get("qdrant", {}).get("recreate", False)
         if recreate:
-            self.db.delete_collection(self.collection_name)
+            self.db.client.delete_collection(self.collection_name)
             logger.info("Recreated Qdrant collection: %s", self.collection_name)
 
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
-            collection_name=self.collection_name,
-        )
-        logger.info("Indexed %d documents to Qdrant", num_indexed)
+        dimension = len(embeddings[0]) if embeddings else 0
+        self.db.create_collection(dimension=dimension)
 
-        return {"documents_indexed": num_indexed}
+        points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=embedding,
+                payload={
+                    "page_content": doc.page_content,
+                    **doc.metadata,
+                },
+            )
+            for doc, embedding in zip(docs, embeddings)
+        ]
+
+        batch_size = 100
+        for i in range(0, len(points), batch_size):
+            self.db.client.upsert(
+                collection_name=self.collection_name,
+                points=points[i : i + batch_size],
+                wait=False,
+            )
+        logger.info("Indexed %d documents to Qdrant", len(docs))
+
+        return {"documents_indexed": len(docs)}

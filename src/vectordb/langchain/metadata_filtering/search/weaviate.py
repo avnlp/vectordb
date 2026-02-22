@@ -14,8 +14,9 @@ Why Metadata Filtering:
 Search Pipeline Architecture:
     1. Query Embedding: Convert query text to vector representation
     2. Filtered Vector Search: Execute similarity search with metadata constraints
-    3. Post-Processing: Apply additional client-side filters if configured
-    4. RAG Generation: Generate answer using filtered documents (optional)
+    3. Document Conversion: Convert Weaviate results to LangChain Documents
+    4. Post-Processing: Apply additional client-side filters if configured
+    5. RAG Generation: Generate answer using filtered documents (optional)
 
 Weaviate Metadata Filtering Capabilities:
     Weaviate supports sophisticated filtering through GraphQL Where filters:
@@ -86,6 +87,7 @@ from vectordb.langchain.utils import (
     EmbedderHelper,
     RAGHelper,
 )
+from vectordb.utils.weaviate_document_converter import WeaviateDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -167,6 +169,7 @@ class WeaviateMetadataFilteringSearchPipeline:
         self.collection_name = weaviate_config.get(
             "collection_name", "MetadataFiltering"
         )
+        self.db._select_collection(self.collection_name)
         self.llm = RAGHelper.create_llm(self.config)
 
         self.filters_config = self.config.get("filters", {})
@@ -206,9 +209,10 @@ class WeaviateMetadataFilteringSearchPipeline:
         Search Flow:
             1. Embed query text using configured embedder
             2. Execute vector search with server-side metadata filters
-            3. Apply client-side filters if configured
-            4. Generate RAG answer using LLM if configured
-            5. Return documents and optional answer
+            3. Convert Weaviate results to LangChain Documents
+            4. Apply client-side filters if configured
+            5. Generate RAG answer using LLM if configured
+            6. Return documents and optional answer
 
         Example:
             >>> results = searcher.search(
@@ -224,12 +228,19 @@ class WeaviateMetadataFilteringSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        documents = self.db.query(
-            query_embedding=query_embedding,
-            top_k=top_k,
+        raw_results = self.db.query(
+            vector=query_embedding,
+            limit=top_k,
             filters=filters,
-            collection_name=self.collection_name,
         )
+        if isinstance(raw_results, list):
+            documents = raw_results
+        else:
+            documents = (
+                WeaviateDocumentConverter.convert_query_results_to_langchain_documents(
+                    raw_results,
+                )
+            )
         logger.info("Retrieved %d documents from Weaviate", len(documents))
 
         # Apply metadata filtering if configured

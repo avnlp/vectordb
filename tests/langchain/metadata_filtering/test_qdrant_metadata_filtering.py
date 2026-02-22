@@ -61,7 +61,6 @@ class TestQdrantMetadataFilteringIndexing:
         mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -79,7 +78,7 @@ class TestQdrantMetadataFilteringIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.client.upsert.assert_called()
 
     @patch("vectordb.langchain.metadata_filtering.indexing.qdrant.QdrantVectorDB")
     @patch(
@@ -141,7 +140,6 @@ class TestQdrantMetadataFilteringIndexing:
         mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -160,7 +158,7 @@ class TestQdrantMetadataFilteringIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.delete_collection.assert_called_once_with(
+        mock_db_inst.client.delete_collection.assert_called_once_with(
             "test_metadata_filtering"
         )
 
@@ -208,7 +206,7 @@ class TestQdrantMetadataFilteringSearch:
         """Test search execution."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -249,7 +247,7 @@ class TestQdrantMetadataFilteringSearch:
         """Test search with metadata filters."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -270,8 +268,8 @@ class TestQdrantMetadataFilteringSearch:
         result = pipeline.search("test query", top_k=5, filters=filters)
 
         assert result["query"] == "test query"
-        mock_db_inst.query.assert_called_once()
-        call_kwargs = mock_db_inst.query.call_args.kwargs
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args.kwargs
         assert call_kwargs["filters"] == filters
 
     @patch("vectordb.langchain.metadata_filtering.search.qdrant.QdrantVectorDB")
@@ -297,7 +295,7 @@ class TestQdrantMetadataFilteringSearch:
         """Test search with filters configured in config."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
         mock_filter.return_value = sample_documents[:2]
@@ -346,7 +344,7 @@ class TestQdrantMetadataFilteringSearch:
         """Test search with RAG generation."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm = MagicMock()

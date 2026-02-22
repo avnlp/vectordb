@@ -14,8 +14,9 @@ Why Metadata Filtering:
 Search Pipeline Architecture:
     1. Query Embedding: Convert query text to vector representation
     2. Filtered Vector Search: Execute similarity search with metadata constraints
-    3. Post-Processing: Apply additional client-side filters if configured
-    4. RAG Generation: Generate answer using filtered documents (optional)
+    3. Document Conversion: Convert Haystack Documents to LangChain Documents
+    4. Post-Processing: Apply additional client-side filters if configured
+    5. RAG Generation: Generate answer using filtered documents (optional)
 
 Pinecone Metadata Filtering Capabilities:
     Pinecone supports server-side metadata filtering through its filter syntax:
@@ -79,6 +80,8 @@ See Also:
 
 import logging
 from typing import Any
+
+from langchain_core.documents import Document as LangchainDocument
 
 from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.langchain.utils import (
@@ -196,7 +199,7 @@ class PineconeMetadataFilteringSearchPipeline:
 
         Returns:
             Dictionary containing:
-            - documents: List of retrieved documents matching query and filters
+            - documents: List of LangChain Document objects matching query and filters
             - query: Original query string
             - answer: Generated RAG answer if LLM is configured, else None
 
@@ -208,9 +211,10 @@ class PineconeMetadataFilteringSearchPipeline:
         Search Flow:
             1. Embed query text using configured embedder
             2. Execute vector search with server-side metadata filters
-            3. Apply client-side filters if configured
-            4. Generate RAG answer using LLM if configured
-            5. Return documents and optional answer
+            3. Convert Haystack Documents to LangChain Documents
+            4. Apply client-side filters if configured
+            5. Generate RAG answer using LLM if configured
+            6. Return documents and optional answer
 
         Example:
             >>> results = searcher.search(
@@ -230,13 +234,27 @@ class PineconeMetadataFilteringSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        # Search Pinecone
-        documents = self.db.query(
+        # Search Pinecone (returns Haystack Documents internally)
+        haystack_docs = self.db.query(
             query_embedding=query_embedding,
             top_k=top_k,
             filters=filters,
             namespace=self.namespace,
         )
+
+        # Convert Haystack Documents (.content/.meta) to LangChain Documents
+        # (.page_content/.metadata) for compatibility with DocumentFilter and RAGHelper
+        documents = []
+        for doc in haystack_docs:
+            if isinstance(doc, LangchainDocument):
+                documents.append(doc)
+            else:
+                documents.append(
+                    LangchainDocument(
+                        page_content=doc.content or "",
+                        metadata=doc.meta,
+                    )
+                )
         logger.info("Retrieved %d documents from Pinecone", len(documents))
 
         # Apply metadata filtering if configured

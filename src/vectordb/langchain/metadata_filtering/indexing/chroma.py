@@ -212,11 +212,13 @@ class ChromaMetadataFilteringIndexingPipeline:
             self.db.delete_collection(self.collection_name)
             logger.info("Recreated Chroma collection: %s", self.collection_name)
 
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
-            collection_name=self.collection_name,
-        )
-        logger.info("Indexed %d documents to Chroma", num_indexed)
+        data = {
+            "ids": [doc.metadata.get("id", str(i)) for i, doc in enumerate(docs)],
+            "documents": [doc.page_content for doc in docs],
+            "metadatas": [doc.metadata for doc in docs],
+            "embeddings": embeddings,
+        }
+        self.db.upsert(data)
+        logger.info("Indexed %d documents to Chroma", len(docs))
 
-        return {"documents_indexed": num_indexed}
+        return {"documents_indexed": len(docs)}

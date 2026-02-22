@@ -40,7 +40,8 @@ Configuration:
       host: "localhost"  # Milvus server host
       port: 19530  # Milvus server port
       collection_name: "metadata_filtering"  # Target collection
-      recreate: false  # Whether to delete and recreate collection
+      dimension: 384  # Embedding vector dimension
+      recreate: false  # Whether to drop and recreate collection
 
     embedder:
       model: "sentence-transformers/all-MiniLM-L6-v2"
@@ -107,6 +108,7 @@ class MilvusMetadataFilteringIndexingPipeline:
             dense vector representations.
         db: MilvusVectorDB instance for database operations.
         collection_name: Name of the Milvus collection for indexing.
+        dimension: Embedding vector dimension for collection schema.
 
     Example:
         >>> pipeline = MilvusMetadataFilteringIndexingPipeline("config.yaml")
@@ -119,7 +121,8 @@ class MilvusMetadataFilteringIndexingPipeline:
         - milvus.host: Milvus server hostname (default: "localhost")
         - milvus.port: Milvus server port (default: 19530)
         - milvus.collection_name: Target collection name (default: "metadata_filtering")
-        - milvus.recreate: Whether to delete existing collection (default: False)
+        - milvus.dimension: Embedding vector dimension (default: 384)
+        - milvus.recreate: Whether to drop and recreate collection (default: False)
         - embedder: Embedding model configuration
         - dataloader: Data source configuration with metadata fields
 
@@ -164,6 +167,7 @@ class MilvusMetadataFilteringIndexingPipeline:
         self.collection_name = milvus_config.get(
             "collection_name", "metadata_filtering"
         )
+        self.dimension = milvus_config.get("dimension", 384)
 
         logger.info(
             "Initialized Milvus metadata filtering indexing pipeline (LangChain)"
@@ -173,7 +177,7 @@ class MilvusMetadataFilteringIndexingPipeline:
         """Execute the complete metadata filtering indexing pipeline.
 
         Loads documents from the configured data source, generates embeddings,
-        and upserts all documents with their metadata into the Milvus collection.
+        and inserts all documents with their metadata into the Milvus collection.
 
         Returns:
             Dictionary with indexing results:
@@ -187,8 +191,8 @@ class MilvusMetadataFilteringIndexingPipeline:
         Pipeline Steps:
             1. Load documents with metadata from configured data source
             2. Generate embeddings for all documents using embedder
-            3. Delete existing collection if recreate=True
-            4. Upsert documents with embeddings and metadata to Milvus
+            3. Create collection (drop and recreate if recreate=True)
+            4. Insert documents with embeddings and metadata to Milvus
             5. Return count of indexed documents
 
         Example:
@@ -215,15 +219,17 @@ class MilvusMetadataFilteringIndexingPipeline:
         logger.info("Generated embeddings for %d documents", len(docs))
 
         recreate = self.config.get("milvus", {}).get("recreate", False)
-        if recreate:
-            self.db.delete_collection(self.collection_name)
-            logger.info("Recreated Milvus collection: %s", self.collection_name)
+        self.db.create_collection(
+            collection_name=self.collection_name,
+            dimension=self.dimension,
+            recreate=recreate,
+        )
 
-        num_indexed = self.db.upsert(
+        self.db.insert_documents(
             documents=docs,
-            embeddings=embeddings,
             collection_name=self.collection_name,
         )
+        num_indexed = len(docs)
         logger.info("Indexed %d documents to Milvus", num_indexed)
 
         return {"documents_indexed": num_indexed}

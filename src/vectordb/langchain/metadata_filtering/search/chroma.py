@@ -85,6 +85,7 @@ from vectordb.langchain.utils import (
     EmbedderHelper,
     RAGHelper,
 )
+from vectordb.utils.chroma_document_converter import ChromaDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -220,12 +221,19 @@ class ChromaMetadataFilteringSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        documents = self.db.query(
+        raw_results = self.db.query(
             query_embedding=query_embedding,
-            top_k=top_k,
-            filters=filters,
-            collection_name=self.collection_name,
+            n_results=top_k,
+            where=filters,
         )
+        if isinstance(raw_results, list):
+            documents = raw_results
+        else:
+            documents = (
+                ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+                    raw_results,
+                )
+            )
         logger.info("Retrieved %d documents from Chroma", len(documents))
 
         # Apply metadata filtering if configured

@@ -204,8 +204,10 @@ class MilvusNamespacePipeline:
 
         with Timer() as search_timer:
             # Apply namespace filter in the query
-            results = self.db.query(
-                vector=query_embedding, top_k=top_k, filters={"namespace": namespace}
+            results = self.db.search(
+                query_embedding=query_embedding,
+                top_k=top_k,
+                filters={"namespace": namespace},
             )
 
         stats = self.get_namespace_stats(namespace)

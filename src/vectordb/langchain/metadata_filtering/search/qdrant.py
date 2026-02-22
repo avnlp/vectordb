@@ -231,11 +231,10 @@ class QdrantMetadataFilteringSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        documents = self.db.query(
-            query_embedding=query_embedding,
+        documents = self.db.search(
+            query_vector=query_embedding,
             top_k=top_k,
             filters=filters,
-            collection_name=self.collection_name,
         )
         logger.info("Retrieved %d documents from Qdrant", len(documents))
 

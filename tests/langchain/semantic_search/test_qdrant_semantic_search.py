@@ -128,7 +128,6 @@ class TestQdrantSemanticIndexing:
         mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -144,7 +143,7 @@ class TestQdrantSemanticIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.client.upsert.assert_called()
 
     @patch("vectordb.langchain.semantic_search.indexing.qdrant.QdrantVectorDB")
     @patch(
@@ -264,7 +263,7 @@ class TestQdrantSemanticSearch:
 
         Validates the search flow without answer generation:
             1. Query is embedded into 384-dimensional vector
-            2. QdrantVectorDB.query is called with embedded query
+            2. QdrantVectorDB.search is called with embedded query
             3. Documents are returned in result with query text
             4. Answer field is not present in result
 
@@ -281,7 +280,7 @@ class TestQdrantSemanticSearch:
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm.return_value = None
 
@@ -324,7 +323,7 @@ class TestQdrantSemanticSearch:
 
         Validates the search flow with answer generation:
             1. Query is embedded into 384-dimensional vector
-            2. QdrantVectorDB.query retrieves relevant documents
+            2. QdrantVectorDB.search retrieves relevant documents
             3. LLM is initialized via RAGHelper.create_llm
             4. RAGHelper.generate produces answer using query and context
             5. Result contains both documents and generated answer
@@ -339,12 +338,12 @@ class TestQdrantSemanticSearch:
             mock_llm: Mock returning LLM instance
             mock_embed_query: Mock returning embedded query vector
             mock_embedder_helper: Mock for embedder initialization
-            mock_db: Mock for QdrantVectorDB with query results
+            mock_db: Mock for QdrantVectorDB with search results
             sample_documents: Pytest fixture providing test documents
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()

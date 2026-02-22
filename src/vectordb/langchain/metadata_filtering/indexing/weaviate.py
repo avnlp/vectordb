@@ -189,8 +189,9 @@ class WeaviateMetadataFilteringIndexingPipeline:
             1. Load documents with metadata from configured data source
             2. Generate embeddings for all documents using embedder
             3. Delete existing collection if recreate=True
-            4. Upsert documents with embeddings and metadata to Weaviate
-            5. Return count of indexed documents
+            4. Create or select the target Weaviate collection
+            5. Upsert documents with embeddings and metadata to Weaviate
+            6. Return count of indexed documents
 
         Example:
             >>> result = pipeline.run()
@@ -220,11 +221,17 @@ class WeaviateMetadataFilteringIndexingPipeline:
             self.db.delete_collection(self.collection_name)
             logger.info("Recreated Weaviate collection: %s", self.collection_name)
 
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
-            collection_name=self.collection_name,
-        )
-        logger.info("Indexed %d documents to Weaviate", num_indexed)
+        self.db.create_collection(self.collection_name)
 
-        return {"documents_indexed": num_indexed}
+        data = [
+            {
+                "content": doc.page_content,
+                "vector": embedding,
+                **doc.metadata,
+            }
+            for doc, embedding in zip(docs, embeddings)
+        ]
+        self.db.upsert(data)
+        logger.info("Indexed %d documents to Weaviate", len(docs))
+
+        return {"documents_indexed": len(docs)}
