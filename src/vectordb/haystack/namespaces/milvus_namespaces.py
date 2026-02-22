@@ -117,13 +117,22 @@ class MilvusNamespacePipeline:
 
     def list_namespaces(self) -> list[str]:
         """List all namespace values in the collection."""
-        results = self.db.client.query(
-            collection_name=self.db.collection_name,
-            filter="",
-            output_fields=["namespace"],
-            limit=10000,
-        )
-        return list({r["namespace"] for r in results if "namespace" in r})
+        batch_size = 10000
+        offset = 0
+        namespaces: set[str] = set()
+        while True:
+            results = self.db.client.query(
+                collection_name=self.db.collection_name,
+                filter="",
+                output_fields=["namespace"],
+                limit=batch_size,
+                offset=offset,
+            )
+            namespaces.update(r["namespace"] for r in results if "namespace" in r)
+            if len(results) < batch_size:
+                break
+            offset += batch_size
+        return list(namespaces)
 
     def namespace_exists(self, namespace: str) -> bool:
         """Check if a namespace has any documents."""

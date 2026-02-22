@@ -1,0 +1,23 @@
+dataloader:
+  type: "triviaqa"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+  dimension: 384
+
+qdrant:
+  url: "http://localhost:6333"
+  api_key: ""
+  collection_name: "lc_namespaces_triviaqa"
+
+search:
+  top_k: 10
+
+logging:
+  name: "lc_namespaces_qdrant"
+  level: "INFO"
