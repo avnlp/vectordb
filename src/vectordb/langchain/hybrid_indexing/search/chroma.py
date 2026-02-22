@@ -25,8 +25,6 @@ Note:
 import logging
 from typing import Any
 
-from langchain_core.documents import Document
-
 from vectordb.databases.chroma import ChromaVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,

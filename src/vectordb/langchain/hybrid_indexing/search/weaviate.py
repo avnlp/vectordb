@@ -71,8 +71,8 @@ class WeaviateHybridSearchPipeline:
 
         Args:
             config_or_path: Configuration dictionary or path to YAML config file.
-                Must contain weaviate section with connection details and
-                optional collection_name, alpha settings.
+                Must contain weaviate section with cluster_url (or legacy url),
+                api_key, and optional collection_name, alpha settings.
 
         Raises:
             ValueError: If required configuration keys are missing.
@@ -90,8 +90,9 @@ class WeaviateHybridSearchPipeline:
 
         weaviate_config = self.config["weaviate"]
         self.db = WeaviateVectorDB(
-            cluster_url=weaviate_config.get("cluster_url", "http://localhost:8080"),
-            api_key=weaviate_config.get("api_key", ""),
+            cluster_url=weaviate_config.get("cluster_url")
+            or weaviate_config.get("url", "http://localhost:8080"),
+            api_key=weaviate_config.get("api_key") or "",
         )
 
         self.collection_name = weaviate_config.get("collection_name")

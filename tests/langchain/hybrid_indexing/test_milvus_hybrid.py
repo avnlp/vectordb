@@ -93,7 +93,6 @@ class TestMilvusHybridIndexing:
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -114,7 +113,7 @@ class TestMilvusHybridIndexing:
         assert result["db"] == "milvus"
         assert result["collection_name"] == "test_hybrid"
         mock_db_inst.create_collection.assert_called_once()
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.insert_documents.assert_called_once()
 
         # Verify sparse embeddings were generated
         mock_sparse_embedder.embed_documents.assert_called_once()
@@ -168,7 +167,7 @@ class TestMilvusHybridIndexing:
     @patch(
         "vectordb.langchain.hybrid_indexing.indexing.milvus.DataloaderCatalog.create"
     )
-    def test_hybrid_upsert_data_structure(
+    def test_hybrid_insert_documents_data_structure(
         self,
         mock_get_docs,
         mock_sparse_embedder_class,
@@ -176,7 +175,7 @@ class TestMilvusHybridIndexing:
         mock_embedder_helper,
         mock_db,
     ):
-        """Test that upsert data includes both dense and sparse embeddings."""
+        """Test that inserted documents include dense and sparse embeddings."""
         from vectordb.langchain.hybrid_indexing.indexing.milvus import (
             MilvusHybridIndexingPipeline,
         )
@@ -202,7 +201,6 @@ class TestMilvusHybridIndexing:
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = 1
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -218,17 +216,18 @@ class TestMilvusHybridIndexing:
         pipeline = MilvusHybridIndexingPipeline(config)
         pipeline.run()
 
-        # Check that upsert was called with correct data structure
-        call_args = mock_db_inst.upsert.call_args
-        upsert_data = call_args.kwargs.get(
-            "data", call_args.args[0] if call_args.args else []
+        call_args = mock_db_inst.insert_documents.call_args
+        inserted_documents = call_args.kwargs.get(
+            "documents", call_args.args[0] if call_args.args else []
         )
-        if upsert_data:
-            assert "id" in upsert_data[0]
-            assert "values" in upsert_data[0]
-            assert "sparse_values" in upsert_data[0]
-            assert "metadata" in upsert_data[0]
-            assert upsert_data[0]["sparse_values"] == sparse_embedding
+        if inserted_documents:
+            inserted = inserted_documents[0]
+            assert inserted.content == "Test document"
+            assert inserted.embedding == [0.1] * 384
+            assert inserted.sparse_embedding is not None
+            assert inserted.sparse_embedding.indices == [1, 2]
+            assert inserted.sparse_embedding.values == [0.5, 0.3]
+            assert inserted.meta["source"] == "test"
 
 
 class TestMilvusHybridSearch:
@@ -297,7 +296,7 @@ class TestMilvusHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -327,12 +326,11 @@ class TestMilvusHybridSearch:
         assert len(result["documents"]) == 1
         assert "answer" not in result
 
-        # Verify hybrid_search was called with both embeddings
-        mock_db_inst.hybrid_search.assert_called_once()
-        call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args.kwargs
         assert "query_embedding" in call_kwargs
         assert "query_sparse_embedding" in call_kwargs
-        assert call_kwargs["alpha"] == 0.5
+        assert call_kwargs["weights"] == [0.5, 0.5]
 
     @patch("vectordb.langchain.hybrid_indexing.search.milvus.MilvusVectorDB")
     @patch(
@@ -367,7 +365,7 @@ class TestMilvusHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()
@@ -429,7 +427,7 @@ class TestMilvusHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -455,8 +453,8 @@ class TestMilvusHybridSearch:
         result = pipeline.search("test query", top_k=10, filters=filters)
 
         assert result["query"] == "test query"
-        mock_db_inst.hybrid_search.assert_called_once()
-        call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args.kwargs
         assert call_kwargs["filters"] == filters
 
     @patch("vectordb.langchain.hybrid_indexing.search.milvus.MilvusVectorDB")
@@ -483,7 +481,7 @@ class TestMilvusHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = []
+        mock_db_inst.search.return_value = []
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -508,5 +506,5 @@ class TestMilvusHybridSearch:
         pipeline = MilvusHybridSearchPipeline(config)
         pipeline.search("test query", top_k=10)
 
-        call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
-        assert call_kwargs["alpha"] == 0.75
+        call_kwargs = mock_db_inst.search.call_args.kwargs
+        assert call_kwargs["weights"] == [0.75, 0.25]

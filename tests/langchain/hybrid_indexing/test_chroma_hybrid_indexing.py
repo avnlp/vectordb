@@ -182,7 +182,8 @@ class TestChromaHybridSearch:
         """Test search execution."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = MagicMock()
+        mock_db_inst.query_to_documents.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 

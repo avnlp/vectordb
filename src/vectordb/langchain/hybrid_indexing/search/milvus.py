@@ -149,6 +149,8 @@ class MilvusHybridSearchPipeline:
             top_k=top_k,
             filters=filters,
             collection_name=self.collection_name,
+            ranker_type="weighted",
+            weights=[self.alpha, 1.0 - self.alpha],
         )
         logger.info("Retrieved %d documents from Milvus", len(documents))
 

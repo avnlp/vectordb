@@ -60,7 +60,7 @@ class WeaviateHybridIndexingPipeline:
             sparse_embedder: Embedder for generating sparse vectors (metadata only).
             db: WeaviateVectorDB instance for database operations.
             collection_name: Target Weaviate collection/class name.
-            dimension: Vector dimension (must match dense embedder output size).
+            dimension: Legacy config field kept for compatibility.
 
     Example:
         >>> pipeline = WeaviateHybridIndexingPipeline("config.yaml")
@@ -74,8 +74,10 @@ class WeaviateHybridIndexingPipeline:
 
         Args:
             config_or_path: Configuration dictionary or path to YAML config file.
-                Must contain weaviate section with cluster_url and api_key,
-                collection_name, dimension settings.
+                Must contain weaviate section with cluster_url (or legacy url),
+                api_key, and collection_name. An optional dimension field is
+                accepted for compatibility but is not used by Weaviate
+                collection creation.
 
         Raises:
             ValueError: If required configuration keys are missing.
@@ -84,9 +86,9 @@ class WeaviateHybridIndexingPipeline:
         Configuration Schema:
             weaviate:
               cluster_url: "http://localhost:8080"
-              api_key: null
+              api_key: "${WEAVIATE_API_KEY}"
               collection_name: "Documents"
-              dimension: 384
+              dimension: 384  # optional, retained for compatibility
 
             embedder:
               type: "sentence-transformers"
@@ -104,8 +106,9 @@ class WeaviateHybridIndexingPipeline:
 
         weaviate_config = self.config["weaviate"]
         self.db = WeaviateVectorDB(
-            cluster_url=weaviate_config.get("cluster_url", "http://localhost:8080"),
-            api_key=weaviate_config.get("api_key", ""),
+            cluster_url=weaviate_config.get("cluster_url")
+            or weaviate_config.get("url", "http://localhost:8080"),
+            api_key=weaviate_config.get("api_key") or "",
         )
 
         self.collection_name = weaviate_config.get("collection_name")

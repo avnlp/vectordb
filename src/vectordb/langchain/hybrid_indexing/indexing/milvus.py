@@ -1,39 +1,17 @@
 """Milvus hybrid indexing pipeline (LangChain).
-Milvus's native hybrid search capabilities. Milvus 2.3+ supports sparse
-vectors as a separate field type, enabling efficient hybrid retrieval.
-    1. Load documents from configured data source
-    2. Generate dense embeddings (semantic meaning via neural networks)
-    3. Generate sparse embeddings (lexical keywords via TF-IDF)
-    4. Create Milvus collection with sparse vector field enabled
-    5. Insert documents as Haystack Document objects with both embedding types
-Milvus sparse vector format:
-    Milvus accepts sparse vectors as dictionaries {index: value}:
-    - index: Integer dimension (token position in vocabulary)
-    - value: Float weight (typically normalized TF-IDF)
-    Sparse vectors are stored efficiently using inverted index structure.
-    Milvus collections require separate fields for:
-    - Primary key (auto-generated INT64 ID)
-    - Dense vector field (float array, indexed via HNSW)
-    - Sparse vector field (dict, indexed via inverted index)
-    - Content field (VARCHAR for document text)
-    - Metadata field (JSON for custom properties)
 
-Document structure:
-    Documents are inserted as Haystack Document objects containing:
-    - content: Document text string
-    - embedding: Dense vector (list of floats)
-    - sparse_embedding: Sparse vector {token_id: weight}
-    - meta: Additional custom metadata fields
+Builds dense and sparse embeddings for source documents, creates a Milvus
+collection with sparse vector support, and inserts Haystack ``Document``
+objects via ``MilvusVectorDB.insert_documents``.
 
-Note: The collection uses auto_id=True, so document IDs are generated
-automatically by Milvus (INT64 primary keys).
-GPU acceleration:
-    Milvus supports GPU indexing for dense vectors (CAGRA index),
-    while sparse vectors use CPU-based inverted indexes.
+The target collection schema uses ``auto_id=True`` with an ``INT64`` primary
+key, so explicit document IDs are not supplied by this pipeline.
 """
 
 import logging
 from typing import Any
+
+from haystack.dataclasses import Document
 
 from vectordb.databases.milvus import MilvusVectorDB
 from vectordb.dataloaders import DataloaderCatalog
@@ -42,6 +20,7 @@ from vectordb.langchain.utils import (
     EmbedderHelper,
     SparseEmbedder,
 )
+from vectordb.utils.sparse import normalize_sparse
 
 
 logger = logging.getLogger(__name__)
@@ -165,29 +144,38 @@ class MilvusHybridIndexingPipeline:
             use_sparse=True,
         )
         logger.info("Created Milvus collection: %s", self.collection_name)
-        # Convert to Haystack Documents for insert_documents
-        # Note: auto_id=True on collection, so we don't provide explicit IDs
-        from haystack.dataclasses import Document
 
-        from vectordb.utils.sparse import to_milvus_sparse
+        haystack_documents = []
+        for doc, dense_emb, sparse_emb in zip(
+            docs, dense_embeddings, sparse_embeddings
+        ):
+            if (
+                isinstance(sparse_emb, dict)
+                and "indices" not in sparse_emb
+                and "values" not in sparse_emb
+            ):
+                sparse_embedding_input = {
+                    int(idx): float(weight) for idx, weight in sparse_emb.items()
+                }
+            else:
+                sparse_embedding_input = sparse_emb
 
-        documents = []
-        for doc, dense_emb, sparse_emb in zip(docs, dense_embeddings, sparse_embeddings):
+            sparse_embedding = normalize_sparse(sparse_embedding_input)
             haystack_doc = Document(
                 content=doc.page_content,
                 embedding=dense_emb,
+                sparse_embedding=sparse_embedding,
                 meta={
                     **(doc.metadata or {}),
                 },
             )
-            # Attach sparse embedding as attribute (insert_documents handles it)
-            haystack_doc.sparse_embedding = to_milvus_sparse(sparse_emb)
-            documents.append(haystack_doc)
+            haystack_documents.append(haystack_doc)
 
-        num_indexed = self.db.insert_documents(
-            documents=documents,
+        self.db.insert_documents(
+            documents=haystack_documents,
             collection_name=self.collection_name,
         )
+        num_indexed = len(haystack_documents)
         logger.info("Indexed %d documents to Milvus", num_indexed)
 
         return {

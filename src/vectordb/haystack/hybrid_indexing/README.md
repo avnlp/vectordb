@@ -2,13 +2,13 @@
 
 Hybrid indexing combines dense vector embeddings with sparse (keyword-based) representations to deliver search results that capture both semantic meaning and exact term matches. By blending these two retrieval signals, hybrid search can outperform either approach alone, particularly on queries that mix conceptual intent with specific terminology.
 
-Each database has a dedicated indexing and search pipeline. At query time, the two result sets are fused using either the database's native hybrid ranking mechanism or a client-side fusion strategy such as Reciprocal Rank Fusion (RRF) or weighted score blending. An alpha parameter controls how much weight is given to dense (semantic) versus sparse (keyword) signals.
+Each database has a dedicated indexing and search pipeline. At query time, the two result sets are fused using either the database's native hybrid ranking mechanism or a client-side fusion strategy such as Reciprocal Rank Fusion (RRF) or weighted score blending. Fusion strategies vary by database: Qdrant, Milvus, and Pinecone use RRF, while Weaviate uses a configurable alpha parameter for weighted blending.
 
 ## Overview
 
 - Dual embedding during indexing: dense vectors from sentence-transformers and sparse vectors from SPLADE models
 - Native hybrid search on databases that support it, with client-side RRF or weighted fusion as a fallback
-- Alpha parameter to control the balance between semantic similarity and keyword matching
+- Fusion strategies: RRF (Qdrant, Milvus, Pinecone) or alpha-weighted blend (Weaviate)
 - Evaluation metrics including Recall at k, MRR at k, NDCG at k, and Precision at k
 - Configuration-driven through YAML files with environment variable substitution
 - No dependency on FastEmbed; all sparse embeddings use native Haystack sentence-transformers components
@@ -22,17 +22,17 @@ The indexing pipeline loads a dataset, generates dense embeddings using a senten
 
 ### Search Phase
 
-The search pipeline embeds the query using both the dense and sparse models. It then issues a hybrid search request to the database, which combines dense nearest-neighbor results with sparse keyword-matching results. Pinecone, Milvus, and Qdrant support native hybrid queries that fuse the results server-side. Weaviate blends its internal BM25 scores with dense vector similarity using a configurable alpha parameter. For Chroma, which lacks native hybrid support, the pipeline runs separate dense and sparse searches and merges results using client-side RRF.
+The search pipeline embeds the query using both the dense and sparse models. It then issues a hybrid search request to the database, which combines dense nearest-neighbor results with sparse keyword-matching results. Qdrant, Pinecone, and Milvus support native hybrid queries that fuse the results server-side using Reciprocal Rank Fusion (RRF). Weaviate blends its internal BM25 scores with dense vector similarity using a configurable alpha parameter. For Chroma, which lacks native hybrid support, the pipeline runs separate dense and sparse searches and merges results using client-side RRF.
 
 ## Supported Databases
 
 | Database | Hybrid Type | Sparse Source | Notes |
 |----------|-------------|---------------|-------|
-| Pinecone | Native hybrid search | SPLADE via sentence-transformers | Sparse stored in sparse_values format |
+| Pinecone | Native hybrid search | SPLADE via sentence-transformers | Sparse stored in sparse_values format; uses RRF fusion |
 | Weaviate | Native BM25 + vector blend | Built-in BM25 (no external sparse) | Alpha parameter controls blend weight |
 | Chroma | Client-side RRF fusion | SPLADE via sentence-transformers | Runs dense and sparse searches separately |
 | Milvus | Native RRF ranking | SPLADE via sentence-transformers | Stores sparse vectors in dedicated field |
-| Qdrant | Native hybrid search | SPLADE via sentence-transformers | Uses named sparse vector fields |
+| Qdrant | Native hybrid search | SPLADE via sentence-transformers | Uses named sparse vector fields; uses RRF fusion |
 
 Note: Chroma does not natively support hybrid search. The Chroma pipeline emulates hybrid behavior through client-side fusion of independent dense and sparse result sets.
 

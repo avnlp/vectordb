@@ -32,7 +32,7 @@ Upsert payload structure:
 
 Advantages over metadata storage:
     - Native sparse vector indexing for fast retrieval
-    - Query-time fusion with alpha weighting
+    - Query-time fusion using Reciprocal Rank Fusion (RRF)
     - Efficient storage through sparse representation
 """
 

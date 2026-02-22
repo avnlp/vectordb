@@ -253,13 +253,11 @@ class TestQdrantHybridSearch:
             "qdrant": {
                 "url": "http://localhost:6333",
                 "collection_name": "test_hybrid",
-                "alpha": 0.8,
             },
         }
 
         pipeline = QdrantHybridSearchPipeline(config)
         assert pipeline.collection_name == "test_hybrid"
-        assert pipeline.alpha == 0.8
         assert pipeline.llm is None
 
     @patch("vectordb.langchain.hybrid_indexing.search.qdrant.QdrantVectorDB")
@@ -293,7 +291,7 @@ class TestQdrantHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -311,7 +309,6 @@ class TestQdrantHybridSearch:
             "qdrant": {
                 "url": "http://localhost:6333",
                 "collection_name": "test_hybrid",
-                "alpha": 0.5,
             },
         }
 
@@ -322,12 +319,11 @@ class TestQdrantHybridSearch:
         assert len(result["documents"]) == 1
         assert "answer" not in result
 
-        # Verify hybrid_search was called with both embeddings
-        mock_db_inst.hybrid_search.assert_called_once()
-        call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
-        assert "query_embedding" in call_kwargs
-        assert "query_sparse_embedding" in call_kwargs
-        assert call_kwargs["alpha"] == 0.5
+        # Verify search was called with both embeddings
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args.kwargs
+        assert "query_vector" in call_kwargs
+        assert call_kwargs["search_type"] == "hybrid"
 
     @patch("vectordb.langchain.hybrid_indexing.search.qdrant.QdrantVectorDB")
     @patch(
@@ -423,7 +419,7 @@ class TestQdrantHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -448,8 +444,8 @@ class TestQdrantHybridSearch:
         result = pipeline.search("test query", top_k=10, filters=filters)
 
         assert result["query"] == "test query"
-        mock_db_inst.hybrid_search.assert_called_once()
-        call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args.kwargs
         assert call_kwargs["filters"] == filters
 
     @patch("vectordb.langchain.hybrid_indexing.search.qdrant.QdrantVectorDB")
@@ -469,14 +465,14 @@ class TestQdrantHybridSearch:
         mock_embedder_helper,
         mock_db,
     ):
-        """Test that alpha parameter controls fusion weight."""
+        """Test that search uses hybrid search type."""
         from vectordb.langchain.hybrid_indexing.search.qdrant import (
             QdrantHybridSearchPipeline,
         )
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.hybrid_search.return_value = []
+        mock_db_inst.search.return_value = []
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -493,12 +489,11 @@ class TestQdrantHybridSearch:
             "qdrant": {
                 "url": "http://localhost:6333",
                 "collection_name": "test_hybrid",
-                "alpha": 0.3,
             },
         }
 
         pipeline = QdrantHybridSearchPipeline(config)
         pipeline.search("test query", top_k=10)
 
-        call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
-        assert call_kwargs["alpha"] == 0.3
+        call_kwargs = mock_db_inst.search.call_args.kwargs
+        assert call_kwargs["search_type"] == "hybrid"
