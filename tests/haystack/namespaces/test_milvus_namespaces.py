@@ -49,7 +49,7 @@ def mock_milvus_db():
     mock_db = MagicMock()
     mock_db.create_index = MagicMock()
     mock_db.delete = MagicMock()
-    mock_db.query = MagicMock(return_value=[])
+    mock_db.search = MagicMock(return_value=[])
     mock_db.upsert = MagicMock(return_value=3)
     mock_db._escape_expr_string = MagicMock(side_effect=lambda v: v)
     return mock_db
@@ -595,7 +595,7 @@ class TestMilvusNamespacePipelineQuery:
             Document(content="Result 1", score=0.9),
             Document(content="Result 2", score=0.8),
         ]
-        mock_milvus_db.query.return_value = mock_results
+        mock_milvus_db.search.return_value = mock_results
         mock_milvus_db.client.query.return_value = [{"count(*)": 2}]
 
         with patch(
@@ -681,10 +681,10 @@ class TestMilvusNamespacePipelineQuery:
 
                 pipeline.query_namespace("test query", "my_namespace", top_k=10)
 
-                # query_namespace calls db.query once for the search,
+                # query_namespace calls db.search once for the search,
                 # and client.query once for get_namespace_stats
-                assert mock_milvus_db.query.call_count == 1
-                first_call_kwargs = mock_milvus_db.query.call_args_list[0][1]
+                assert mock_milvus_db.search.call_count == 1
+                first_call_kwargs = mock_milvus_db.search.call_args_list[0][1]
                 assert first_call_kwargs.get("filters") == {"namespace": "my_namespace"}
                 assert first_call_kwargs.get("top_k") == 10
                 pipeline.close()
@@ -695,14 +695,14 @@ class TestMilvusNamespacePipelineQuery:
         mock_results_ns1 = [Document(content="NS1 Result", score=0.95)]
         mock_results_ns2 = [Document(content="NS2 Result", score=0.85)]
 
-        def mock_query_side_effect(*, vector, top_k, filters):
+        def mock_query_side_effect(*, query_embedding, top_k, filters):
             if filters.get("namespace") == "ns1":
                 return mock_results_ns1
             if filters.get("namespace") == "ns2":
                 return mock_results_ns2
             return []
 
-        mock_milvus_db.query.side_effect = mock_query_side_effect
+        mock_milvus_db.search.side_effect = mock_query_side_effect
         mock_milvus_db.client.query.return_value = [{"count(*)": 1}]
 
         with patch(
@@ -765,16 +765,16 @@ class TestMilvusNamespacePipelineQuery:
                 # query_cross_namespace calls:
                 # 1. list_namespaces() uses client.query (scalar)
                 # 2. For each namespace, query_namespace() calls:
-                #    - db.query for the search
+                #    - db.search for the search
                 #    - client.query for get_namespace_stats
-                # So db.query: 2 calls (search per ns)
+                # So db.search: 2 calls (search per ns)
                 #    client.query: 1 (list) + 2 (stats per ns) = 3 calls
                 mock_milvus_db.client.query.side_effect = [
                     [{"namespace": "ns1"}, {"namespace": "ns2"}],  # list_namespaces
                     [{"count(*)": 1}],  # ns1 stats
                     [{"count(*)": 1}],  # ns2 stats
                 ]
-                mock_milvus_db.query.side_effect = [
+                mock_milvus_db.search.side_effect = [
                     [Document(content="Result 1")],  # ns1 search query
                     [Document(content="Result 2")],  # ns2 search query
                 ]
@@ -792,7 +792,7 @@ class TestMilvusNamespacePipelineQuery:
         """Test query_cross_namespace includes timing comparison."""
         mock_doc_embedder, mock_text_embedder = mock_embedders
         mock_results = [Document(content="Result", score=0.9)]
-        mock_milvus_db.query.return_value = mock_results
+        mock_milvus_db.search.return_value = mock_results
         mock_milvus_db.client.query.return_value = [{"count(*)": 1}]
 
         with patch(
@@ -829,7 +829,7 @@ class TestMilvusNamespacePipelineQuery:
     ):
         """Test query_cross_namespace handles empty results."""
         mock_doc_embedder, mock_text_embedder = mock_embedders
-        mock_milvus_db.query.return_value = []
+        mock_milvus_db.search.return_value = []
         mock_milvus_db.client.query.return_value = [{"count(*)": 0}]
 
         with patch(

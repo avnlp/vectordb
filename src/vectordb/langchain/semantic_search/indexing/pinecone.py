@@ -70,6 +70,7 @@ from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
 )
+from vectordb.utils.pinecone_document_converter import PineconeDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -212,9 +213,11 @@ class PineconeSemanticIndexingPipeline:
         )
 
         # Upsert documents
+        upsert_data = PineconeDocumentConverter.prepare_langchain_documents_for_upsert(
+            docs, embeddings
+        )
         num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
+            data=upsert_data,
             namespace=self.namespace,
         )
         logger.info("Indexed %d documents to Pinecone", num_indexed)
