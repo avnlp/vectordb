@@ -10,7 +10,7 @@ embeddings:
   batch_size: 32
 
 weaviate:
-  url: "${WEAVIATE_URL}"
+  cluster_url: "${WEAVIATE_URL}"
   api_key: "${WEAVIATE_API_KEY}"
   collection_name: "lc_hybrid_popqa"
   dimension: 384

@@ -33,6 +33,7 @@ Use cases:
     - Prototyping before migrating to full hybrid databases
 """
 
+import json
 import logging
 from typing import Any
 
@@ -133,10 +134,10 @@ class ChromaHybridIndexingPipeline:
                     ValueError: If document loading returns invalid data.
 
         Sparse Storage:
-            Sparse embeddings are converted to string representation and stored
-            in metadata["sparse_embedding"]. Deserialize with eval() or
-            ast.literal_eval() for custom reranking:
-            sparse_dict = eval(metadata["sparse_embedding"])
+            Sparse embeddings are converted to JSON string representation and stored
+            in metadata["sparse_embedding"]. Deserialize with json.loads()
+            for custom reranking:
+            sparse_dict = json.loads(metadata["sparse_embedding"])
         """
         limit = self.config.get("dataloader", {}).get("limit")
         dl_config = self.config.get("dataloader", {})

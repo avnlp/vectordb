@@ -106,8 +106,18 @@ class QdrantHybridIndexingPipeline:
         self.sparse_embedder = SparseEmbedder()
 
         qdrant_config = self.config["qdrant"]
+        url = qdrant_config.get("url", "http://localhost:6333")
+        # Parse URL to extract host and port
+        url_parsed = url.replace("http://", "").replace("https://", "")
+        if ":" in url_parsed:
+            host, port_str = url_parsed.split(":", 1)
+            port = int(port_str)
+        else:
+            host = url_parsed
+            port = 6333
         self.db = QdrantVectorDB(
-            url=qdrant_config.get("url", "http://localhost:6333"),
+            host=host,
+            port=port,
             api_key=qdrant_config.get("api_key"),
             collection_name=qdrant_config.get("collection_name"),
         )
@@ -165,7 +175,7 @@ class QdrantHybridIndexingPipeline:
 
         self.db.create_collection(
             collection_name=self.collection_name,
-            dimension=self.dimension,
+            vector_size=self.dimension,
         )
         logger.info("Created Qdrant collection: %s", self.collection_name)
 

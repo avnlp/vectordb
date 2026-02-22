@@ -90,8 +90,8 @@ class WeaviateHybridSearchPipeline:
 
         weaviate_config = self.config["weaviate"]
         self.db = WeaviateVectorDB(
-            url=weaviate_config.get("url", "http://localhost:8080"),
-            api_key=weaviate_config.get("api_key"),
+            cluster_url=weaviate_config.get("cluster_url", "http://localhost:8080"),
+            api_key=weaviate_config.get("api_key", ""),
         )
 
         self.collection_name = weaviate_config.get("collection_name")

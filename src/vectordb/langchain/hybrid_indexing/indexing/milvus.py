@@ -1,37 +1,32 @@
 """Milvus hybrid indexing pipeline (LangChain).
-
-Implements document indexing with both dense and sparse embeddings for
 Milvus's native hybrid search capabilities. Milvus 2.3+ supports sparse
 vectors as a separate field type, enabling efficient hybrid retrieval.
-
-Indexing workflow:
     1. Load documents from configured data source
     2. Generate dense embeddings (semantic meaning via neural networks)
     3. Generate sparse embeddings (lexical keywords via TF-IDF)
-    4. Create Milvus collection with sparse vector field
-    5. Upsert documents with both embedding types
-
+    4. Create Milvus collection with sparse vector field enabled
+    5. Insert documents as Haystack Document objects with both embedding types
 Milvus sparse vector format:
     Milvus accepts sparse vectors as dictionaries {index: value}:
     - index: Integer dimension (token position in vocabulary)
     - value: Float weight (typically normalized TF-IDF)
     Sparse vectors are stored efficiently using inverted index structure.
-
-Collection schema for hybrid:
     Milvus collections require separate fields for:
-    - Primary key (document ID)
-    - Dense vector field (float array, indexed via IVF/HNSW)
+    - Primary key (auto-generated INT64 ID)
+    - Dense vector field (float array, indexed via HNSW)
     - Sparse vector field (dict, indexed via inverted index)
-    - Scalar fields for metadata (text content, custom properties)
+    - Content field (VARCHAR for document text)
+    - Metadata field (JSON for custom properties)
 
-Upsert payload structure:
-    Each document is stored with:
-    - id: Unique identifier (collection_name + sequence number)
+Document structure:
+    Documents are inserted as Haystack Document objects containing:
+    - content: Document text string
     - embedding: Dense vector (list of floats)
     - sparse_embedding: Sparse vector {token_id: weight}
-    - text: Document content string
-    - metadata: Additional custom fields
+    - meta: Additional custom metadata fields
 
+Note: The collection uses auto_id=True, so document IDs are generated
+automatically by Milvus (INT64 primary keys).
 GPU acceleration:
     Milvus supports GPU indexing for dense vectors (CAGRA index),
     while sparse vectors use CPU-based inverted indexes.
@@ -121,7 +116,7 @@ class MilvusHybridIndexingPipeline:
         """Execute hybrid indexing pipeline.
 
         Loads documents, generates both dense and sparse embeddings, creates
-        the Milvus collection with sparse vector field, and upserts all
+        the Milvus collection with sparse vector field, and inserts all
         documents with hybrid embeddings.
 
         Returns:
@@ -131,7 +126,7 @@ class MilvusHybridIndexingPipeline:
                 - collection_name: Name of the target collection
 
         Raises:
-            RuntimeError: If database connection fails or upsert errors occur.
+            RuntimeError: If database connection fails or insert errors occur.
             ValueError: If document loading returns invalid data.
 
         Sparse Vector Details:
@@ -167,27 +162,30 @@ class MilvusHybridIndexingPipeline:
         self.db.create_collection(
             collection_name=self.collection_name,
             dimension=self.dimension,
+            use_sparse=True,
         )
         logger.info("Created Milvus collection: %s", self.collection_name)
+        # Convert to Haystack Documents for insert_documents
+        # Note: auto_id=True on collection, so we don't provide explicit IDs
+        from haystack.dataclasses import Document
 
-        upsert_data = []
-        for i, (doc, dense_emb, sparse_emb) in enumerate(
-            zip(docs, dense_embeddings, sparse_embeddings)
-        ):
-            upsert_data.append(
-                {
-                    "id": f"{self.collection_name}_{i}",
-                    "values": dense_emb,
-                    "sparse_values": sparse_emb,
-                    "metadata": {
-                        "text": doc.page_content,
-                        **(doc.metadata or {}),
-                    },
-                }
+        from vectordb.utils.sparse import to_milvus_sparse
+
+        documents = []
+        for doc, dense_emb, sparse_emb in zip(docs, dense_embeddings, sparse_embeddings):
+            haystack_doc = Document(
+                content=doc.page_content,
+                embedding=dense_emb,
+                meta={
+                    **(doc.metadata or {}),
+                },
             )
+            # Attach sparse embedding as attribute (insert_documents handles it)
+            haystack_doc.sparse_embedding = to_milvus_sparse(sparse_emb)
+            documents.append(haystack_doc)
 
-        num_indexed = self.db.upsert(
-            data=upsert_data,
+        num_indexed = self.db.insert_documents(
+            documents=documents,
             collection_name=self.collection_name,
         )
         logger.info("Indexed %d documents to Milvus", num_indexed)

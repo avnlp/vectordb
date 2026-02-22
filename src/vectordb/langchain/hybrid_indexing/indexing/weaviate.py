@@ -32,6 +32,7 @@ Collection schema:
 """
 
 import logging
+import uuid
 from typing import Any
 
 from vectordb.databases.weaviate import WeaviateVectorDB
@@ -73,7 +74,7 @@ class WeaviateHybridIndexingPipeline:
 
         Args:
             config_or_path: Configuration dictionary or path to YAML config file.
-                Must contain weaviate section with url and optional api_key,
+                Must contain weaviate section with cluster_url and api_key,
                 collection_name, dimension settings.
 
         Raises:
@@ -82,7 +83,7 @@ class WeaviateHybridIndexingPipeline:
 
         Configuration Schema:
             weaviate:
-              url: "http://localhost:8080"
+              cluster_url: "http://localhost:8080"
               api_key: null
               collection_name: "Documents"
               dimension: 384
@@ -103,8 +104,8 @@ class WeaviateHybridIndexingPipeline:
 
         weaviate_config = self.config["weaviate"]
         self.db = WeaviateVectorDB(
-            url=weaviate_config.get("url", "http://localhost:8080"),
-            api_key=weaviate_config.get("api_key"),
+            cluster_url=weaviate_config.get("cluster_url", "http://localhost:8080"),
+            api_key=weaviate_config.get("api_key", ""),
         )
 
         self.collection_name = weaviate_config.get("collection_name")
@@ -158,15 +159,14 @@ class WeaviateHybridIndexingPipeline:
 
         self.db.create_collection(
             collection_name=self.collection_name,
-            dimension=self.dimension,
         )
         logger.info("Created Weaviate collection: %s", self.collection_name)
 
         upsert_data = []
-        for i, (doc, dense_emb) in enumerate(zip(docs, dense_embeddings)):
+        for doc, dense_emb in zip(docs, dense_embeddings):
             upsert_data.append(
                 {
-                    "id": f"{self.collection_name}_{i}",
+                    "id": str(uuid.uuid4()),
                     "values": dense_emb,
                     "metadata": {
                         "text": doc.page_content,

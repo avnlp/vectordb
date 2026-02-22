@@ -8,22 +8,17 @@ The hybrid search mechanism:
     1. Query is embedded using both dense and sparse embedders
     2. Dense embedding captures semantic meaning (neural network-based)
     3. Sparse embedding captures exact keyword matches (TF-IDF style)
-    4. Qdrant computes similarity for both vector types
-    5. Results are ranked by weighted combination of similarities
+    4. Qdrant computes similarity for both vector types independently
+    5. Results are combined using Reciprocal Rank Fusion (RRF)
 
 Sparse vector format:
     Qdrant expects sparse vectors as dictionaries mapping dimension indices
     to float values (non-zero entries only). The SparseEmbedder generates
     this format from text using scikit-learn's TF-IDF vectorization.
 
-Alpha parameter (0.0 to 1.0):
-    - 1.0: Pure dense/semantic search
-    - 0.0: Pure sparse/keyword search
-    - 0.5: Balanced hybrid (default)
-
 Qdrant advantages:
     - Native sparse vector storage (efficient compression)
-    - Query-time fusion with configurable weights
+    - Query-time fusion using RRF (Reciprocal Rank Fusion)
     - Filter support on metadata during hybrid search
     - Open-source with self-hosting options
 """
@@ -47,8 +42,8 @@ class QdrantHybridSearchPipeline:
     """Qdrant hybrid (dense + sparse) search pipeline.
 
     Combines dense semantic embeddings with sparse lexical embeddings using
-    Qdrant's native hybrid search capabilities. Supports configurable alpha
-    weighting and metadata filtering.
+    Qdrant's native hybrid search capabilities. Uses Reciprocal Rank Fusion (RRF)
+    to combine results from dense and sparse search. Supports metadata filtering.
 
     Attributes:
         config: Validated configuration dictionary.
@@ -56,13 +51,12 @@ class QdrantHybridSearchPipeline:
         sparse_embedder: Embedder for sparse TF-IDF vector generation.
         db: QdrantVectorDB instance for vector operations.
         collection_name: Target Qdrant collection name.
-        alpha: Fusion weight between dense and sparse (0.0-1.0).
         llm: Optional language model for RAG answer generation.
 
     Example:
         >>> pipeline = QdrantHybridSearchPipeline("config.yaml")
         >>> results = pipeline.search(
-        ...     query="transformer architecture explained", top_k=10, alpha=0.6
+        ...     query="transformer architecture explained", top_k=10
         ... )
         >>> print(f"Retrieved {len(results['documents'])} documents")
     """
@@ -73,7 +67,7 @@ class QdrantHybridSearchPipeline:
         Args:
             config_or_path: Configuration dictionary or path to YAML config file.
                 Must contain qdrant section with connection details and
-                optional collection_name, alpha settings.
+                optional collection_name.
 
         Raises:
             ValueError: If required configuration keys are missing.
@@ -84,7 +78,6 @@ class QdrantHybridSearchPipeline:
               url: "http://localhost:6333"
               api_key: null  # Optional for authenticated instances
               collection_name: "hybrid-collection"
-              alpha: 0.5  # Fusion weight
         """
         self.config = ConfigLoader.load(config_or_path)
         ConfigLoader.validate(self.config, "qdrant")
@@ -100,7 +93,6 @@ class QdrantHybridSearchPipeline:
         )
 
         self.collection_name = qdrant_config.get("collection_name")
-        self.alpha = qdrant_config.get("alpha", 0.5)
         self.llm = RAGHelper.create_llm(self.config)
 
         logger.info("Initialized Qdrant hybrid search pipeline (LangChain)")
@@ -141,13 +133,15 @@ class QdrantHybridSearchPipeline:
         sparse_embedding = self.sparse_embedder.embed_query(query)
         logger.info("Generated hybrid embeddings for query: %s...", query[:50])
 
-        documents = self.db.hybrid_search(
-            query_embedding=dense_embedding,
-            query_sparse_embedding=sparse_embedding,
+        documents = self.db.search(
+            query_vector={
+                "dense": dense_embedding,
+                "sparse": sparse_embedding,
+            },
+            search_type="hybrid",
             top_k=top_k,
             filters=filters,
-            collection_name=self.collection_name,
-            alpha=self.alpha,
+            scope=self.collection_name,
         )
         logger.info("Retrieved %d documents from Qdrant", len(documents))
 

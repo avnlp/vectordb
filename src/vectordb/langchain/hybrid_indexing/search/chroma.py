@@ -25,6 +25,8 @@ Note:
 import logging
 from typing import Any
 
+from langchain_core.documents import Document
+
 from vectordb.databases.chroma import ChromaVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
@@ -131,12 +133,13 @@ class ChromaHybridSearchPipeline:
         dense_embedding = EmbedderHelper.embed_query(self.dense_embedder, query)
         logger.info("Generated dense embedding for query: %s...", query[:50])
 
-        documents = self.db.query(
+        raw_results = self.db.query(
             query_embedding=dense_embedding,
             top_k=top_k,
             filters=filters,
             collection_name=self.collection_name,
         )
+        documents = self.db.query_to_documents(raw_results)
         logger.info("Retrieved %d documents from Chroma", len(documents))
 
         result = {

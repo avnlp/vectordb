@@ -143,13 +143,12 @@ class MilvusHybridSearchPipeline:
         sparse_embedding = self.sparse_embedder.embed_query(query)
         logger.info("Generated hybrid embeddings for query: %s...", query[:50])
 
-        documents = self.db.hybrid_search(
+        documents = self.db.search(
             query_embedding=dense_embedding,
             query_sparse_embedding=sparse_embedding,
             top_k=top_k,
             filters=filters,
             collection_name=self.collection_name,
-            alpha=self.alpha,
         )
         logger.info("Retrieved %d documents from Milvus", len(documents))
 
