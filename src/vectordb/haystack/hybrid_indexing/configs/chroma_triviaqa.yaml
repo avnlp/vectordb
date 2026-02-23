@@ -1,0 +1,29 @@
+# Chroma Hybrid Indexing Configuration
+# Indexes TriviaQA dataset with dense + sparse embeddings
+
+dataloader:
+  type: "triviaqa"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  sparse_model: "prithivida/Splade_PP_en_v2"
+  device: "cpu"
+  batch_size: 32
+
+chroma:
+  host: "${CHROMA_HOST:-localhost}"
+  port: 8000
+  persistent: false
+  path: null  # For in-memory mode
+  collection_name: "triviaqa_hybrid"
+  dimension: 384
+  batch_size: 100
+  fusion_strategy: "rrf"  # rrf or weighted
+
+logging:
+  name: "chroma_hybrid"
+  level: "INFO"

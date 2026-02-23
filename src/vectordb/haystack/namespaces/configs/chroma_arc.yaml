@@ -1,0 +1,67 @@
+# Chroma namespace pipeline for ARC dataset
+pipeline:
+  name: "chroma_arc_namespaces"
+  description: "Chroma namespace pipeline for ARC dataset using collection-per-namespace"
+  database: "chroma"
+  dataset: "arc"
+
+chroma:
+  persist_directory: "${CHROMA_PERSIST_DIR}"
+  host: ""
+  port: ""
+
+collection:
+  name: "arc"
+  description: "ARC dataset with collection-per-namespace isolation"
+
+namespaces:
+  strategy: "split"
+  prefix: ""
+  definitions:
+    - name: "arc_train"
+      split: "train"
+      description: "ARC training set"
+    - name: "arc_test"
+      split: "test"
+      description: "ARC test set"
+    - name: "arc_validation"
+      split: "validation"
+      description: "ARC validation set"
+
+dataloader:
+  type: "haystack"
+  class: "ARCDataloader"
+  dataset_name: "ai2_arc"
+  config: "ARC-Challenge"
+  subset: "ARC-Challenge"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "question"
+  custom_queries: []
+
+cross_namespace:
+  enabled: true
+  compare_namespaces: ["arc_train", "arc_test"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "chroma_arc_namespaces"

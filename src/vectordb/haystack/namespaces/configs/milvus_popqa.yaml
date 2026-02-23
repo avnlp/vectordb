@@ -1,0 +1,60 @@
+# Milvus namespace pipeline for PopQA dataset
+pipeline:
+  name: "milvus_popqa_namespaces"
+  description: "Milvus namespace pipeline for PopQA dataset using partition key"
+  database: "milvus"
+  dataset: "popqa"
+
+milvus:
+  host: "${MILVUS_HOST}"
+  port: "${MILVUS_PORT}"
+  user: ""
+  password: ""
+
+collection:
+  name: "popqa_namespaces"
+  description: "PopQA dataset with partition key isolation"
+
+namespaces:
+  strategy: "split"
+  prefix: ""
+  definitions:
+    - name: "popqa_test"
+      split: "test"
+      description: "PopQA test set (single split)"
+
+dataloader:
+  type: "haystack"
+  class: "PopQADataloader"
+  dataset_name: "akariasai/PopQA"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "question"
+  custom_queries: []
+
+cross_namespace:
+  enabled: false
+  compare_namespaces: ["popqa_test"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "milvus_popqa_namespaces"

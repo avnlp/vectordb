@@ -1,0 +1,58 @@
+# Weaviate namespace pipeline for FactScore dataset
+pipeline:
+  name: "weaviate_factscore_namespaces"
+  description: "Weaviate namespace pipeline for FactScore dataset using multi-tenancy"
+  database: "weaviate"
+  dataset: "factscore"
+
+weaviate:
+  url: "${WEAVIATE_URL}"
+  api_key: "${WEAVIATE_API_KEY}"
+
+collection:
+  name: "FactScoreNamespaces"
+  description: "FactScore dataset with multi-tenant isolation"
+
+namespaces:
+  strategy: "split"
+  prefix: ""
+  definitions:
+    - name: "factscore_test"
+      split: "test"
+      description: "FactScore test set"
+
+dataloader:
+  type: "haystack"
+  class: "FactScoreDataloader"
+  dataset_name: "dskar/FActScore"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "claim"
+  custom_queries: []
+
+cross_namespace:
+  enabled: false
+  compare_namespaces: ["factscore_test"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "weaviate_factscore_namespaces"

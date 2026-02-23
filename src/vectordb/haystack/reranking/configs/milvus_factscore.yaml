@@ -1,0 +1,39 @@
+# MILVUS Reranking Pipeline - FactScore Dataset
+
+milvus:
+  uri: "${MILVUS_URI:-http://localhost:19530}"
+  token: "${MILVUS_TOKEN:-}"
+
+collection:
+  name: "factscore_reranking"
+
+dataloader:
+  type: "factscore"
+  dataset_name: "dskar/FActScore"
+  split: "test"
+  limit: null
+
+generator:
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY:-}"
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  batch_size: 32
+
+reranker:
+  type: "cross_encoder"
+  model: "BAAI/bge-reranker-v2-m3"
+  top_k: 5
+
+evaluation:
+  enabled: true
+  metrics:
+    - contextual_recall
+    - contextual_precision
+    - answer_relevancy
+    - faithfulness
+
+logging:
+  name: "milvus_reranking"
+  level: "INFO"
