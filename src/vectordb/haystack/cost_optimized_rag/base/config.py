@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field, field_validator
 class VectorConfig(BaseModel):
     """Vector database configuration."""
 
-    size: int = 384
+    size: int = 1024
     distance: str = "Cosine"
 
 
@@ -44,9 +44,9 @@ class EmbeddingConfig(BaseModel):
 
     Attributes:
         model: HuggingFace model identifier or local path.
-            Default: "Qwen/Qwen3-Embedding-0.6B" (384-dim, fast inference)
+            Default: "Qwen/Qwen3-Embedding-0.6B" (1024-dim, fast inference)
             Alternatives: "sentence-transformers/all-MiniLM-L6-v2"
-                (faster, lower quality)
+                (384-dim, faster, lower quality)
         batch_size: Documents to embed per batch.
             Higher values amortize API overhead but increase memory.
             Default: 32 (optimal for most embedding APIs)
