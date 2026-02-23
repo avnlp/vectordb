@@ -1,0 +1,24 @@
+chroma:
+  path: "${CHROMA_PATH:-/tmp/chroma}"
+  collection_name: "triviaqa_compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "llm_extraction"
+  top_k: 5
+  llm:
+    provider: "groq"
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "chroma_triviaqa_llm"
+  level: "INFO"

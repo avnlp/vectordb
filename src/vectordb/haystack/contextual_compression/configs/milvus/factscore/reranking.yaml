@@ -1,0 +1,25 @@
+milvus:
+  host: "${{MILVUS_HOST:-localhost}}"
+  port: ${{MILVUS_PORT:-19530}}
+collection:
+  name: "factscore_compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "reranking"
+  top_k: 5
+  reranker:
+    type: "cross_encoder"
+    model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "milvus_factscore_reranking"
+  level: "INFO"

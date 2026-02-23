@@ -1,0 +1,27 @@
+milvus:
+  host: "${MILVUS_HOST:-localhost}"
+  port: ${MILVUS_PORT:-19530}
+
+collection:
+  name: "triviaqa_compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "llm_extraction"
+  top_k: 5
+  llm:
+    provider: "groq"
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "milvus_triviaqa_llm"
+  level: "INFO"

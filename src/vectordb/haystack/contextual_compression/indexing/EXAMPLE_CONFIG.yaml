@@ -1,0 +1,106 @@
+# Example configuration for contextual compression indexing pipelines
+# Copy this file and adjust parameters as needed for your database and dataset
+
+# MILVUS EXAMPLE
+#
+# embeddings:
+#   model: "sentence-transformers/all-MiniLM-L6-v2"
+#   dimension: 384
+#
+# dataset:
+#   type: "triviaqa"              # Options: triviaqa, arc, popqa, factscore, earnings_calls
+#   name: "trivia_qa"       # Optional HuggingFace dataset ID
+#   split: "test"                 # Dataset split (train, test, etc.)
+#   limit: null                   # Limit number of documents (null = all)
+#
+# milvus:
+#   host: "localhost"
+#   port: 19530
+#   collection_name: "triviaqa_compression"
+#   drop_existing: false          # Drop and recreate collection
+#
+# logging:
+#   name: "milvus_indexing"
+#   level: "INFO"
+
+# PINECONE EXAMPLE
+#
+# embeddings:
+#   model: "sentence-transformers/all-MiniLM-L6-v2"
+#   dimension: 384
+#
+# dataset:
+#   type: "arc"
+#   split: "test"
+#   limit: 1000
+#
+# pinecone:
+#   api_key: "${PINECONE_API_KEY}"  # Can use env var interpolation
+#   index_name: "arc-compression"
+#   metric: "cosine"                # Options: cosine, euclidean, dotproduct
+#   cloud: "aws"                    # aws, gcp, azure
+#   region: "us-east-1"
+#
+# logging:
+#   name: "pinecone_indexing"
+#   level: "INFO"
+
+# QDRANT EXAMPLE
+#
+# embeddings:
+#   model: "sentence-transformers/all-MiniLM-L6-v2"
+#   dimension: 384
+#
+# dataset:
+#   type: "popqa"
+#   split: "test"
+#   limit: 500
+#
+# qdrant:
+#   url: "http://localhost:6333"
+#   api_key: null                  # Optional for cloud deployments
+#   collection_name: "popqa_compression"
+#
+# logging:
+#   name: "qdrant_indexing"
+#   level: "INFO"
+
+# CHROMA EXAMPLE
+#
+# embeddings:
+#   model: "sentence-transformers/all-MiniLM-L6-v2"
+#   dimension: 384
+#
+# dataset:
+#   type: "factscore"
+#   split: "test"
+#   limit: 200
+#
+# chroma:
+#   path: "./chroma_data"          # Local storage path
+#   persist_directory: "./chroma_data"
+#   collection_name: "factscore_compression"
+#
+# logging:
+#   name: "chroma_indexing"
+#   level: "INFO"
+
+# WEAVIATE EXAMPLE
+#
+# embeddings:
+#   model: "sentence-transformers/all-MiniLM-L6-v2"
+#   dimension: 384
+#
+# dataset:
+#   type: "earnings_calls"
+#   split: "test"
+#   limit: 100
+#
+# weaviate:
+#   url: "http://localhost:8080"   # Local or cloud URL
+#   api_key: null                  # Only for cloud deployments
+#   collection_name: "EarningsCallsCompression"
+#
+# logging:
+#   name: "weaviate_indexing"
+#   level: "INFO"

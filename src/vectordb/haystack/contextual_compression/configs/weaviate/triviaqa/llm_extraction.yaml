@@ -1,0 +1,27 @@
+weaviate:
+  url: "${WEAVIATE_URL:-http://localhost:8080}"
+  api_key: "${WEAVIATE_API_KEY:-}"
+
+collection:
+  name: "Triviaqa_Compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "llm_extraction"
+  top_k: 5
+  llm:
+    provider: "groq"
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "weaviate_triviaqa_llm"
+  level: "INFO"

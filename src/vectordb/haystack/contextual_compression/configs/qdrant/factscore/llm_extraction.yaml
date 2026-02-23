@@ -1,0 +1,26 @@
+qdrant:
+  url: "${{QDRANT_URL:-http://localhost:6333}}"
+  api_key: "${{QDRANT_API_KEY:-}}"
+collection:
+  name: "factscore_compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "llm_extraction"
+  top_k: 5
+  llm:
+    provider: "groq"
+    model: "mixtral-8x7b-32768"
+    api_key: "${GROQ_API_KEY}"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "qdrant_factscore_llm"
+  level: "INFO"
