@@ -1,0 +1,38 @@
+dataloader:
+  type: "popqa"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+weaviate:
+  url: "${WEAVIATE_URL}"
+  api_key: "${WEAVIATE_API_KEY}"
+  collection_name: "AgenticRagPopqa"
+  recreate: false
+
+search:
+  top_k: 10
+
+rag:
+  enabled: true
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+reranker:
+  model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+agentic:
+  router_model: "llama-3.3-70b-versatile"
+  max_iterations: 3
+  compression_mode: "reranking"
+
+logging:
+  name: "lc_agentic_rag_weaviate_popqa"
+  level: "INFO"
