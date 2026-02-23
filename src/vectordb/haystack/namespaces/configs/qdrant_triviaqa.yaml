@@ -1,0 +1,64 @@
+# Qdrant namespace pipeline for TriviaQA dataset
+pipeline:
+  name: "qdrant_triviaqa_namespaces"
+  description: "Qdrant namespace pipeline for TriviaQA dataset using payload filtering"
+  database: "qdrant"
+  dataset: "triviaqa"
+
+qdrant:
+  host: "${QDRANT_HOST}"
+  port: "${QDRANT_PORT}"
+  api_key: "${QDRANT_API_KEY}"
+
+collection:
+  name: "triviaqa_namespaces"
+  description: "TriviaQA dataset with payload-based tenant isolation"
+
+namespaces:
+  strategy: "split"
+  prefix: ""
+  definitions:
+    - name: "triviaqa_train"
+      split: "train"
+      description: "TriviaQA training set"
+    - name: "triviaqa_validation"
+      split: "validation"
+      description: "TriviaQA validation set"
+
+dataloader:
+  type: "haystack"
+  class: "TriviaQADataloader"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  subset: "rc.nocontext"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "question"
+  custom_queries: []
+
+cross_namespace:
+  enabled: true
+  compare_namespaces: ["triviaqa_train", "triviaqa_validation"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "qdrant_triviaqa_namespaces"

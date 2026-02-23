@@ -48,12 +48,12 @@ lint-style:
 	uv run ruff check .
 
 lint-fmt:
-	uv run ruff format .
 	uv run ruff check --fix --unsafe-fixes .
+	uv run ruff format .
 
 lint-check:
-	uv run ruff format --check .
 	uv run ruff check .
+	uv run ruff format --check .
 
 lint-typos:
 	uv run typos

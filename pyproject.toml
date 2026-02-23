@@ -20,10 +20,10 @@ classifiers = [
   "Programming Language :: Python",
 ]
 dependencies = [
-  "pinecone[grpc]>=8.0.0",
-  "weaviate-client<4.16.8",
-  "chromadb",
-  "pysqlite3-binary",
+  "pinecone[grpc]==8.0.1",
+  "weaviate-client==4.16.7",
+  "chromadb==1.4.1",
+  "pysqlite3-binary>=0.5.4,<1.0.0",
   "langchain",
   "langchain-core",
   "langchain-community",
@@ -31,19 +31,21 @@ dependencies = [
   "langchain-qdrant",
   "langchain-chroma",
   "langchain-weaviate",
-  "haystack-ai",
+  "deepeval==3.8.4",
+  "haystack-ai>=2.24.1,<3.0.0",
+  "voyage-embedders-haystack==1.10.0",
   "sentence-transformers",
   "fastembed-haystack",
-  "langchain-text-splitters>=1.1.0",
-  "datasets>=4.5.0",
-  "pymilvus>=2.5.18",
-  "qdrant-client",
-  "langchain-groq>=1.1.1",
-  "psutil>=6.0.0",
-  "click>=8.1.0",
-  "pyarrow>=14.0.0",
+  "langchain-text-splitters",
+  "datasets",
+  "pymilvus==2.6.9",
+  "qdrant-client==1.16.2",
+  "langchain-groq",
+  "psutil",
+  "click",
+  "pyarrow",
   "accelerate",
-  "weave>=0.50.0",
+  "weave",
 ]
 
 [project.urls]
@@ -144,6 +146,7 @@ ignore_errors = true
 module = [
   "vectordb.langchain.*",
   "vectordb.haystack.*",
+  "vectordb.databases.*",
 ]
 follow_imports = "skip"
 ignore_errors = true

@@ -1,0 +1,27 @@
+# Pinecone JSON Indexing Configuration - ARC Dataset
+
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "arc-json-indexed"
+  environment: "${PINECONE_ENV:-us-east-1}"
+
+collection:
+  name: "arc_json_indexed"
+
+dataloader:
+  type: "arc"
+  dataset_name: "ai2_arc"
+  config: "ARC-Challenge"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  batch_size: 32
+
+search:
+  top_k: 10
+
+logging:
+  level: "INFO"
+  name: "pinecone_arc_json"

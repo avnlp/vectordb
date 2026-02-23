@@ -1,0 +1,29 @@
+dataloader:
+  type: "triviaqa"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+chroma:
+  collection_name: "lc-semantic-search-triviaqa"
+  path: "${CHROMA_PATH}"
+  recreate: false
+
+search:
+  top_k: 10
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+logging:
+  name: "lc_semantic_search_chroma"
+  level: "INFO"

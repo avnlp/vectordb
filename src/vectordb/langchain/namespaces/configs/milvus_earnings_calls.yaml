@@ -1,0 +1,23 @@
+dataloader:
+  type: "earnings_calls"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+  dimension: 384
+
+milvus:
+  uri: "http://localhost:19530"
+  token: ""
+  collection_name: "lc_namespaces_earnings_calls"
+
+search:
+  top_k: 10
+
+logging:
+  name: "lc_namespaces_milvus"
+  level: "INFO"
