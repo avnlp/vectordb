@@ -33,6 +33,8 @@ Example:
 """
 
 import ast
+import contextlib
+import json
 
 from haystack import Document
 from qdrant_client import QdrantClient
@@ -95,16 +97,26 @@ class QdrantCompressionSearch(BaseContextualCompressionPipeline):
         for point in results:
             payload = point.payload or {}
             content = payload.pop("content", "")
+
+            # Handle metadata - try metadata_json first, then metadata field
+            metadata = {}
+            metadata_str = payload.pop("metadata_json", None) or payload.pop(
+                "metadata", None
+            )
+            if metadata_str:
+                try:
+                    metadata = json.loads(metadata_str)
+                except json.JSONDecodeError:
+                    # Fallback to ast.literal_eval for Python dict strings
+                    with contextlib.suppress(ValueError, SyntaxError):
+                        metadata = ast.literal_eval(metadata_str)
+
             doc = Document(
                 content=content,
                 meta={
                     "score": point.score,
                     "qdrant_id": point.id,
-                    **(
-                        ast.literal_eval(payload.pop("metadata", "{}"))
-                        if "metadata" in payload
-                        else {}
-                    ),
+                    **metadata,
                     **payload,
                 },
             )

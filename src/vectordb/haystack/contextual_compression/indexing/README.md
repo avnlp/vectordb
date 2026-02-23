@@ -442,8 +442,13 @@ After indexing:
 
 3. **Evaluation**: Use evaluation metrics
    ```python
-   from vectordb.haystack.contextual_compression.evaluation import evaluate
-   metrics = evaluate(search_results, ground_truths)
+   from vectordb.haystack.contextual_compression.evaluation import CompressionEvaluator, print_detailed_report
+
+   # Assuming you have `ranked_results`, `ideal_results`, and token counts
+   metrics = CompressionEvaluator.evaluate_compression(
+       ranked_results, ideal_results, original_token_count, compressed_token_count
+   )
+   print_detailed_report(metrics)
    ```
 
 ## Support

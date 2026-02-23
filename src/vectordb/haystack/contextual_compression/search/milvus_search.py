@@ -16,7 +16,7 @@ Compression Integration:
 Milvus-Specific Notes:
     - Requires collection.load() before search (handled in _ensure_collection_ready)
     - IVF_FLAT index with 128 clusters (nlist=128)
-    - Metadata stored as JSON strings, deserialized with ast.literal_eval
+    - Metadata stored as JSON strings, deserialized with json.loads
 
 Compression Benefits with Milvus:
     - Can retrieve large top_k (e.g., 50-100) for better coverage
@@ -29,6 +29,8 @@ Example:
 """
 
 import ast
+import contextlib
+import json
 
 from haystack import Document
 from pymilvus import Collection, connections
@@ -90,16 +92,22 @@ class MilvusCompressionSearch(BaseContextualCompressionPipeline):
 
         documents = []
         for hit in results[0]:
+            metadata = {}
+            metadata_str = hit.entity.get("metadata")
+            if metadata_str:
+                try:
+                    metadata = json.loads(metadata_str)
+                except json.JSONDecodeError:
+                    # Fallback to ast.literal_eval for Python dict strings
+                    with contextlib.suppress(ValueError, SyntaxError):
+                        metadata = ast.literal_eval(metadata_str)
+
             doc = Document(
                 content=hit.entity.get("content", ""),
                 meta={
                     "distance": hit.distance,
                     "milvus_id": hit.id,
-                    **(
-                        ast.literal_eval(hit.entity.get("metadata", "{}"))
-                        if hit.entity.get("metadata")
-                        else {}
-                    ),
+                    **metadata,
                 },
             )
             documents.append(doc)

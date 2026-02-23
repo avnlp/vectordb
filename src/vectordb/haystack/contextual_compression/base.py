@@ -163,25 +163,36 @@ class BaseContextualCompressionPipeline(ABC):
     ) -> dict[str, Any]:
         """Evaluate compression quality using metrics.
 
+        Runs the compression pipeline for each question and collects results.
+
         Args:
             questions: List of query questions.
             ground_truths: List of ground truth answers.
 
         Returns:
-            Dictionary with evaluation metrics.
+            Dictionary with evaluation results including:
+            - questions: Number of questions evaluated
+            - metrics: Dictionary with evaluation metrics
+            - results: List of results for each question
         """
-        self.logger.info(
-            "Evaluating compression pipeline with %d questions", len(questions)
-        )
+        self.logger.info("Evaluating pipeline on %d questions", len(questions))
 
-        results = {"questions": len(questions), "metrics": {}}
-        for i, question in enumerate(questions):
-            result = self.run(question)
-            self.logger.debug(
-                "Query %d: %s -> %d documents",
-                i + 1,
-                question,
-                len(result.get("documents", [])),
+        results = []
+        for question, ground_truth in zip(questions, ground_truths):
+            # Run the compression pipeline for each question
+            result = self.run(query=question)
+            results.append(
+                {
+                    "question": question,
+                    "ground_truth": ground_truth,
+                    "retrieved_documents": result.get("documents", []),
+                }
             )
 
-        return results
+        self.logger.info("Evaluation completed for %d questions", len(questions))
+
+        return {
+            "questions": len(questions),
+            "metrics": {},
+            "results": results,
+        }

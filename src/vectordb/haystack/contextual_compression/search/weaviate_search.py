@@ -33,6 +33,8 @@ Example:
 """
 
 import ast
+import contextlib
+import json
 
 import weaviate
 from haystack import Document
@@ -96,13 +98,26 @@ class WeaviateCompressionSearch(BaseContextualCompressionPipeline):
         for obj in results.objects:
             properties = obj.properties or {}
             content = properties.pop("content", "")
-            metadata = properties.pop("metadata", "{}")
+
+            # Handle metadata - try metadata_json first, then metadata field
+            metadata = {}
+            metadata_str = properties.pop("metadata_json", None) or properties.pop(
+                "metadata", None
+            )
+            if metadata_str:
+                try:
+                    metadata = json.loads(metadata_str)
+                except json.JSONDecodeError:
+                    # Fallback to ast.literal_eval for Python dict strings
+                    with contextlib.suppress(ValueError, SyntaxError):
+                        metadata = ast.literal_eval(metadata_str)
+
             doc = Document(
                 content=content,
                 meta={
                     "score": 1 - (obj.metadata.distance or 0),
                     "weaviate_distance": obj.metadata.distance,
-                    **(ast.literal_eval(metadata) if metadata else {}),
+                    **metadata,
                     **properties,
                 },
             )

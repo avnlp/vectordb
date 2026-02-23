@@ -447,9 +447,8 @@ class TestBaseContextualCompressionPipelineEvaluate:
         assert result["questions"] == 2
         assert "metrics" in result
         assert pipeline.run.call_count == 2
-        mock_logger.info.assert_called_with(
-            "Evaluating compression pipeline with %d questions", 2
-        )
+        mock_logger.info.assert_any_call("Evaluating pipeline on %d questions", 2)
+        mock_logger.info.assert_any_call("Evaluation completed for %d questions", 2)
 
     @patch("vectordb.haystack.contextual_compression.base.CompressorFactory")
     @patch("vectordb.haystack.contextual_compression.base.load_config")

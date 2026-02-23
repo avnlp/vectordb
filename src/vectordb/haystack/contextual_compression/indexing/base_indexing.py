@@ -23,7 +23,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from haystack import Document
-from haystack.components.embedders import SentenceTransformersTextEmbedder
+from haystack.components.embedders import (
+    SentenceTransformersDocumentEmbedder,
+)
 
 from vectordb.dataloaders import DataloaderCatalog
 from vectordb.haystack.json_indexing.common.config import load_config
@@ -66,7 +68,7 @@ class BaseIndexingPipeline(ABC):
         }
         dense_model = model_aliases.get(dense_model.lower(), dense_model)
 
-        self.dense_embedder = SentenceTransformersTextEmbedder(model=dense_model)
+        self.dense_embedder = SentenceTransformersDocumentEmbedder(model=dense_model)
         self.dense_embedder.warm_up()
         self.logger.info("Initialized dense embedder with model: %s", dense_model)
 
@@ -155,10 +157,9 @@ class BaseIndexingPipeline(ABC):
                     "Processing batch %d-%d", i, min(i + batch_size, len(documents))
                 )
 
-                # Embed batch
-                for doc in batch:
-                    embedding_result = self.dense_embedder.run(text=doc.content)
-                    doc.embedding = embedding_result["embedding"]
+                # Embed batch using SentenceTransformersDocumentEmbedder
+                embedding_result = self.dense_embedder.run(documents=batch)
+                batch = embedding_result["documents"]
 
                 # Store batch
                 self._store_documents(batch)

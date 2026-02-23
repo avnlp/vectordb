@@ -34,7 +34,7 @@ class TestBaseIndexingPipeline:
     """Unit tests for BaseIndexingPipeline functionality."""
 
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     @patch(
         "vectordb.haystack.contextual_compression.indexing.base_indexing.load_config"
@@ -76,7 +76,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_init_embedders_default_model(
         self,
@@ -108,7 +108,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_init_embedders_with_alias(
         self,
@@ -140,7 +140,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_init_embedders_with_minilm_alias(
         self,
@@ -174,7 +174,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_load_dataset(
         self,
@@ -222,7 +222,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     @patch(
         "vectordb.haystack.contextual_compression.indexing.base_indexing.DataloaderCatalog"
@@ -257,7 +257,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_success(
         self,
@@ -279,7 +279,14 @@ class TestBaseIndexingPipeline:
         mock_logger = MagicMock()
         mock_setup_logger.return_value = mock_logger
         mock_embedder_instance = MagicMock()
-        mock_embedder_instance.run.return_value = {"embedding": [0.1, 0.2, 0.3]}
+
+        def mock_run(documents):
+            # Return documents with embeddings
+            for doc in documents:
+                doc.embedding = [0.1, 0.2, 0.3]
+            return {"documents": documents}
+
+        mock_embedder_instance.run.side_effect = mock_run
         mock_embedder_class.return_value = mock_embedder_instance
 
         pipeline = ConcreteIndexingPipeline("config.yaml")
@@ -306,7 +313,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_empty_dataset(
         self,
@@ -347,7 +354,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_with_exception(
         self,
@@ -369,7 +376,14 @@ class TestBaseIndexingPipeline:
         mock_logger = MagicMock()
         mock_setup_logger.return_value = mock_logger
         mock_embedder_instance = MagicMock()
-        mock_embedder_instance.run.return_value = {"embedding": [0.1, 0.2, 0.3]}
+
+        def mock_run(documents):
+            # Return documents with embeddings
+            for doc in documents:
+                doc.embedding = [0.1, 0.2, 0.3]
+            return {"documents": documents}
+
+        mock_embedder_instance.run.side_effect = mock_run
         mock_embedder_class.return_value = mock_embedder_instance
 
         pipeline = ConcreteIndexingPipeline("config.yaml")
@@ -405,7 +419,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_batch_processing(
         self,
@@ -427,7 +441,14 @@ class TestBaseIndexingPipeline:
         mock_logger = MagicMock()
         mock_setup_logger.return_value = mock_logger
         mock_embedder_instance = MagicMock()
-        mock_embedder_instance.run.return_value = {"embedding": [0.1, 0.2, 0.3]}
+
+        def mock_run(documents):
+            # Return documents with embeddings
+            for doc in documents:
+                doc.embedding = [0.1, 0.2, 0.3]
+            return {"documents": documents}
+
+        mock_embedder_instance.run.side_effect = mock_run
         mock_embedder_class.return_value = mock_embedder_instance
 
         pipeline = ConcreteIndexingPipeline("config.yaml")
@@ -443,8 +464,8 @@ class TestBaseIndexingPipeline:
         assert result["indexed_count"] == 5
         assert result["status"] == "success"
         assert result["batch_size"] == 2
-        # Verify that embedder was called for each document
-        assert mock_embedder_instance.run.call_count == 5
+        # Verify embedder called for each batch (3 batches for 5 docs with batch_size=2)
+        assert mock_embedder_instance.run.call_count == 3
 
     @patch(
         "vectordb.haystack.contextual_compression.indexing.base_indexing.load_config"
@@ -453,7 +474,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_dataset_load_exception(
         self,
@@ -492,7 +513,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_embedding_exception(
         self,
@@ -533,7 +554,7 @@ class TestBaseIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_run_with_none_documents_from_load(
         self,

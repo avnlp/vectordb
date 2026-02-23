@@ -90,10 +90,13 @@ class TestCompressionEvaluatorCalculateNDCG:
         ]
 
         ndcg = CompressionEvaluator.calculate_ndcg(ranked_results, ideal_docs, k=3)
-        # DCG = 1/2 + 0/3 + 0/4 = 0.5
-        # Ideal DCG = 1/2 + 1/3 = 0.833...
-        # NDCG = 0.5 / 0.833... = 0.6
-        assert ndcg == pytest.approx(0.6, abs=0.01)
+        # Using standard NDCG formula with log2 discount:
+        # actual_relevances = [1.0, 0.0, 0.0]
+        # ideal_relevances = [1.0, 1.0, 0.0]
+        # actual_dcg = 1/log2(2) + 0/log2(3) + 0/log2(4) = 1.0
+        # ideal_dcg = 1/log2(2) + 1/log2(3) + 0/log2(4) = 1.0 + 0.631 = 1.631
+        # NDCG = 1.0 / 1.631 = 0.613
+        assert ndcg == pytest.approx(0.613, abs=0.01)
 
     def test_ndcg_no_match(self) -> None:
         """Test NDCG when no documents match."""
@@ -159,9 +162,9 @@ class TestCompressionEvaluatorCalculateNDCG:
         ndcg_k3 = CompressionEvaluator.calculate_ndcg(ranked_results, ideal_docs, k=3)
         # ideal_relevances = [1.0, 0.0, 0.0]
         # actual_relevances = [1.0, 0.0, 0.0]
-        # Ideal DCG = 1/2 = 0.5
-        # Actual DCG = 1/2 = 0.5
-        # NDCG = 0.5 / 0.5 = 1.0
+        # ideal_dcg = 1/log2(2) = 1.0
+        # actual_dcg = 1/log2(2) = 1.0
+        # NDCG = 1.0 / 1.0 = 1.0
         assert ndcg_k3 == 1.0
 
         # Now test with relevant doc NOT in top-k
@@ -179,9 +182,9 @@ class TestCompressionEvaluatorCalculateNDCG:
         )
         # ideal_relevances = [1.0, 0.0, 0.0]
         # actual_relevances = [0.0, 0.0, 0.0] (doc1 is at position 5, not in top 3)
-        # Ideal DCG = 1/2 = 0.5
-        # Actual DCG = 0
-        # NDCG = 0 / 0.5 = 0
+        # ideal_dcg = 1/log2(2) = 1.0
+        # actual_dcg = 0
+        # NDCG = 0 / 1.0 = 0
         assert ndcg_k3_missing == 0.0
 
         # With k=5, relevant doc is in top-k at position 5
@@ -190,10 +193,10 @@ class TestCompressionEvaluatorCalculateNDCG:
         )
         # ideal_relevances = [1.0, 0.0, 0.0, 0.0, 0.0]
         # actual_relevances = [0.0, 0.0, 0.0, 0.0, 1.0]
-        # Ideal DCG = 1/2 = 0.5
-        # Actual DCG = 0/2 + 0/3 + 0/4 + 0/5 + 1/6 = 0.1667
-        # NDCG = 0.1667 / 0.5 = 0.333
-        assert ndcg_k5 == pytest.approx(1.0 / 3.0, abs=0.01)
+        # ideal_dcg = 1/log2(2) = 1.0
+        # actual_dcg = 1/log2(6) = 0.387
+        # NDCG = 0.387 / 1.0 = 0.387
+        assert ndcg_k5 == pytest.approx(0.387, abs=0.01)
 
     def test_ndcg_with_none_ids(self) -> None:
         """Test NDCG handling documents with None IDs."""

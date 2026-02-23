@@ -24,7 +24,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_initialization_with_defaults(
         self,
@@ -70,7 +70,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_initialization_with_custom_values(
         self,
@@ -123,7 +123,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_prepare_collection_new_collection(
         self,
@@ -173,7 +173,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_prepare_collection_existing_collection(
         self,
@@ -221,7 +221,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_success(
         self,
@@ -298,7 +298,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_with_empty_metadata(
         self,
@@ -370,7 +370,7 @@ class TestQdrantIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_failure(
         self,

@@ -21,7 +21,7 @@ class TestChromaIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_initialization_with_defaults(
         self,
@@ -69,7 +69,7 @@ class TestChromaIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_initialization_with_custom_values(
         self,
@@ -120,7 +120,7 @@ class TestChromaIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_success(
         self,
@@ -187,7 +187,7 @@ class TestChromaIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_with_empty_metadata(
         self,
@@ -244,7 +244,7 @@ class TestChromaIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_failure(
         self,
@@ -292,7 +292,7 @@ class TestChromaIndexingPipeline:
         "vectordb.haystack.contextual_compression.indexing.base_indexing.setup_logger"
     )
     @patch(
-        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersTextEmbedder"
+        "vectordb.haystack.contextual_compression.indexing.base_indexing.SentenceTransformersDocumentEmbedder"
     )
     def test_store_documents_large_content(
         self,

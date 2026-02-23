@@ -26,6 +26,7 @@ Target Benchmarks:
     - Recall@10 > 0.8: Most relevant documents retrieved
 """
 
+import math
 from dataclasses import dataclass
 
 from haystack import Document
@@ -96,7 +97,7 @@ class CompressionEvaluator:
 
         # Calculate DCG
         def calculate_dcg(relevances: list[float]) -> float:
-            return sum(rel / (i + 2) for i, rel in enumerate(relevances))
+            return sum(rel / math.log2(i + 2) for i, rel in enumerate(relevances))
 
         actual_dcg = calculate_dcg(actual_relevances)
         ideal_dcg = calculate_dcg(ideal_relevances)

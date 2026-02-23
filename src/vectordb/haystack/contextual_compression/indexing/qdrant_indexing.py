@@ -4,7 +4,7 @@ Prepares Qdrant vector store for contextual compression search with
 payload-based storage and flexible filtering capabilities.
 
 Schema:
-    - id: Unique numeric identifier (hashed from doc reference)
+    - id: Unique identifier (UUID string)
     - vector: Dense embedding with cosine distance metric
     - payload: content (full text), metadata_json (document metadata)
 
@@ -24,6 +24,7 @@ Compression Context:
 """
 
 import json
+import uuid
 
 from haystack import Document
 from qdrant_client import QdrantClient
@@ -85,12 +86,12 @@ class QdrantIndexingPipeline(BaseIndexingPipeline):
             documents: List of Document objects with embeddings.
         """
         points = []
-        for i, doc in enumerate(documents):
+        for _i, doc in enumerate(documents):
             # Convert metadata to JSON string for storage
             metadata_json = json.dumps(doc.meta) if doc.meta else "{}"
 
             point = PointStruct(
-                id=abs(hash(f"{id(doc)}_{i}")) % (10**8),  # Unique numeric ID
+                id=str(uuid.uuid4()),  # Unique UUID string for stability across runs
                 vector=doc.embedding,
                 payload={
                     "content": doc.content,
