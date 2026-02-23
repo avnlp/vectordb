@@ -39,12 +39,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
           cache-suffix: "py311"
           save-cache: true
 
-      - name: Install dependencies (locked)
-        run: uv sync --all-groups --locked
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Prune uv cache for CI
         run: uv cache prune --ci
@@ -64,12 +64,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
           cache-suffix: "py314"
           save-cache: true
 
-      - name: Install dependencies (locked)
-        run: uv sync --all-groups --locked
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Prune uv cache for CI
         run: uv cache prune --ci
@@ -90,12 +90,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
           cache-suffix: "py311"
           save-cache: false
 
-      - name: Install dependencies (locked)
-        run: uv sync --all-groups --locked
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Lint & type check
         run: |
@@ -145,12 +145,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
           cache-suffix: "py314"
           save-cache: false
 
-      - name: Install dependencies (locked)
-        run: uv sync --all-groups --locked
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Run tests
         run: make test
@@ -174,12 +174,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
           cache-suffix: "py311"
           save-cache: false
 
-      - name: Install dependencies (locked)
-        run: uv sync --all-groups --locked
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Run Bandit security scan
         run: make security-bandit
