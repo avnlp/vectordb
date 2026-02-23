@@ -1,0 +1,26 @@
+milvus:
+  host: "${{MILVUS_HOST:-localhost}}"
+  port: ${{MILVUS_PORT:-19530}}
+collection:
+  name: "factscore_compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "llm_extraction"
+  top_k: 5
+  llm:
+    provider: "groq"
+    model: "mixtral-8x7b-32768"
+    api_key: "${GROQ_API_KEY}"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "milvus_factscore_llm"
+  level: "INFO"

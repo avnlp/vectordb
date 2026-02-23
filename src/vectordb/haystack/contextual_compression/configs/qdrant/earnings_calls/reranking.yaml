@@ -1,0 +1,25 @@
+qdrant:
+  url: "${{QDRANT_URL:-http://localhost:6333}}"
+  api_key: "${{QDRANT_API_KEY:-}}"
+collection:
+  name: "earnings_calls_compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "reranking"
+  top_k: 5
+  reranker:
+    type: "cross_encoder"
+    model: "cross-encoder/ms-marco-MiniLM-L-12-v2"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "qdrant_earnings_calls_reranking"
+  level: "INFO"

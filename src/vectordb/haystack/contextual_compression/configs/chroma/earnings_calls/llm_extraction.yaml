@@ -1,0 +1,25 @@
+chroma:
+  path: "${{CHROMA_PATH:-/tmp/chroma}}"
+  collection_name: "earnings_calls_compression"
+
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "llm_extraction"
+  top_k: 5
+  llm:
+    provider: "groq"
+    model: "mixtral-8x7b-32768"
+    api_key: "${GROQ_API_KEY}"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "chroma_earnings_calls_llm"
+  level: "INFO"

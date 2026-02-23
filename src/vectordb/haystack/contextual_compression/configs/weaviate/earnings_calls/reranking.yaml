@@ -1,0 +1,25 @@
+weaviate:
+  url: "${{WEAVIATE_URL:-http://localhost:8080}}"
+  api_key: "${{WEAVIATE_API_KEY:-}}"
+collection:
+  name: "Earningscalls_Compression"
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+
+compression:
+  type: "reranking"
+  top_k: 5
+  reranker:
+    type: "cross_encoder"
+    model: "cross-encoder/ms-marco-MiniLM-L-12-v2"
+
+retrieval:
+  top_k: 20
+
+rag:
+  enabled: false
+
+logging:
+  name: "weaviate_earnings_calls_reranking"
+  level: "INFO"
