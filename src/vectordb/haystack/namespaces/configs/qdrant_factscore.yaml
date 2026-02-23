@@ -1,0 +1,59 @@
+# Qdrant namespace pipeline for FactScore dataset
+pipeline:
+  name: "qdrant_factscore_namespaces"
+  description: "Qdrant namespace pipeline for FactScore dataset using payload filtering"
+  database: "qdrant"
+  dataset: "factscore"
+
+qdrant:
+  host: "${QDRANT_HOST}"
+  port: "${QDRANT_PORT}"
+  api_key: "${QDRANT_API_KEY}"
+
+collection:
+  name: "factscore_namespaces"
+  description: "FactScore dataset with payload-based tenant isolation"
+
+namespaces:
+  strategy: "split"
+  prefix: ""
+  definitions:
+    - name: "factscore_test"
+      split: "test"
+      description: "FactScore test set"
+
+dataloader:
+  type: "haystack"
+  class: "FactScoreDataloader"
+  dataset_name: "dskar/FActScore"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  batch_size: 32
+  model_kwargs:
+    trust_remote_code: true
+
+indexing:
+  batch_size: 100
+
+test_queries:
+  sample_size: 5
+  sample_from: "dataset"
+  sample_field: "claim"
+  custom_queries: []
+
+cross_namespace:
+  enabled: false
+  compare_namespaces: ["factscore_test"]
+  top_k: 10
+
+metrics:
+  collect_timing: true
+  collect_stats: true
+  log_results: true
+
+logging:
+  level: "INFO"
+  name: "qdrant_factscore_namespaces"

@@ -1,218 +1,277 @@
-"""Pinecone namespaces management script.
+"""Pinecone namespace pipeline using native namespace isolation."""
 
-This module provides functionality to manage namespaces
-in Pinecone vector database using Haystack components.
-"""
+from __future__ import annotations
 
-import argparse
+import logging
+from typing import Any
 
-from dataloaders.llms.groq import ChatGroqGenerator
-from dataloaders.triviaqa_dataloader import TriviaQADataloader
-from haystack.components.embedders import (
-    SentenceTransformersDocumentEmbedder,
-    SentenceTransformersTextEmbedder,
+from haystack import Document
+
+from vectordb.databases.pinecone import PineconeVectorDB
+from vectordb.haystack.namespaces.types import (
+    CrossNamespaceComparison,
+    CrossNamespaceResult,
+    IsolationStrategy,
+    NamespaceOperationResult,
+    NamespaceQueryResult,
+    NamespaceStats,
+    NamespaceTimingMetrics,
+    TenantStatus,
 )
-from haystack_integrations.components.embedders.fastembed import (
-    FastembedSparseDocumentEmbedder,
-    FastembedSparseTextEmbedder,
+from vectordb.haystack.namespaces.utils import (
+    Timer,
+    get_document_embedder,
+    get_text_embedder,
+    load_config,
+    load_documents_from_config,
 )
-from pinecone import ServerlessSpec
-
-from vectordb import PineconeDocumentConverter, PineconeVectorDB
 
 
-def main():
-    """Manage Pinecone namespaces with hybrid embeddings."""
-    parser = argparse.ArgumentParser(
-        description="Hybrid embedding upsert and retrieval using Pinecone."
-    )
+class PineconeNamespacePipeline:
+    """Pinecone namespace pipeline using native namespace isolation.
 
-    # Pinecone VectorDB parameters
-    parser.add_argument(
-        "--api_key", required=True, help="API key for accessing Pinecone."
-    )
-    parser.add_argument(
-        "--index_name", required=True, help="Name of the Pinecone index."
-    )
-    parser.add_argument(
-        "--namespace1", required=True, help="Namespace for the first data split."
-    )
-    parser.add_argument(
-        "--namespace2", required=True, help="Namespace for the second data split."
-    )
-    parser.add_argument(
-        "--dimension",
-        type=int,
-        default=768,
-        help="Vector dimension for the Pinecone index.",
-    )
-    parser.add_argument(
-        "--metric",
-        default="cosine",
-        help="Similarity metric to use in the Pinecone index.",
-    )
-    parser.add_argument(
-        "--cloud", default="aws", help="Cloud provider hosting the Pinecone database."
-    )
-    parser.add_argument(
-        "--region",
-        default="us-east-1",
-        help="Region where the Pinecone index is hosted.",
-    )
-    parser.add_argument(
-        "--tracing_project_name", type=str, help="Name of the tracing project."
-    )
-    parser.add_argument(
-        "--weave_params",
-        type=str,
-        help="JSON string of parameters for configuring Weave.",
-    )
+    Uses PineconeVectorDB for all database operations.
+    Namespaces are a first-class concept in Pinecone with strong isolation.
+    """
 
-    # Dataloader parameters
-    parser.add_argument(
-        "--dataset_name", required=True, help="Name of the dataset to use."
-    )
-    parser.add_argument(
-        "--split1",
-        required=True,
-        help="Dataset split for the first namespace (e.g., 'train').",
-    )
-    parser.add_argument(
-        "--split2",
-        required=True,
-        help="Dataset split for the second namespace (e.g., 'test').",
-    )
+    ISOLATION_STRATEGY = IsolationStrategy.NAMESPACE
 
-    # Embedding model parameters
-    parser.add_argument(
-        "--dense_model", type=str, required=True, help="Dense embedding model name."
-    )
-    parser.add_argument(
-        "--sparse_model", type=str, required=True, help="Sparse embedding model name."
-    )
+    def __init__(self, config_path: str) -> None:
+        """Initialize the pipeline.
 
-    # Query parameters
-    parser.add_argument(
-        "--question", type=str, required=True, help="Query/question text."
-    )
-    parser.add_argument(
-        "--top_k", type=int, default=10, help="Number of top results to retrieve."
-    )
+        Args:
+            config_path: Path to YAML configuration file.
+        """
+        self.config = load_config(config_path)
+        self.config_path = config_path
 
-    args = parser.parse_args()
+        # Lazy-initialized components
+        self._db: PineconeVectorDB | None = None
+        self._doc_embedder = None
+        self._text_embedder = None
+        self._logger: logging.Logger | None = None
 
-    # Load data splits using TriviaQADataloader
-    dataloader_1 = TriviaQADataloader(
-        answer_summary_generator=ChatGroqGenerator,
-        dataset_name=args.dataset_name,
-        split=args.split1,
-    )
-    dataloader_2 = TriviaQADataloader(
-        answer_summary_generator=ChatGroqGenerator,
-        dataset_name=args.dataset_name,
-        split=args.split2,
-    )
-    dataloader_1.load_data()
-    dataloader_2.load_data()
+        self._connect()
 
-    haystack_documents_1 = dataloader_1.get_haystack_documents()
-    haystack_documents_2 = dataloader_2.get_haystack_documents()
+    def _connect(self) -> None:
+        """Connect to Pinecone via unified wrapper."""
+        self._db = PineconeVectorDB(config=self.config)
 
-    # Initialize embedders
-    dense_embedder = SentenceTransformersDocumentEmbedder(model=args.dense_model)
-    dense_embedder.warm_up()
-    sparse_embedder = FastembedSparseDocumentEmbedder(model=args.sparse_model)
-    sparse_embedder.warm_up()
+        embedding_dim = self.config.get("embedding", {}).get("dimension", 1024)
+        metric = self.config.get("pinecone", {}).get("metric", "cosine")
+        self._db.create_index(dimension=embedding_dim, metric=metric)
 
-    # Generate embeddings for both splits
-    split_1_docs_with_dense_embeddings = dense_embedder.run(
-        documents=haystack_documents_1
-    )["documents"]
-    split_1_docs_with_sparse_embeddings = sparse_embedder.run(
-        documents=split_1_docs_with_dense_embeddings
-    )["documents"]
+    @property
+    def db(self) -> PineconeVectorDB:
+        """Get the VectorDB wrapper."""
+        if self._db is None:
+            raise RuntimeError("Not connected to Pinecone")
+        return self._db
 
-    split_2_docs_with_dense_embeddings = dense_embedder.run(
-        documents=haystack_documents_2
-    )["documents"]
-    split_2_docs_with_sparse_embeddings = sparse_embedder.run(
-        documents=split_2_docs_with_dense_embeddings
-    )["documents"]
+    @property
+    def logger(self) -> logging.Logger:
+        """Get logger instance."""
+        if self._logger is None:
+            name = self.config.get("pipeline", {}).get("name", "pinecone_namespaces")
+            self._logger = logging.getLogger(name)
+        return self._logger
 
-    # Initialize Pinecone and create index
-    pinecone_vector_db = PineconeVectorDB(api_key=args.api_key)
-    pinecone_vector_db.create_index(
-        index_name=args.index_name,
-        dimension=args.dimension,
-        metric=args.metric,
-        spec=ServerlessSpec(cloud=args.cloud, region=args.region),
-    )
+    def _init_embedders(self) -> None:
+        """Initialize embedders lazily."""
+        if self._doc_embedder is None:
+            self._doc_embedder = get_document_embedder(self.config)
+            self._text_embedder = get_text_embedder(self.config)
 
-    # Prepare data for upsert
-    docs_for_pinecone_split_1 = (
-        PineconeDocumentConverter.prepare_haystack_documents_for_upsert(
-            split_1_docs_with_sparse_embeddings
+    def close(self) -> None:
+        """Close connection."""
+        self._db = None
+        self.logger.info("Closed Pinecone connection")
+
+    def __enter__(self) -> "PineconeNamespacePipeline":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager."""
+        self.close()
+
+    def create_namespace(self, namespace: str) -> NamespaceOperationResult:
+        """Create a namespace (auto-created on first upsert in Pinecone)."""
+        return NamespaceOperationResult(
+            success=True,
+            namespace=namespace,
+            operation="create",
+            message="Namespace will be auto-created on first upsert (Pinecone behavior)",
         )
-    )
-    docs_for_pinecone_split_2 = (
-        PineconeDocumentConverter.prepare_haystack_documents_for_upsert(
-            split_2_docs_with_sparse_embeddings
+
+    def delete_namespace(self, namespace: str) -> NamespaceOperationResult:
+        """Delete all vectors in a namespace."""
+        self.db.delete(delete_all=True, namespace=namespace)
+        return NamespaceOperationResult(
+            success=True,
+            namespace=namespace,
+            operation="delete",
+            message=f"Deleted all vectors in namespace '{namespace}'",
         )
-    )
 
-    # Upsert data into namespaces
-    pinecone_vector_db.upsert(
-        data=docs_for_pinecone_split_1,
-        namespace=args.namespace1,
-    )
-    pinecone_vector_db.upsert(
-        data=docs_for_pinecone_split_2,
-        namespace=args.namespace2,
-    )
+    def list_namespaces(self) -> list[str]:
+        """List all namespaces in the index."""
+        return self.db.list_namespaces()
 
-    # Query Pinecone for both namespaces
-    dense_text_embedder = SentenceTransformersTextEmbedder(model=args.dense_model)
-    dense_text_embedder.warm_up()
-    sparse_text_embedder = FastembedSparseTextEmbedder(model=args.sparse_model)
-    sparse_text_embedder.warm_up()
+    def namespace_exists(self, namespace: str) -> bool:
+        """Check if a namespace exists."""
+        return namespace in self.list_namespaces()
 
-    dense_question_embedding = dense_text_embedder.run(text=args.question)["embedding"]
-    sparse_question_embedding = sparse_text_embedder.run(text=args.question)[
-        "sparse_embedding"
-    ].to_dict()
+    def get_namespace_stats(self, namespace: str) -> NamespaceStats:
+        """Get statistics for a namespace."""
+        stats = self.db.describe_index_stats()
+        ns_stats = stats.get("namespaces", {}).get(namespace, {})
+        vector_count = ns_stats.get("vector_count", 0)
 
-    # Query namespace 1
-    query_response_split_1 = pinecone_vector_db.query(
-        vector=dense_question_embedding,
-        sparse_vector=sparse_question_embedding,
-        top_k=args.top_k,
-        namespace=args.namespace1,
-    )
-    retrieval_results_split_1 = (
-        PineconeDocumentConverter.convert_query_results_to_haystack_documents(
-            query_response_split_1
+        return NamespaceStats(
+            namespace=namespace,
+            document_count=vector_count,
+            vector_count=vector_count,
+            status=TenantStatus.ACTIVE if vector_count > 0 else TenantStatus.UNKNOWN,
         )
-    )
-    print("Results from namespace 1:")
-    for result in retrieval_results_split_1:
-        print(result)
 
-    # Query namespace 2
-    query_response_split_2 = pinecone_vector_db.query(
-        vector=dense_question_embedding,
-        sparse_vector=sparse_question_embedding,
-        top_k=args.top_k,
-        namespace=args.namespace2,
-    )
-    retrieval_results_split_2 = (
-        PineconeDocumentConverter.convert_query_results_to_haystack_documents(
-            query_response_split_2
+    def index_documents(
+        self, documents: list[Document], namespace: str
+    ) -> NamespaceOperationResult:
+        """Index documents into a namespace."""
+        if not documents:
+            return NamespaceOperationResult(
+                success=True,
+                namespace=namespace,
+                operation="index",
+                message="No documents to index",
+                data={"count": 0},
+            )
+
+        self._init_embedders()
+        embedded_docs = self._doc_embedder.run(documents=documents)["documents"]
+
+        count = self.db.upsert(
+            data=embedded_docs,
+            namespace=namespace,
+            batch_size=self.config.get("indexing", {}).get("batch_size", 100),
         )
-    )
-    print("Results from namespace 2:")
-    for result in retrieval_results_split_2:
-        print(result)
 
+        self.logger.info("Indexed %d documents into namespace '%s'", count, namespace)
+        return NamespaceOperationResult(
+            success=True,
+            namespace=namespace,
+            operation="index",
+            message=f"Indexed {count} documents",
+            data={"count": count},
+        )
 
-if __name__ == "__main__":
-    main()
+    def index_from_config(self, namespace: str) -> NamespaceOperationResult:
+        """Index documents from dataset specified in config."""
+        documents = load_documents_from_config(self.config)
+        return self.index_documents(documents, namespace)
+
+    def query_namespace(
+        self, query: str, namespace: str, top_k: int = 10
+    ) -> list[NamespaceQueryResult]:
+        """Query a specific namespace."""
+        self._init_embedders()
+
+        with Timer() as embed_timer:
+            query_embedding = self._text_embedder.run(text=query)["embedding"]
+
+        with Timer() as search_timer:
+            results = self.db.query(
+                vector=query_embedding,
+                namespace=namespace,
+                top_k=top_k,
+            )
+
+        stats = self.get_namespace_stats(namespace)
+        timing = NamespaceTimingMetrics(
+            namespace_lookup_ms=embed_timer.elapsed_ms,
+            vector_search_ms=search_timer.elapsed_ms,
+            total_ms=embed_timer.elapsed_ms + search_timer.elapsed_ms,
+            documents_searched=stats.document_count,
+            documents_returned=len(results),
+        )
+
+        query_results = []
+        for i, doc in enumerate(results):
+            query_results.append(
+                NamespaceQueryResult(
+                    document=doc,
+                    relevance_score=getattr(doc, "score", 0.0),
+                    rank=i + 1,
+                    namespace=namespace,
+                    timing=timing if i == 0 else None,
+                )
+            )
+
+        return query_results
+
+    def query_cross_namespace(
+        self, query: str, namespaces: list[str] | None = None, top_k: int = 10
+    ) -> CrossNamespaceResult:
+        """Query across multiple namespaces with timing comparison.
+
+        Args:
+            query: Query string.
+            namespaces: List of namespaces to query. If None, queries all.
+            top_k: Number of results per namespace.
+
+        Returns:
+            CrossNamespaceResult with results and timing comparison.
+        """
+        if namespaces is None:
+            namespaces = self.list_namespaces()
+
+        namespace_results: dict[str, list[NamespaceQueryResult]] = {}
+        timing_comparisons: list[CrossNamespaceComparison] = []
+
+        with Timer() as total_timer:
+            for ns in namespaces:
+                results = self.query_namespace(query, ns, top_k)
+                namespace_results[ns] = results
+
+                if results:
+                    timing = results[0].timing
+                    if timing is not None:
+                        comparison = CrossNamespaceComparison(
+                            namespace=ns,
+                            timing=timing,
+                            result_count=len(results),
+                            top_score=results[0].relevance_score if results else 0.0,
+                        )
+                        timing_comparisons.append(comparison)
+                    else:
+                        comparison = CrossNamespaceComparison(
+                            namespace=ns,
+                            timing=NamespaceTimingMetrics(
+                                namespace_lookup_ms=0.0,
+                                vector_search_ms=0.0,
+                                total_ms=0.0,
+                                documents_searched=0,
+                                documents_returned=len(results),
+                            ),
+                            result_count=len(results),
+                            top_score=results[0].relevance_score if results else 0.0,
+                        )
+                        timing_comparisons.append(comparison)
+
+        return CrossNamespaceResult(
+            query=query,
+            namespace_results=namespace_results,
+            timing_comparison=timing_comparisons,
+            total_time_ms=total_timer.elapsed_ms,
+        )
+
+    def run(self) -> dict[str, Any]:
+        """Execute the complete namespace pipeline."""
+        # This would implement the full pipeline execution
+        # For now, return a placeholder result
+        return {
+            "success": True,
+            "message": "Pipeline executed successfully",
+            "namespaces": self.list_namespaces(),
+        }

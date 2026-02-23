@@ -1,0 +1,106 @@
+# Chroma metadata filtering configuration for Earnings Calls dataset
+# Production config for financial transcript analysis with temporal filtering
+
+chroma:
+  persist_directory: "${CHROMA_PERSIST_DIR:-./chroma_data/earnings_calls}"
+  collection_name: "earnings_calls_metadata_filtered"
+
+collection:
+  name: "earnings_calls_metadata_filtered"
+  description: "Earnings call transcripts with metadata filtering for financial analysis"
+
+dataloader:
+  type: "haystack"
+  dataset_name: "lamini/earnings-calls-qa"
+  split: "train"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 384
+  batch_size: 32
+
+metadata_filtering:
+  test_query: "What were the quarterly revenue results?"
+
+  schema:
+    - field: "ticker"
+      type: "string"
+      operators: ["eq", "in"]
+      description: "Stock ticker symbol (e.g., AAPL, GOOGL)"
+
+    - field: "year"
+      type: "integer"
+      operators: ["eq", "range", "gt", "gte", "lt", "lte"]
+      description: "Fiscal year of the earnings call"
+
+    - field: "quarter"
+      type: "string"
+      operators: ["eq", "in"]
+      description: "Fiscal quarter (Q1, Q2, Q3, Q4)"
+
+    - field: "date"
+      type: "string"
+      operators: ["eq", "range"]
+      description: "Date of the earnings call"
+
+    - field: "speaker"
+      type: "string"
+      operators: ["eq", "contains", "in"]
+      description: "Speaker name (CEO, CFO, Analyst)"
+
+  test_filters:
+    - name: "by_ticker"
+      description: "Filter by stock ticker symbol"
+      conditions:
+        - field: "ticker"
+          operator: "eq"
+          value: "AAPL"
+
+    - name: "by_year"
+      description: "Filter by fiscal year"
+      conditions:
+        - field: "year"
+          operator: "eq"
+          value: 2023
+
+    - name: "by_quarter"
+      description: "Filter by fiscal quarter"
+      conditions:
+        - field: "quarter"
+          operator: "eq"
+          value: "Q4"
+
+    - name: "by_speaker_role"
+      description: "Filter by speaker role"
+      conditions:
+        - field: "speaker"
+          operator: "contains"
+          value: "CEO"
+
+    - name: "combined_temporal"
+      description: "Filter by ticker, year, and quarter"
+      conditions:
+        - field: "ticker"
+          operator: "in"
+          value: ["AAPL", "GOOGL", "MSFT"]
+        - field: "year"
+          operator: "gte"
+          value: 2022
+        - field: "quarter"
+          operator: "in"
+          value: ["Q3", "Q4"]
+
+    - name: "executive_commentary"
+      description: "Filter for executive speakers in recent years"
+      conditions:
+        - field: "speaker"
+          operator: "in"
+          value: ["CEO", "CFO", "COO"]
+        - field: "year"
+          operator: "gte"
+          value: 2021
+
+logging:
+  level: "INFO"
+  name: "chroma_earnings_calls_metadata_filtering"

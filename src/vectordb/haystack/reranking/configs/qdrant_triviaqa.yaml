@@ -1,0 +1,41 @@
+# QDRANT Reranking Pipeline - TriviaQA Dataset
+
+qdrant:
+  host: "${QDRANT_HOST:-localhost}"
+  port: "${QDRANT_PORT:-6333}"
+  api_key: "${QDRANT_API_KEY:-}"
+
+collection:
+  name: "triviaqa_reranking"
+
+dataloader:
+  type: "triviaqa"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  split: "test"
+  limit: null
+
+generator:
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY:-}"
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  batch_size: 32
+
+reranker:
+  type: "cross_encoder"
+  model: "BAAI/bge-reranker-v2-m3"
+  top_k: 5
+
+evaluation:
+  enabled: true
+  metrics:
+    - contextual_recall
+    - contextual_precision
+    - answer_relevancy
+    - faithfulness
+
+logging:
+  name: "qdrant_reranking"
+  level: "INFO"

@@ -1,0 +1,27 @@
+# Milvus Hybrid Indexing Configuration
+# Indexes TriviaQA dataset with dense + sparse embeddings
+
+dataloader:
+  type: "triviaqa"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  split: "test"
+  limit: null  # Set to integer to limit docs for testing
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  sparse_model: "prithivida/Splade_PP_en_v2"
+  device: "cpu"
+  batch_size: 32
+
+milvus:
+  uri: "${MILVUS_URI:-http://localhost:19530}"
+  token: "${MILVUS_TOKEN:-}"
+  collection_name: "triviaqa_hybrid"
+  dimension: 384  # all-MiniLM-L6-v2 dimension
+  recreate: false
+  batch_size: 100
+
+logging:
+  name: "milvus_hybrid"
+  level: "INFO"

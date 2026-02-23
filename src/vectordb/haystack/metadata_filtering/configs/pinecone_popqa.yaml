@@ -1,0 +1,60 @@
+# Pinecone metadata filtering configuration for PopQA dataset
+# Production config for popular knowledge question-answering
+
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "popqa-metadata-filtered"
+  environment: "${PINECONE_ENV:-us-west1-gcp}"
+
+collection:
+  name: "popqa_metadata_filtered"
+  description: "PopQA long-tail dataset with metadata filtering for popular knowledge QA"
+
+dataloader:
+  type: "haystack"
+  dataset_name: "akariasai/PopQA"
+  split: "test"
+  limit: 1000
+
+embeddings:
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 384
+  batch_size: 32
+
+metadata_filtering:
+  test_query: "Who wrote Romeo and Juliet?"
+
+  schema:
+    - field: "question"
+      type: "string"
+      operators: ["eq", "contains"]
+      description: "Original question text"
+
+    - field: "id"
+      type: "string"
+      operators: ["eq", "in"]
+      description: "Context document ID"
+
+    - field: "title"
+      type: "string"
+      operators: ["eq", "contains", "in"]
+      description: "Wikipedia article title"
+
+  test_filters:
+    - name: "by_title"
+      description: "Filter by specific Wikipedia article title"
+      conditions:
+        - field: "title"
+          operator: "eq"
+          value: "William Shakespeare"
+
+    - name: "multiple_titles"
+      description: "Filter by multiple possible titles"
+      conditions:
+        - field: "title"
+          operator: "in"
+          value: ["William Shakespeare", "Romeo and Juliet", "Hamlet"]
+
+logging:
+  level: "INFO"
+  name: "pinecone_popqa_metadata_filtering"
