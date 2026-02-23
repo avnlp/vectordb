@@ -24,48 +24,90 @@ env:
   FORCE_COLOR: "1"
 
 jobs:
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  deps-py311:
+    name: Dependencies (Python 3.11)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.14"]
 
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
 
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: "pyproject.toml"
+          cache-suffix: "py311"
+          save-cache: true
 
       - name: Install dependencies
-        run: make sync
+        run: uv sync --all-groups
+
+      - name: Prune uv cache for CI
+        run: uv cache prune --ci
+
+  deps-py314:
+    name: Dependencies (Python 3.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          cache-suffix: "py314"
+          save-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Prune uv cache for CI
+        run: uv cache prune --ci
+
+  test-py311:
+    name: Test and Lint (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: deps-py311
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          cache-suffix: "py311"
+          save-cache: false
+
+      - name: Install dependencies
+        run: uv sync --all-groups
 
       - name: Lint & type check
-        if: matrix.python-version == '3.11'
         run: |
           make lint-check
           make lint-typing
 
       - name: Run tests with coverage
-        if: matrix.python-version == '3.11'
         run: make test-ci
         env:
           PYTHONPATH: ${{ github.workspace }}/src
 
-      - name: Run tests
-        if: matrix.python-version != '3.11'
-        run: make test
-
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -77,38 +119,67 @@ jobs:
           slug: avnlp/vectordb
         env:
           OS: ubuntu-latest
-          PYTHON: ${{ matrix.python-version }}
+          PYTHON: "3.11"
 
       - name: Upload test results
-        if: matrix.python-version == '3.11' && always()
+        if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: pytest-results-${{ matrix.python-version }}
+          name: pytest-results-3.11
           path: pytest-results.xml
           retention-days: 30
+
+  test-py314:
+    name: Tests (Python 3.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: deps-py314
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          cache-suffix: "py314"
+          save-cache: false
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run tests
+        run: make test
 
   security-scan:
     name: Security Scanning
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: deps-py311
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
       - uses: actions/setup-python@v6
         with:
           python-version-file: ".python-version"
 
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          cache-suffix: "py311"
+          save-cache: false
+
       - name: Install dependencies
-        run: make sync
+        run: uv sync --all-groups
 
       - name: Run Bandit security scan
         run: make security-bandit
