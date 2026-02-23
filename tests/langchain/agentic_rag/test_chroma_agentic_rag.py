@@ -1132,7 +1132,10 @@ class TestChromaAgenticRAGPipelineRun:
         mock_router.route.side_effect = [
             {"action": "search", "reasoning": "Iteration 1: search"},
             {"action": "search", "reasoning": "Iteration 2: search again"},
-            {"action": "reflect", "reasoning": "Iteration 3: reflect"},
+            {
+                "action": "search",
+                "reasoning": "Iteration 3: search again to hit max iterations",
+            },
         ]
         mock_router_class.return_value = mock_router
 

@@ -243,15 +243,24 @@ class ChromaAgenticRAGPipeline(AgenticRAGPipeline):
             elif action == "reflect":
                 logger.info("Executing REFLECT action")
 
+                # If no answer exists yet, generate a draft to reflect on.
+                if retrieved_documents and not current_answer:
+                    current_answer = RAGHelper.generate(
+                        self.llm, query, retrieved_documents
+                    )
+                    step_record["draft_answer_generated"] = True
+
                 # Reflection evaluates answer quality and identifies gaps
-                # Only reflect if we have both documents and a current answer
                 if retrieved_documents and current_answer:
+                    documents_context = "\n".join(
+                        doc.page_content for doc in retrieved_documents[:3]
+                    )
                     reflection_prompt = (
                         f"Given the following documents and answer, is the answer "
                         f"accurate, complete, and well-supported by the documents? "
                         f"Suggest improvements if needed.\n\n"
                         f"Documents:\n"
-                        f"{chr(10).join([doc.page_content for doc in retrieved_documents[:3]])}\n\n"
+                        f"{documents_context}\n\n"
                         f"Current Answer: {current_answer}"
                     )
 
