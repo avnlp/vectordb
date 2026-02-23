@@ -5,7 +5,6 @@ collection:
   description: FACTSCORE Milvus RAG
   name: factscore_milvus_rag
 dataloader:
-  dataloader:
   dataset_name: dskar/FActScore
   limit: null
   split: test
@@ -38,7 +37,7 @@ indexing:
     method: scalar
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: milvus_factscore_rag

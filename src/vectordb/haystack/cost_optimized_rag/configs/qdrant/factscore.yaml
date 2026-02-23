@@ -8,7 +8,6 @@ collection:
   description: FACTSCORE with cost-optimized RAG
 dataloader:
   type: factscore
-  dataloader:
   dataset_name: dskar/FActScore
   split: test
   limit: null
@@ -38,7 +37,7 @@ indexing:
     method: scalar
     compression_ratio: 4.0
   vector_config:
-    size: 384
+    size: 1024
     distance: Cosine
   payload_indexes: []
 search:

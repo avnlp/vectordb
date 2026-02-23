@@ -7,7 +7,6 @@ collection:
   description: FACTSCORE Chroma RAG
   name: factscore_chroma_rag
 dataloader:
-  dataloader:
   dataset_name: dskar/FActScore
   limit: null
   split: test
@@ -32,7 +31,7 @@ indexing:
     enabled: false
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: chroma_factscore_rag

@@ -5,7 +5,6 @@ collection:
   description: POPQA Milvus RAG
   name: popqa_milvus_rag
 dataloader:
-  dataloader:
   dataset_name: akariasai/PopQA
   limit: null
   split: test
@@ -38,7 +37,7 @@ indexing:
     method: scalar
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: milvus_popqa_rag

@@ -38,7 +38,7 @@ indexing:
     method: scalar
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: milvus_triviaqa_rag

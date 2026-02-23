@@ -5,7 +5,6 @@ collection:
   description: TRIVIAQA Pinecone RAG
   name: triviaqa_pinecone_rag
 dataloader:
-  dataloader:
   dataset_name: trivia_qa
   config: rc
   limit: null
@@ -32,7 +31,7 @@ indexing:
     method: pq
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: pinecone_triviaqa_rag

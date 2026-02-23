@@ -29,7 +29,7 @@ indexing:
     method: scalar
     compression_ratio: 4.0
   vector_config:
-    size: 384
+    size: 1024
     distance: Cosine
   payload_indexes: []
 search:

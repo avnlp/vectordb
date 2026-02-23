@@ -223,10 +223,10 @@ class TestMilvusCostOptimizedRag:
         mock_hit = MagicMock()
         mock_hit.id = "doc1"
         mock_hit.distance = 0.05
-        mock_hit.entity.get.side_effect = lambda k, default: {
+        mock_hit.entity.get.side_effect = {
             "content": "Test content 1",
             "metadata": {"source": "test"},
-        }.get(k, default)
+        }.get
 
         mock_search_result = [[mock_hit]]
 

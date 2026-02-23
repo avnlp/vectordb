@@ -8,7 +8,6 @@ collection:
   description: ARC with cost-optimized RAG
 dataloader:
   type: arc
-  dataloader:
   dataset_name: ai2_arc
   config: ARC-Challenge
   split: test
@@ -31,7 +30,7 @@ indexing:
     method: scalar
     compression_ratio: 4.0
   vector_config:
-    size: 384
+    size: 1024
     distance: Cosine
   payload_indexes: []
 search:

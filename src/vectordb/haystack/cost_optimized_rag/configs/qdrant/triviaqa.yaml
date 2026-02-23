@@ -8,7 +8,6 @@ collection:
   description: TriviaQA with cost-optimized RAG indexing
 dataloader:
   type: triviaqa
-  dataloader:
   dataset_name: trivia_qa
   config: rc
   split: test

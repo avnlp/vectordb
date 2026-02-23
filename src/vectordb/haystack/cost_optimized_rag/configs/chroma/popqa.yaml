@@ -7,7 +7,6 @@ collection:
   description: POPQA Chroma RAG
   name: popqa_chroma_rag
 dataloader:
-  dataloader:
   dataset_name: akariasai/PopQA
   limit: null
   split: test
@@ -32,7 +31,7 @@ indexing:
     enabled: false
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: chroma_popqa_rag

@@ -5,7 +5,6 @@ collection:
   description: TRIVIAQA Weaviate RAG
   name: Triviaqa
 dataloader:
-  dataloader:
   dataset_name: trivia_qa
   config: rc
   limit: null
@@ -31,7 +30,7 @@ indexing:
     enabled: false
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: weaviate_triviaqa_rag

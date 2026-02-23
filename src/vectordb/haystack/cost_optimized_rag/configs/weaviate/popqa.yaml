@@ -5,7 +5,6 @@ collection:
   description: POPQA Weaviate RAG
   name: Popqa
 dataloader:
-  dataloader:
   dataset_name: akariasai/PopQA
   limit: null
   split: test
@@ -30,7 +29,7 @@ indexing:
     enabled: false
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: weaviate_popqa_rag

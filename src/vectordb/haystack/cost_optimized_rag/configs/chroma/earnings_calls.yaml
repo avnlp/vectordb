@@ -23,7 +23,7 @@ indexing:
     enabled: false
   vector_config:
     distance: Cosine
-    size: 384
+    size: 1024
 logging:
   level: INFO
   name: chroma_earnings_calls_rag
