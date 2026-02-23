@@ -25,7 +25,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class QdrantReankingIndexingPipeline:
+class QdrantRerankingIndexingPipeline:
     """Indexing pipeline for Qdrant with reranking support.
 
     This pipeline loads documents, generates embeddings, and indexes them
@@ -44,16 +44,18 @@ class QdrantReankingIndexingPipeline:
         collection_name: Name of the Qdrant collection
 
     Example:
-        >>> pipeline = QdrantReankingIndexingPipeline("config.yaml")
+        >>> pipeline = QdrantRerankingIndexingPipeline("config.yaml")
         >>> result = pipeline.run()
         >>> print(f"Indexed {result['documents_indexed']} documents to Qdrant")
 
     Configuration Requirements:
-        The config file must specify:
+        The config dict (or YAML file) must contain a top-level ``qdrant`` key
+        with the following fields:
+
         - qdrant.url: Qdrant server URL (default: http://localhost:6333)
         - qdrant.api_key: API key for authenticated instances (optional)
         - qdrant.collection_name: Target collection name (default: "reranking")
-        - embedder: Embedding model configuration
+        - embeddings: Embedding model configuration
         - dataloader: Data source configuration
     """
 
@@ -61,11 +63,12 @@ class QdrantReankingIndexingPipeline:
         """Initialize the Qdrant indexing pipeline.
 
         Loads configuration, initializes the embedding model, and connects
-        to the Qdrant vector database.
+        to the Qdrant vector database via ``QdrantVectorDB(config=...)``.
 
         Args:
-            config_or_path: Either a configuration dictionary or path to
-                a YAML configuration file.
+            config_or_path: Configuration dictionary containing a top-level
+                ``qdrant`` key, or a path to a YAML file with the same
+                structure.
 
         Raises:
             ValueError: If required configuration keys are missing.
@@ -77,12 +80,9 @@ class QdrantReankingIndexingPipeline:
 
         self.embedder = EmbedderHelper.create_embedder(self.config)
 
-        qdrant_config = self.config["qdrant"]
-        self.db = QdrantVectorDB(
-            url=qdrant_config.get("url", "http://localhost:6333"),
-            api_key=qdrant_config.get("api_key"),
-        )
+        self.db = QdrantVectorDB(config=self.config)
 
+        qdrant_config = self.config["qdrant"]
         self.collection_name = qdrant_config.get("collection_name", "reranking")
 
         logger.info("Initialized Qdrant reranking indexing pipeline (LangChain)")

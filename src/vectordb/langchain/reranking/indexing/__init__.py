@@ -3,21 +3,21 @@
 This module provides document indexing pipelines for reranking-based retrieval.
 """
 
-from vectordb.langchain.reranking.indexing.chroma import ChromaReankingIndexingPipeline
-from vectordb.langchain.reranking.indexing.milvus import MilvusReankingIndexingPipeline
+from vectordb.langchain.reranking.indexing.chroma import ChromaRerankingIndexingPipeline
+from vectordb.langchain.reranking.indexing.milvus import MilvusRerankingIndexingPipeline
 from vectordb.langchain.reranking.indexing.pinecone import (
-    PineconeReankingIndexingPipeline,
+    PineconeRerankingIndexingPipeline,
 )
-from vectordb.langchain.reranking.indexing.qdrant import QdrantReankingIndexingPipeline
+from vectordb.langchain.reranking.indexing.qdrant import QdrantRerankingIndexingPipeline
 from vectordb.langchain.reranking.indexing.weaviate import (
-    WeaviateReankingIndexingPipeline,
+    WeaviateRerankingIndexingPipeline,
 )
 
 
 __all__ = [
-    "ChromaReankingIndexingPipeline",
-    "MilvusReankingIndexingPipeline",
-    "PineconeReankingIndexingPipeline",
-    "QdrantReankingIndexingPipeline",
-    "WeaviateReankingIndexingPipeline",
+    "ChromaRerankingIndexingPipeline",
+    "MilvusRerankingIndexingPipeline",
+    "PineconeRerankingIndexingPipeline",
+    "QdrantRerankingIndexingPipeline",
+    "WeaviateRerankingIndexingPipeline",
 ]

@@ -14,6 +14,8 @@ The pipeline supports:
 import logging
 from typing import Any
 
+from haystack.dataclasses import Document
+
 from vectordb.databases.milvus import MilvusVectorDB
 from vectordb.dataloaders import DataloaderCatalog
 from vectordb.langchain.utils import (
@@ -25,7 +27,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class MilvusReankingIndexingPipeline:
+class MilvusRerankingIndexingPipeline:
     """Indexing pipeline for Milvus with reranking support.
 
     This pipeline loads documents, generates embeddings, and indexes them
@@ -44,7 +46,7 @@ class MilvusReankingIndexingPipeline:
         collection_name: Name of the Milvus collection
 
     Example:
-        >>> pipeline = MilvusReankingIndexingPipeline("config.yaml")
+        >>> pipeline = MilvusRerankingIndexingPipeline("config.yaml")
         >>> result = pipeline.run()
         >>> print(f"Indexed {result['documents_indexed']} documents to Milvus")
 
@@ -53,7 +55,7 @@ class MilvusReankingIndexingPipeline:
         - milvus.host: Milvus server host (default: localhost)
         - milvus.port: Milvus server port (default: 19530)
         - milvus.collection_name: Target collection name (default: "reranking")
-        - embedder: Embedding model configuration
+        - embeddings: Embedding model configuration
         - dataloader: Data source configuration
     """
 
@@ -91,7 +93,7 @@ class MilvusReankingIndexingPipeline:
         """Execute the complete indexing pipeline.
 
         Loads documents from the configured data source, generates embeddings,
-        and upserts all documents into the Milvus collection.
+        and inserts all documents into the Milvus collection.
 
         Returns:
             Dictionary with indexing results:
@@ -103,8 +105,9 @@ class MilvusReankingIndexingPipeline:
         Pipeline Steps:
             1. Load documents from configured data source
             2. Generate embeddings for all documents using embedder
-            3. Upsert documents with embeddings to Milvus collection
-            4. Return count of indexed documents
+            3. Attach embeddings to Haystack Document objects
+            4. Insert documents to Milvus collection
+            5. Return count of indexed documents
         """
         limit = self.config.get("dataloader", {}).get("limit")
         dl_config = self.config.get("dataloader", {})
@@ -124,11 +127,20 @@ class MilvusReankingIndexingPipeline:
         docs, embeddings = EmbedderHelper.embed_documents(self.embedder, documents)
         logger.info("Generated embeddings for %d documents", len(docs))
 
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
+        haystack_docs = [
+            Document(
+                content=doc.page_content,
+                embedding=embedding,
+                meta=doc.metadata or {},
+            )
+            for doc, embedding in zip(docs, embeddings)
+        ]
+
+        self.db.insert_documents(
+            documents=haystack_docs,
             collection_name=self.collection_name,
         )
+        num_indexed = len(haystack_docs)
         logger.info("Indexed %d documents to Milvus", num_indexed)
 
         return {"documents_indexed": num_indexed}

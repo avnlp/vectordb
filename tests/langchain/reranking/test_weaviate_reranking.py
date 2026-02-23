@@ -18,7 +18,7 @@ class TestWeaviateRerankingIndexing:
     ):
         """Test pipeline initialization."""
         from vectordb.langchain.reranking.indexing.weaviate import (
-            WeaviateReankingIndexingPipeline,
+            WeaviateRerankingIndexingPipeline,
         )
 
         config = {
@@ -31,7 +31,7 @@ class TestWeaviateRerankingIndexing:
             },
         }
 
-        pipeline = WeaviateReankingIndexingPipeline(config)
+        pipeline = WeaviateRerankingIndexingPipeline(config)
         assert pipeline.config == config
         assert pipeline.collection_name == "TestReranking"
 
@@ -52,7 +52,7 @@ class TestWeaviateRerankingIndexing:
     ):
         """Test indexing with documents."""
         from vectordb.langchain.reranking.indexing.weaviate import (
-            WeaviateReankingIndexingPipeline,
+            WeaviateRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -87,7 +87,7 @@ class TestWeaviateRerankingIndexing:
             },
         }
 
-        pipeline = WeaviateReankingIndexingPipeline(config)
+        pipeline = WeaviateRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
@@ -103,7 +103,7 @@ class TestWeaviateRerankingIndexing:
     ):
         """Test indexing with no documents."""
         from vectordb.langchain.reranking.indexing.weaviate import (
-            WeaviateReankingIndexingPipeline,
+            WeaviateRerankingIndexingPipeline,
         )
 
         mock_dataset = MagicMock()
@@ -122,7 +122,7 @@ class TestWeaviateRerankingIndexing:
             },
         }
 
-        pipeline = WeaviateReankingIndexingPipeline(config)
+        pipeline = WeaviateRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == 0
@@ -138,7 +138,7 @@ class TestWeaviateRerankingIndexing:
     ):
         """Test indexing with default collection name."""
         from vectordb.langchain.reranking.indexing.weaviate import (
-            WeaviateReankingIndexingPipeline,
+            WeaviateRerankingIndexingPipeline,
         )
 
         config = {
@@ -149,7 +149,7 @@ class TestWeaviateRerankingIndexing:
             },
         }
 
-        pipeline = WeaviateReankingIndexingPipeline(config)
+        pipeline = WeaviateRerankingIndexingPipeline(config)
         assert pipeline.collection_name == "Reranking"
 
 
@@ -169,7 +169,7 @@ class TestWeaviateRerankingSearch:
     ):
         """Test search pipeline initialization."""
         from vectordb.langchain.reranking.search.weaviate import (
-            WeaviateReankingSearchPipeline,
+            WeaviateRerankingSearchPipeline,
         )
 
         mock_llm_helper.return_value = None
@@ -186,7 +186,7 @@ class TestWeaviateRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = WeaviateReankingSearchPipeline(config)
+        pipeline = WeaviateRerankingSearchPipeline(config)
         assert pipeline.config == config
         assert pipeline.llm is None
 
@@ -211,7 +211,7 @@ class TestWeaviateRerankingSearch:
     ):
         """Test search execution."""
         from vectordb.langchain.reranking.search.weaviate import (
-            WeaviateReankingSearchPipeline,
+            WeaviateRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -246,7 +246,7 @@ class TestWeaviateRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = WeaviateReankingSearchPipeline(config)
+        pipeline = WeaviateRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -276,7 +276,7 @@ class TestWeaviateRerankingSearch:
     ):
         """Test search with RAG generation."""
         from vectordb.langchain.reranking.search.weaviate import (
-            WeaviateReankingSearchPipeline,
+            WeaviateRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -310,7 +310,7 @@ class TestWeaviateRerankingSearch:
             "rag": {"enabled": True},
         }
 
-        pipeline = WeaviateReankingSearchPipeline(config)
+        pipeline = WeaviateRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -337,7 +337,7 @@ class TestWeaviateRerankingSearch:
     ):
         """Test search with filters."""
         from vectordb.langchain.reranking.search.weaviate import (
-            WeaviateReankingSearchPipeline,
+            WeaviateRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -368,7 +368,7 @@ class TestWeaviateRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = WeaviateReankingSearchPipeline(config)
+        pipeline = WeaviateRerankingSearchPipeline(config)
         filters = {"source": "wiki"}
         result = pipeline.search("test query", top_k=10, rerank_k=5, filters=filters)
 
@@ -398,7 +398,7 @@ class TestWeaviateRerankingSearch:
     ):
         """Test search with empty results."""
         from vectordb.langchain.reranking.search.weaviate import (
-            WeaviateReankingSearchPipeline,
+            WeaviateRerankingSearchPipeline,
         )
 
         mock_embed_query.return_value = [0.1] * 384
@@ -422,7 +422,7 @@ class TestWeaviateRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = WeaviateReankingSearchPipeline(config)
+        pipeline = WeaviateRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"

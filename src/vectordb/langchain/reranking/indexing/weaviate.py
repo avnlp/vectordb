@@ -25,7 +25,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class WeaviateReankingIndexingPipeline:
+class WeaviateRerankingIndexingPipeline:
     """Indexing pipeline for Weaviate with reranking support.
 
     This pipeline loads documents, generates embeddings, and indexes them
@@ -44,7 +44,7 @@ class WeaviateReankingIndexingPipeline:
         collection_name: Name of the Weaviate collection/class
 
     Example:
-        >>> pipeline = WeaviateReankingIndexingPipeline("config.yaml")
+        >>> pipeline = WeaviateRerankingIndexingPipeline("config.yaml")
         >>> result = pipeline.run()
         >>> print(f"Indexed {result['documents_indexed']} documents to Weaviate")
 
@@ -53,7 +53,7 @@ class WeaviateReankingIndexingPipeline:
         - weaviate.url: Weaviate instance URL
         - weaviate.api_key: API key (optional for local instances)
         - weaviate.collection_name: Target collection name (default: "Reranking")
-        - embedder: Embedding model configuration
+        - embeddings: Embedding model configuration
         - dataloader: Data source configuration
     """
 
@@ -79,7 +79,7 @@ class WeaviateReankingIndexingPipeline:
 
         weaviate_config = self.config["weaviate"]
         self.db = WeaviateVectorDB(
-            url=weaviate_config["url"],
+            cluster_url=weaviate_config["url"],
             api_key=weaviate_config.get("api_key"),
         )
 

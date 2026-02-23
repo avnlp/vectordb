@@ -35,7 +35,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class MilvusReankingSearchPipeline:
+class MilvusRerankingSearchPipeline:
     """Search pipeline with reranking for Milvus (LangChain).
 
     This pipeline implements two-stage retrieval with cross-encoder reranking
@@ -57,7 +57,7 @@ class MilvusReankingSearchPipeline:
         llm: Optional LLM for RAG answer generation
 
     Example:
-        >>> pipeline = MilvusReankingSearchPipeline("config.yaml")
+        >>> pipeline = MilvusRerankingSearchPipeline("config.yaml")
         >>> results = pipeline.search(
         ...     query="deep learning optimization techniques", top_k=200, rerank_k=20
         ... )

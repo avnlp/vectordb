@@ -34,7 +34,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class WeaviateReankingSearchPipeline:
+class WeaviateRerankingSearchPipeline:
     """Search pipeline with reranking for Weaviate (LangChain).
 
     This pipeline implements two-stage retrieval with cross-encoder reranking
@@ -55,7 +55,7 @@ class WeaviateReankingSearchPipeline:
         llm: Optional LLM for RAG answer generation
 
     Example:
-        >>> pipeline = WeaviateReankingSearchPipeline("config.yaml")
+        >>> pipeline = WeaviateRerankingSearchPipeline("config.yaml")
         >>> results = pipeline.search(
         ...     query="climate change effects",
         ...     top_k=40,
@@ -146,10 +146,10 @@ class WeaviateReankingSearchPipeline:
         logger.info("Embedded query: %s", query[:50])
 
         candidates = self.db.query(
-            query_embedding=query_embedding,
-            top_k=top_k,
+            vector=query_embedding,
+            limit=top_k,
             filters=filters,
-            collection_name=self.collection_name,
+            return_documents=True,
         )
         logger.info("Retrieved %d candidate documents from Weaviate", len(candidates))
 

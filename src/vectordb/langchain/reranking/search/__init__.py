@@ -3,17 +3,17 @@
 This module provides search pipelines with cross-encoder reranking.
 """
 
-from vectordb.langchain.reranking.search.chroma import ChromaReankingSearchPipeline
-from vectordb.langchain.reranking.search.milvus import MilvusReankingSearchPipeline
-from vectordb.langchain.reranking.search.pinecone import PineconeReankingSearchPipeline
-from vectordb.langchain.reranking.search.qdrant import QdrantReankingSearchPipeline
-from vectordb.langchain.reranking.search.weaviate import WeaviateReankingSearchPipeline
+from vectordb.langchain.reranking.search.chroma import ChromaRerankingSearchPipeline
+from vectordb.langchain.reranking.search.milvus import MilvusRerankingSearchPipeline
+from vectordb.langchain.reranking.search.pinecone import PineconeRerankingSearchPipeline
+from vectordb.langchain.reranking.search.qdrant import QdrantRerankingSearchPipeline
+from vectordb.langchain.reranking.search.weaviate import WeaviateRerankingSearchPipeline
 
 
 __all__ = [
-    "ChromaReankingSearchPipeline",
-    "MilvusReankingSearchPipeline",
-    "PineconeReankingSearchPipeline",
-    "QdrantReankingSearchPipeline",
-    "WeaviateReankingSearchPipeline",
+    "ChromaRerankingSearchPipeline",
+    "MilvusRerankingSearchPipeline",
+    "PineconeRerankingSearchPipeline",
+    "QdrantRerankingSearchPipeline",
+    "WeaviateRerankingSearchPipeline",
 ]

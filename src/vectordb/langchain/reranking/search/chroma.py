@@ -33,7 +33,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class ChromaReankingSearchPipeline:
+class ChromaRerankingSearchPipeline:
     """Search pipeline with reranking for Chroma (LangChain).
 
     This pipeline implements two-stage retrieval with cross-encoder reranking
@@ -54,7 +54,7 @@ class ChromaReankingSearchPipeline:
         llm: Optional LLM for RAG answer generation
 
     Example:
-        >>> pipeline = ChromaReankingSearchPipeline("config.yaml")
+        >>> pipeline = ChromaRerankingSearchPipeline("config.yaml")
         >>> results = pipeline.search(
         ...     query="machine learning tutorials", top_k=30, rerank_k=5
         ... )
@@ -138,12 +138,13 @@ class ChromaReankingSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        candidates = self.db.query(
+        self.db._get_collection(self.collection_name)
+        results_dict = self.db.query(
             query_embedding=query_embedding,
-            top_k=top_k,
-            filters=filters,
-            collection_name=self.collection_name,
+            n_results=top_k,
+            where=filters,
         )
+        candidates = self.db.query_to_documents(results_dict)
         logger.info("Retrieved %d candidate documents from Chroma", len(candidates))
 
         reranked_docs = RerankerHelper.rerank(

@@ -18,7 +18,7 @@ class TestPineconeRerankingIndexing:
     ):
         """Test pipeline initialization."""
         from vectordb.langchain.reranking.indexing.pinecone import (
-            PineconeReankingIndexingPipeline,
+            PineconeRerankingIndexingPipeline,
         )
 
         config = {
@@ -33,7 +33,7 @@ class TestPineconeRerankingIndexing:
             },
         }
 
-        pipeline = PineconeReankingIndexingPipeline(config)
+        pipeline = PineconeRerankingIndexingPipeline(config)
         assert pipeline.config == config
         assert pipeline.index_name == "test-index"
         assert pipeline.namespace == "test-namespace"
@@ -55,7 +55,7 @@ class TestPineconeRerankingIndexing:
     ):
         """Test indexing with documents."""
         from vectordb.langchain.reranking.indexing.pinecone import (
-            PineconeReankingIndexingPipeline,
+            PineconeRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -93,7 +93,7 @@ class TestPineconeRerankingIndexing:
             },
         }
 
-        pipeline = PineconeReankingIndexingPipeline(config)
+        pipeline = PineconeRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
@@ -110,7 +110,7 @@ class TestPineconeRerankingIndexing:
     ):
         """Test indexing with no documents."""
         from vectordb.langchain.reranking.indexing.pinecone import (
-            PineconeReankingIndexingPipeline,
+            PineconeRerankingIndexingPipeline,
         )
 
         mock_dataset = MagicMock()
@@ -131,7 +131,7 @@ class TestPineconeRerankingIndexing:
             },
         }
 
-        pipeline = PineconeReankingIndexingPipeline(config)
+        pipeline = PineconeRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == 0
@@ -153,7 +153,7 @@ class TestPineconeRerankingIndexing:
     ):
         """Test indexing with recreate option."""
         from vectordb.langchain.reranking.indexing.pinecone import (
-            PineconeReankingIndexingPipeline,
+            PineconeRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -188,7 +188,7 @@ class TestPineconeRerankingIndexing:
             },
         }
 
-        pipeline = PineconeReankingIndexingPipeline(config)
+        pipeline = PineconeRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
@@ -213,7 +213,7 @@ class TestPineconeRerankingSearch:
     ):
         """Test search pipeline initialization."""
         from vectordb.langchain.reranking.search.pinecone import (
-            PineconeReankingSearchPipeline,
+            PineconeRerankingSearchPipeline,
         )
 
         mock_llm_helper.return_value = None
@@ -230,7 +230,7 @@ class TestPineconeRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = PineconeReankingSearchPipeline(config)
+        pipeline = PineconeRerankingSearchPipeline(config)
         assert pipeline.config == config
         assert pipeline.llm is None
 
@@ -255,7 +255,7 @@ class TestPineconeRerankingSearch:
     ):
         """Test search execution."""
         from vectordb.langchain.reranking.search.pinecone import (
-            PineconeReankingSearchPipeline,
+            PineconeRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -290,7 +290,7 @@ class TestPineconeRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = PineconeReankingSearchPipeline(config)
+        pipeline = PineconeRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -320,7 +320,7 @@ class TestPineconeRerankingSearch:
     ):
         """Test search with RAG generation."""
         from vectordb.langchain.reranking.search.pinecone import (
-            PineconeReankingSearchPipeline,
+            PineconeRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -354,7 +354,7 @@ class TestPineconeRerankingSearch:
             "rag": {"enabled": True},
         }
 
-        pipeline = PineconeReankingSearchPipeline(config)
+        pipeline = PineconeRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -381,7 +381,7 @@ class TestPineconeRerankingSearch:
     ):
         """Test search with filters."""
         from vectordb.langchain.reranking.search.pinecone import (
-            PineconeReankingSearchPipeline,
+            PineconeRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -412,7 +412,7 @@ class TestPineconeRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = PineconeReankingSearchPipeline(config)
+        pipeline = PineconeRerankingSearchPipeline(config)
         filters = {"source": "wiki"}
         result = pipeline.search("test query", top_k=10, rerank_k=5, filters=filters)
 
@@ -442,7 +442,7 @@ class TestPineconeRerankingSearch:
     ):
         """Test search with empty results."""
         from vectordb.langchain.reranking.search.pinecone import (
-            PineconeReankingSearchPipeline,
+            PineconeRerankingSearchPipeline,
         )
 
         mock_embed_query.return_value = [0.1] * 384
@@ -466,7 +466,7 @@ class TestPineconeRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = PineconeReankingSearchPipeline(config)
+        pipeline = PineconeRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"

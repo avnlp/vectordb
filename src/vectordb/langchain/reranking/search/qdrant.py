@@ -34,7 +34,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class QdrantReankingSearchPipeline:
+class QdrantRerankingSearchPipeline:
     """Search pipeline with reranking for Qdrant (LangChain).
 
     This pipeline implements two-stage retrieval with cross-encoder reranking
@@ -55,7 +55,7 @@ class QdrantReankingSearchPipeline:
         llm: Optional LLM for RAG answer generation
 
     Example:
-        >>> pipeline = QdrantReankingSearchPipeline("config.yaml")
+        >>> pipeline = QdrantRerankingSearchPipeline("config.yaml")
         >>> results = pipeline.search(
         ...     query="neural network architectures",
         ...     top_k=100,

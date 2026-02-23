@@ -33,7 +33,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class PineconeReankingSearchPipeline:
+class PineconeRerankingSearchPipeline:
     """Search pipeline with reranking for Pinecone (LangChain).
 
     This pipeline implements two-stage retrieval with cross-encoder reranking
@@ -53,7 +53,7 @@ class PineconeReankingSearchPipeline:
         llm: Optional LLM for RAG answer generation
 
     Example:
-        >>> pipeline = PineconeReankingSearchPipeline("config.yaml")
+        >>> pipeline = PineconeRerankingSearchPipeline("config.yaml")
         >>> results = pipeline.search(
         ...     query="renewable energy technologies",
         ...     top_k=50,

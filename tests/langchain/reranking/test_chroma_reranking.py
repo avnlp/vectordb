@@ -74,7 +74,7 @@ class TestChromaRerankingIndexing:
             mock_db: Mock for ChromaVectorDB class.
         """
         from vectordb.langchain.reranking.indexing.chroma import (
-            ChromaReankingIndexingPipeline,
+            ChromaRerankingIndexingPipeline,
         )
 
         config = {
@@ -86,7 +86,7 @@ class TestChromaRerankingIndexing:
             },
         }
 
-        pipeline = ChromaReankingIndexingPipeline(config)
+        pipeline = ChromaRerankingIndexingPipeline(config)
         assert pipeline.config == config
         assert pipeline.collection_name == "test_reranking"
 
@@ -120,7 +120,7 @@ class TestChromaRerankingIndexing:
             mock_db: Mock for ChromaVectorDB, tracks upsert operation.
         """
         from vectordb.langchain.reranking.indexing.chroma import (
-            ChromaReankingIndexingPipeline,
+            ChromaRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -154,7 +154,7 @@ class TestChromaRerankingIndexing:
             },
         }
 
-        pipeline = ChromaReankingIndexingPipeline(config)
+        pipeline = ChromaRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
@@ -181,7 +181,7 @@ class TestChromaRerankingIndexing:
             mock_db: Mock for ChromaVectorDB (should not be called).
         """
         from vectordb.langchain.reranking.indexing.chroma import (
-            ChromaReankingIndexingPipeline,
+            ChromaRerankingIndexingPipeline,
         )
 
         mock_dataset = MagicMock()
@@ -199,7 +199,7 @@ class TestChromaRerankingIndexing:
             },
         }
 
-        pipeline = ChromaReankingIndexingPipeline(config)
+        pipeline = ChromaRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == 0
@@ -235,7 +235,7 @@ class TestChromaRerankingIndexing:
             mock_db: Mock for ChromaVectorDB.
         """
         from vectordb.langchain.reranking.indexing.chroma import (
-            ChromaReankingIndexingPipeline,
+            ChromaRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -264,7 +264,7 @@ class TestChromaRerankingIndexing:
             },
         }
 
-        pipeline = ChromaReankingIndexingPipeline(config)
+        pipeline = ChromaRerankingIndexingPipeline(config)
         assert pipeline.collection_name == "reranking"
 
 
@@ -307,7 +307,7 @@ class TestChromaRerankingSearch:
             mock_db: Mock for ChromaVectorDB class.
         """
         from vectordb.langchain.reranking.search.chroma import (
-            ChromaReankingSearchPipeline,
+            ChromaRerankingSearchPipeline,
         )
 
         mock_llm_helper.return_value = None
@@ -323,7 +323,7 @@ class TestChromaRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = ChromaReankingSearchPipeline(config)
+        pipeline = ChromaRerankingSearchPipeline(config)
         assert pipeline.config == config
         assert pipeline.llm is None
 
@@ -364,7 +364,7 @@ class TestChromaRerankingSearch:
             mock_db: Mock for ChromaVectorDB with query results.
         """
         from vectordb.langchain.reranking.search.chroma import (
-            ChromaReankingSearchPipeline,
+            ChromaRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -398,7 +398,7 @@ class TestChromaRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = ChromaReankingSearchPipeline(config)
+        pipeline = ChromaRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -445,7 +445,7 @@ class TestChromaRerankingSearch:
             mock_db: Mock for ChromaVectorDB with query results.
         """
         from vectordb.langchain.reranking.search.chroma import (
-            ChromaReankingSearchPipeline,
+            ChromaRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -478,7 +478,7 @@ class TestChromaRerankingSearch:
             "rag": {"enabled": True},
         }
 
-        pipeline = ChromaReankingSearchPipeline(config)
+        pipeline = ChromaRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -519,7 +519,7 @@ class TestChromaRerankingSearch:
             mock_db: Mock for ChromaVectorDB with query results.
         """
         from vectordb.langchain.reranking.search.chroma import (
-            ChromaReankingSearchPipeline,
+            ChromaRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -549,14 +549,14 @@ class TestChromaRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = ChromaReankingSearchPipeline(config)
+        pipeline = ChromaRerankingSearchPipeline(config)
         filters = {"source": "wiki"}
         result = pipeline.search("test query", top_k=10, rerank_k=5, filters=filters)
 
         assert result["query"] == "test query"
         mock_db_inst.query.assert_called_once()
         call_kwargs = mock_db_inst.query.call_args.kwargs
-        assert call_kwargs["filters"] == filters
+        assert call_kwargs["where"] == filters
 
     @patch("vectordb.langchain.reranking.search.chroma.ChromaVectorDB")
     @patch("vectordb.langchain.reranking.search.chroma.EmbedderHelper.create_embedder")
@@ -595,7 +595,7 @@ class TestChromaRerankingSearch:
             mock_db: Mock for ChromaVectorDB returning empty results.
         """
         from vectordb.langchain.reranking.search.chroma import (
-            ChromaReankingSearchPipeline,
+            ChromaRerankingSearchPipeline,
         )
 
         mock_embed_query.return_value = [0.1] * 384
@@ -618,7 +618,7 @@ class TestChromaRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = ChromaReankingSearchPipeline(config)
+        pipeline = ChromaRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"

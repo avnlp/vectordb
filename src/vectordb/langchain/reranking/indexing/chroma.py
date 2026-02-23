@@ -35,7 +35,7 @@ Configuration:
       path: "./chroma_data"  # Local directory for persistence
       collection_name: "reranking"  # Collection for reranking pipeline
 
-    embedder:
+    embeddings:
       model: "sentence-transformers/all-MiniLM-L6-v2"  # First-stage retrieval
 
     cross_encoder:
@@ -79,7 +79,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class ChromaReankingIndexingPipeline:
+class ChromaRerankingIndexingPipeline:
     """Indexing pipeline for Chroma with reranking support.
 
     This pipeline loads documents, generates embeddings, and indexes them
@@ -98,7 +98,7 @@ class ChromaReankingIndexingPipeline:
         collection_name: Name of the Chroma collection
 
     Example:
-        >>> pipeline = ChromaReankingIndexingPipeline("config.yaml")
+        >>> pipeline = ChromaRerankingIndexingPipeline("config.yaml")
         >>> result = pipeline.run()
         >>> print(f"Indexed {result['documents_indexed']} documents to Chroma")
 
@@ -106,7 +106,7 @@ class ChromaReankingIndexingPipeline:
         The config file must specify:
         - chroma.path: Local directory for Chroma persistence
         - chroma.collection_name: Target collection name (default: "reranking")
-        - embedder: Embedding model configuration
+        - embeddings: Embedding model configuration
         - dataloader: Data source configuration
     """
 
@@ -130,11 +130,11 @@ class ChromaReankingIndexingPipeline:
         self.embedder = EmbedderHelper.create_embedder(self.config)
 
         chroma_config = self.config["chroma"]
+        self.collection_name = chroma_config.get("collection_name", "reranking")
         self.db = ChromaVectorDB(
             path=chroma_config.get("path", "./chroma_data"),
+            collection_name=self.collection_name,
         )
-
-        self.collection_name = chroma_config.get("collection_name", "reranking")
 
         logger.info("Initialized Chroma reranking indexing pipeline (LangChain)")
 
@@ -154,7 +154,7 @@ class ChromaReankingIndexingPipeline:
         Pipeline Steps:
             1. Load documents from configured data source
             2. Generate embeddings for all documents using embedder
-            3. Upsert documents with embeddings to Chroma collection
+            3. Build Chroma upsert payload with docs, metadata, and embeddings
             4. Return count of indexed documents
         """
         limit = self.config.get("dataloader", {}).get("limit")
@@ -175,11 +175,15 @@ class ChromaReankingIndexingPipeline:
         docs, embeddings = EmbedderHelper.embed_documents(self.embedder, documents)
         logger.info("Generated embeddings for %d documents", len(docs))
 
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
-            collection_name=self.collection_name,
-        )
+        self.db.create_collection(name=self.collection_name)
+        upsert_data = {
+            "ids": [doc.metadata.get("id", str(i)) for i, doc in enumerate(docs)],
+            "documents": [doc.page_content for doc in docs],
+            "metadatas": [doc.metadata or {} for doc in docs],
+            "embeddings": embeddings,
+        }
+        self.db.upsert(data=upsert_data)
+        num_indexed = len(docs)
         logger.info("Indexed %d documents to Chroma", num_indexed)
 
         return {"documents_indexed": num_indexed}

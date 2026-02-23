@@ -18,7 +18,7 @@ class TestQdrantRerankingIndexing:
     ):
         """Test pipeline initialization."""
         from vectordb.langchain.reranking.indexing.qdrant import (
-            QdrantReankingIndexingPipeline,
+            QdrantRerankingIndexingPipeline,
         )
 
         config = {
@@ -31,7 +31,7 @@ class TestQdrantRerankingIndexing:
             },
         }
 
-        pipeline = QdrantReankingIndexingPipeline(config)
+        pipeline = QdrantRerankingIndexingPipeline(config)
         assert pipeline.config == config
         assert pipeline.collection_name == "test_reranking"
 
@@ -52,7 +52,7 @@ class TestQdrantRerankingIndexing:
     ):
         """Test indexing with documents."""
         from vectordb.langchain.reranking.indexing.qdrant import (
-            QdrantReankingIndexingPipeline,
+            QdrantRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -87,7 +87,7 @@ class TestQdrantRerankingIndexing:
             },
         }
 
-        pipeline = QdrantReankingIndexingPipeline(config)
+        pipeline = QdrantRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
@@ -103,7 +103,7 @@ class TestQdrantRerankingIndexing:
     ):
         """Test indexing with no documents."""
         from vectordb.langchain.reranking.indexing.qdrant import (
-            QdrantReankingIndexingPipeline,
+            QdrantRerankingIndexingPipeline,
         )
 
         mock_dataset = MagicMock()
@@ -122,7 +122,7 @@ class TestQdrantRerankingIndexing:
             },
         }
 
-        pipeline = QdrantReankingIndexingPipeline(config)
+        pipeline = QdrantRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == 0
@@ -138,7 +138,7 @@ class TestQdrantRerankingIndexing:
     ):
         """Test indexing with default collection name."""
         from vectordb.langchain.reranking.indexing.qdrant import (
-            QdrantReankingIndexingPipeline,
+            QdrantRerankingIndexingPipeline,
         )
 
         config = {
@@ -149,7 +149,7 @@ class TestQdrantRerankingIndexing:
             },
         }
 
-        pipeline = QdrantReankingIndexingPipeline(config)
+        pipeline = QdrantRerankingIndexingPipeline(config)
         assert pipeline.collection_name == "reranking"
 
 
@@ -165,7 +165,7 @@ class TestQdrantRerankingSearch:
     ):
         """Test search pipeline initialization."""
         from vectordb.langchain.reranking.search.qdrant import (
-            QdrantReankingSearchPipeline,
+            QdrantRerankingSearchPipeline,
         )
 
         mock_llm_helper.return_value = None
@@ -182,7 +182,7 @@ class TestQdrantRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = QdrantReankingSearchPipeline(config)
+        pipeline = QdrantRerankingSearchPipeline(config)
         assert pipeline.config == config
         assert pipeline.llm is None
 
@@ -203,7 +203,7 @@ class TestQdrantRerankingSearch:
     ):
         """Test search execution."""
         from vectordb.langchain.reranking.search.qdrant import (
-            QdrantReankingSearchPipeline,
+            QdrantRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -238,7 +238,7 @@ class TestQdrantRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = QdrantReankingSearchPipeline(config)
+        pipeline = QdrantRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -264,7 +264,7 @@ class TestQdrantRerankingSearch:
     ):
         """Test search with RAG generation."""
         from vectordb.langchain.reranking.search.qdrant import (
-            QdrantReankingSearchPipeline,
+            QdrantRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -298,7 +298,7 @@ class TestQdrantRerankingSearch:
             "rag": {"enabled": True},
         }
 
-        pipeline = QdrantReankingSearchPipeline(config)
+        pipeline = QdrantRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -321,7 +321,7 @@ class TestQdrantRerankingSearch:
     ):
         """Test search with filters."""
         from vectordb.langchain.reranking.search.qdrant import (
-            QdrantReankingSearchPipeline,
+            QdrantRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -352,7 +352,7 @@ class TestQdrantRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = QdrantReankingSearchPipeline(config)
+        pipeline = QdrantRerankingSearchPipeline(config)
         filters = {"source": "wiki"}
         result = pipeline.search("test query", top_k=10, rerank_k=5, filters=filters)
 
@@ -378,7 +378,7 @@ class TestQdrantRerankingSearch:
     ):
         """Test search with empty results."""
         from vectordb.langchain.reranking.search.qdrant import (
-            QdrantReankingSearchPipeline,
+            QdrantRerankingSearchPipeline,
         )
 
         mock_embed_query.return_value = [0.1] * 384
@@ -402,7 +402,7 @@ class TestQdrantRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = QdrantReankingSearchPipeline(config)
+        pipeline = QdrantRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"

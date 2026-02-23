@@ -26,7 +26,7 @@ from vectordb.langchain.utils import (
 logger = logging.getLogger(__name__)
 
 
-class PineconeReankingIndexingPipeline:
+class PineconeRerankingIndexingPipeline:
     """Indexing pipeline for Pinecone with reranking support.
 
     This pipeline loads documents, generates embeddings using the configured
@@ -47,7 +47,7 @@ class PineconeReankingIndexingPipeline:
         dimension: Vector dimension (must match embedding model)
 
     Example:
-        >>> pipeline = PineconeReankingIndexingPipeline("config.yaml")
+        >>> pipeline = PineconeRerankingIndexingPipeline("config.yaml")
         >>> result = pipeline.run()
         >>> print(f"Indexed {result['documents_indexed']} documents")
 
@@ -57,7 +57,7 @@ class PineconeReankingIndexingPipeline:
         - pinecone.index_name: Target index name
         - pinecone.dimension: Vector dimension (e.g., 384, 768, 1536)
         - pinecone.metric: Distance metric (cosine, euclidean, dotproduct)
-        - embedder: Embedding model configuration
+        - embeddings: Embedding model configuration
         - dataloader: Data source configuration
     """
 

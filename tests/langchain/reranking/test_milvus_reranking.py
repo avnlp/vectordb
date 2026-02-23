@@ -18,7 +18,7 @@ class TestMilvusRerankingIndexing:
     ):
         """Test pipeline initialization."""
         from vectordb.langchain.reranking.indexing.milvus import (
-            MilvusReankingIndexingPipeline,
+            MilvusRerankingIndexingPipeline,
         )
 
         config = {
@@ -31,7 +31,7 @@ class TestMilvusRerankingIndexing:
             },
         }
 
-        pipeline = MilvusReankingIndexingPipeline(config)
+        pipeline = MilvusRerankingIndexingPipeline(config)
         assert pipeline.config == config
         assert pipeline.collection_name == "test_reranking"
 
@@ -52,7 +52,7 @@ class TestMilvusRerankingIndexing:
     ):
         """Test indexing with documents."""
         from vectordb.langchain.reranking.indexing.milvus import (
-            MilvusReankingIndexingPipeline,
+            MilvusRerankingIndexingPipeline,
         )
 
         sample_documents = [
@@ -74,7 +74,6 @@ class TestMilvusRerankingIndexing:
         mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 2)
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -87,11 +86,19 @@ class TestMilvusRerankingIndexing:
             },
         }
 
-        pipeline = MilvusReankingIndexingPipeline(config)
+        pipeline = MilvusRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.insert_documents.assert_called_once()
+        call_kwargs = mock_db_inst.insert_documents.call_args.kwargs
+        assert call_kwargs["collection_name"] == "test_reranking"
+
+        inserted_docs = call_kwargs["documents"]
+        assert len(inserted_docs) == len(sample_documents)
+        assert inserted_docs[0].content == sample_documents[0].page_content
+        assert inserted_docs[0].meta == sample_documents[0].metadata
+        assert inserted_docs[0].embedding == [0.1] * 384
 
     @patch("vectordb.langchain.reranking.indexing.milvus.MilvusVectorDB")
     @patch(
@@ -103,7 +110,7 @@ class TestMilvusRerankingIndexing:
     ):
         """Test indexing with no documents."""
         from vectordb.langchain.reranking.indexing.milvus import (
-            MilvusReankingIndexingPipeline,
+            MilvusRerankingIndexingPipeline,
         )
 
         mock_dataset = MagicMock()
@@ -122,7 +129,7 @@ class TestMilvusRerankingIndexing:
             },
         }
 
-        pipeline = MilvusReankingIndexingPipeline(config)
+        pipeline = MilvusRerankingIndexingPipeline(config)
         result = pipeline.run()
 
         assert result["documents_indexed"] == 0
@@ -138,7 +145,7 @@ class TestMilvusRerankingIndexing:
     ):
         """Test indexing with default collection name."""
         from vectordb.langchain.reranking.indexing.milvus import (
-            MilvusReankingIndexingPipeline,
+            MilvusRerankingIndexingPipeline,
         )
 
         config = {
@@ -150,7 +157,7 @@ class TestMilvusRerankingIndexing:
             },
         }
 
-        pipeline = MilvusReankingIndexingPipeline(config)
+        pipeline = MilvusRerankingIndexingPipeline(config)
         assert pipeline.collection_name == "reranking"
 
 
@@ -166,7 +173,7 @@ class TestMilvusRerankingSearch:
     ):
         """Test search pipeline initialization."""
         from vectordb.langchain.reranking.search.milvus import (
-            MilvusReankingSearchPipeline,
+            MilvusRerankingSearchPipeline,
         )
 
         mock_llm_helper.return_value = None
@@ -183,7 +190,7 @@ class TestMilvusRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = MilvusReankingSearchPipeline(config)
+        pipeline = MilvusRerankingSearchPipeline(config)
         assert pipeline.config == config
         assert pipeline.llm is None
 
@@ -204,7 +211,7 @@ class TestMilvusRerankingSearch:
     ):
         """Test search execution."""
         from vectordb.langchain.reranking.search.milvus import (
-            MilvusReankingSearchPipeline,
+            MilvusRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -239,7 +246,7 @@ class TestMilvusRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = MilvusReankingSearchPipeline(config)
+        pipeline = MilvusRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -265,7 +272,7 @@ class TestMilvusRerankingSearch:
     ):
         """Test search with RAG generation."""
         from vectordb.langchain.reranking.search.milvus import (
-            MilvusReankingSearchPipeline,
+            MilvusRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -299,7 +306,7 @@ class TestMilvusRerankingSearch:
             "rag": {"enabled": True},
         }
 
-        pipeline = MilvusReankingSearchPipeline(config)
+        pipeline = MilvusRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
@@ -322,7 +329,7 @@ class TestMilvusRerankingSearch:
     ):
         """Test search with filters."""
         from vectordb.langchain.reranking.search.milvus import (
-            MilvusReankingSearchPipeline,
+            MilvusRerankingSearchPipeline,
         )
 
         sample_documents = [
@@ -353,7 +360,7 @@ class TestMilvusRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = MilvusReankingSearchPipeline(config)
+        pipeline = MilvusRerankingSearchPipeline(config)
         filters = {"source": "wiki"}
         result = pipeline.search("test query", top_k=10, rerank_k=5, filters=filters)
 
@@ -379,7 +386,7 @@ class TestMilvusRerankingSearch:
     ):
         """Test search with empty results."""
         from vectordb.langchain.reranking.search.milvus import (
-            MilvusReankingSearchPipeline,
+            MilvusRerankingSearchPipeline,
         )
 
         mock_embed_query.return_value = [0.1] * 384
@@ -403,7 +410,7 @@ class TestMilvusRerankingSearch:
             "rag": {"enabled": False},
         }
 
-        pipeline = MilvusReankingSearchPipeline(config)
+        pipeline = MilvusRerankingSearchPipeline(config)
         result = pipeline.search("test query", top_k=10, rerank_k=5)
 
         assert result["query"] == "test query"
