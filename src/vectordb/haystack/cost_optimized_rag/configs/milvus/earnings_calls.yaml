@@ -1,0 +1,55 @@
+chunking:
+  chunk_size: 512
+  overlap: 50
+collection:
+  description: EARNINGS_CALLS Milvus RAG
+  name: earnings_calls_milvus_rag
+dataloader:
+  dataset_name: lamini/earnings-calls-qa
+  limit: null
+  split: test
+  type: earnings_calls
+embeddings:
+  backend: transformers
+  batch_size: 32
+  model: Qwen/Qwen3-Embedding-0.6B
+indexing:
+  partitions:
+    enabled: true
+    partition_key: dataset_id
+    values:
+    - triviaqa
+    - arc
+    - popqa
+    - factscore
+    - earnings_calls
+  payload_indexes: []
+  quantization:
+    enabled: false
+    method: scalar
+  vector_config:
+    distance: Cosine
+    size: 384
+logging:
+  level: INFO
+  name: milvus_earnings_calls_rag
+milvus:
+  api_key: ''
+  host: ${MILVUS_HOST:-localhost}
+  port: ${MILVUS_PORT:-19530}
+reranker:
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 5
+  use_crossencoder: true
+search:
+  hybrid_enabled: false
+  reranking_enabled: false
+  top_k: 10
+generator:
+  enabled: true
+  provider: groq
+  model: llama-3.3-70b-versatile
+  api_key: ${GROQ_API_KEY}
+  api_base_url: https://api.groq.com/openai/v1
+  temperature: 0.7
+  max_tokens: 2048
