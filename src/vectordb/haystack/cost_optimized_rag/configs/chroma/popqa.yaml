@@ -1,0 +1,45 @@
+chroma:
+  path: ./chroma_data
+chunking:
+  chunk_size: 512
+  overlap: 50
+collection:
+  description: POPQA Chroma RAG
+  name: popqa_chroma_rag
+dataloader:
+  dataset_name: akariasai/PopQA
+  limit: null
+  split: test
+  type: popqa
+embeddings:
+  backend: transformers
+  batch_size: 32
+  model: Qwen/Qwen3-Embedding-0.6B
+generator:
+  enabled: true
+  provider: groq
+  model: llama-3.3-70b-versatile
+  api_key: ${GROQ_API_KEY}
+  api_base_url: https://api.groq.com/openai/v1
+  temperature: 0.7
+  max_tokens: 2048
+indexing:
+  partitions:
+    enabled: false
+  payload_indexes: []
+  quantization:
+    enabled: false
+  vector_config:
+    distance: Cosine
+    size: 1024
+logging:
+  level: INFO
+  name: chroma_popqa_rag
+reranker:
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 5
+  use_crossencoder: true
+search:
+  hybrid_enabled: false
+  reranking_enabled: false
+  top_k: 10

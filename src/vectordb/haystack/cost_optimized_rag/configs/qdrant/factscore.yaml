@@ -1,0 +1,56 @@
+qdrant:
+  host: ${QDRANT_HOST:-localhost}
+  port: ${QDRANT_PORT:-6333}
+  api_key: ${QDRANT_API_KEY:-}
+  https: false
+collection:
+  name: factscore_cost_optimized
+  description: FACTSCORE with cost-optimized RAG
+dataloader:
+  type: factscore
+  dataset_name: dskar/FActScore
+  split: test
+  limit: null
+generator:
+  enabled: true
+  provider: groq
+  model: llama-3.3-70b-versatile
+  api_key: ${GROQ_API_KEY}
+  api_base_url: https://api.groq.com/openai/v1
+  temperature: 0.7
+  max_tokens: 2048
+embeddings:
+  model: Qwen/Qwen3-Embedding-0.6B
+  batch_size: 32
+  backend: transformers
+  cache_embeddings: false
+chunking:
+  chunk_size: 512
+  overlap: 50
+indexing:
+  partitions:
+    enabled: false
+    partition_key: dataset_id
+    values: []
+  quantization:
+    enabled: false
+    method: scalar
+    compression_ratio: 4.0
+  vector_config:
+    size: 1024
+    distance: Cosine
+  payload_indexes: []
+search:
+  top_k: 10
+  hybrid_enabled: false
+  reranking_enabled: false
+  metadata_filtering_enabled: false
+reranker:
+  use_crossencoder: true
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 5
+  cohere_enabled: false
+  cohere_api_key: ''
+logging:
+  level: INFO
+  name: qdrant_factscore_rag
