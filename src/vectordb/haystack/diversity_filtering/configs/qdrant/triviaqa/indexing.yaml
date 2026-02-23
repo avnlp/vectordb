@@ -1,0 +1,29 @@
+dataset:
+  name: triviaqa
+  split: test
+  max_documents: null
+
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  dimension: 384
+  batch_size: 32
+  device: null
+
+index:
+  name: triviaqa_diversity
+
+retrieval:
+  top_k_candidates: 100
+
+diversity:
+  algorithm: maximum_margin_relevance
+  top_k: 10
+  mmr_lambda: 0.5
+  similarity_metric: cosine
+
+vectordb:
+  type: qdrant
+  qdrant:
+    url: ${QDRANT_URL}
+    api_key: ${QDRANT_API_KEY}
+    timeout: 30
