@@ -189,7 +189,7 @@ class ConfigLoader:
 
     Example:
         loader = ConfigLoader()
-        config = loader.load("configs/qdrant/triviaqa/search.yaml")
+        config = loader.load("configs/triviaqa_diversity_config.yaml")
     """
 
     @staticmethod

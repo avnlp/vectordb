@@ -25,7 +25,7 @@ Supports all 5 vector databases:
 Example usage:
     from vectordb.haystack.diversity_filtering.pipelines import qdrant_indexing
 
-    result = qdrant_indexing.run_indexing("configs/qdrant/triviaqa/indexing.yaml")
+    result = qdrant_indexing.run_indexing("configs/triviaqa_diversity_config.yaml")
 
     from vectordb.haystack.diversity_filtering.pipelines.chroma_search import (
         ChromaDiversitySearchPipeline,
@@ -33,7 +33,7 @@ Example usage:
 
     # Initialize pipeline once (components loaded once, reused across searches)
     pipeline = ChromaDiversitySearchPipeline(
-        "configs/chroma/triviaqa/search.yaml"
+        "configs/triviaqa_diversity_config.yaml"
     )
 
     # Execute multiple searches efficiently
