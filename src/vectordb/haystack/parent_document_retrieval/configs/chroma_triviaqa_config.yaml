@@ -1,0 +1,55 @@
+# Haystack Parent Document Retrieval Configuration
+# Database: Chroma
+# Dataset: triviaqa
+
+logging:
+  name: haystack_parent_doc_chroma_triviaqa
+  level: INFO
+
+# Embedding model configuration (Qwen3-Embedding-0.6B - 1024 dimensions)
+embeddings:
+  model: Qwen/Qwen3-Embedding-0.6B
+
+# Chunking configuration
+chunking:
+  child_chunk_size: 200
+  child_chunk_overlap: 50
+  parent_chunk_size: 1000
+  parent_chunk_overlap: 100
+
+# Retrieval configuration
+retrieval:
+  top_k: 5
+  mode: with_parents  # Options: with_parents, children_only, context_window
+  context_window: 1
+  oversample_factor: 3
+
+# Dataloader configuration
+dataloader:
+  type: triviaqa
+  dataset_name: trivia_qa
+  config: rc
+  split: test
+  index_limit: 500
+  eval_limit: 100
+
+# Generator for answer summarization (required for this dataset)
+generator:
+  model: llama-3.3-70b-versatile
+  api_key: ${GROQ_API_KEY}
+
+# Database configuration
+database:
+  type: chroma
+
+  chroma:
+    # Chroma Cloud connection (set env vars or uncomment and fill)
+    tenant: ${CHROMA_TENANT}
+    database: ${CHROMA_DATABASE}
+    api_key: ${CHROMA_API_KEY}
+    # Local fallback
+    # host: localhost
+    # port: 8000
+    # persist_directory: ./chroma_db
+    collection_name: parent_doc_children_triviaqa
+    distance_function: cosine

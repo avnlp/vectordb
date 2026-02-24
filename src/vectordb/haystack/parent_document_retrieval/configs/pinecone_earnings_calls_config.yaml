@@ -1,0 +1,45 @@
+# Haystack Parent Document Retrieval Configuration
+# Database: Pinecone
+# Dataset: earnings_calls
+
+logging:
+  name: haystack_parent_doc_pinecone_earnings_calls
+  level: INFO
+
+# Embedding model configuration (Qwen3-Embedding-0.6B - 1024 dimensions)
+embeddings:
+  model: Qwen/Qwen3-Embedding-0.6B
+
+# Chunking configuration
+chunking:
+  child_chunk_size: 200
+  child_chunk_overlap: 50
+  parent_chunk_size: 1000
+  parent_chunk_overlap: 100
+
+# Retrieval configuration
+retrieval:
+  top_k: 5
+  mode: with_parents  # Options: with_parents, children_only, context_window
+  context_window: 1
+  oversample_factor: 3
+
+# Dataloader configuration
+dataloader:
+  type: earnings_calls
+  dataset_name: lamini/earnings-calls-qa
+  split: train
+  index_limit: 300
+  eval_limit: 50
+
+# Database configuration
+database:
+  type: pinecone
+
+  pinecone:
+    api_key: ${PINECONE_API_KEY}
+    index_name: parent-doc-children-earnings_calls
+    namespace: children
+    metric: cosine
+    cloud: aws
+    region: us-east-1

@@ -1,0 +1,50 @@
+# Haystack Parent Document Retrieval Configuration
+# Database: Chroma
+# Dataset: arc
+
+logging:
+  name: haystack_parent_doc_chroma_arc
+  level: INFO
+
+# Embedding model configuration (Qwen3-Embedding-0.6B - 1024 dimensions)
+embeddings:
+  model: Qwen/Qwen3-Embedding-0.6B
+
+# Chunking configuration
+chunking:
+  child_chunk_size: 200
+  child_chunk_overlap: 50
+  parent_chunk_size: 1000
+  parent_chunk_overlap: 100
+
+# Retrieval configuration
+retrieval:
+  top_k: 5
+  mode: with_parents  # Options: with_parents, children_only, context_window
+  context_window: 1
+  oversample_factor: 3
+
+# Dataloader configuration
+dataloader:
+  type: arc
+  dataset_name: ai2_arc
+  config: ARC-Challenge
+  split: test
+  index_limit: 1000
+  eval_limit: 200
+
+# Database configuration
+database:
+  type: chroma
+
+  chroma:
+    # Chroma Cloud connection (set env vars or uncomment and fill)
+    tenant: ${CHROMA_TENANT}
+    database: ${CHROMA_DATABASE}
+    api_key: ${CHROMA_API_KEY}
+    # Local fallback
+    # host: localhost
+    # port: 8000
+    # persist_directory: ./chroma_db
+    collection_name: parent_doc_children_arc
+    distance_function: cosine
