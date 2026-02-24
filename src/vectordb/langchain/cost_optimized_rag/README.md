@@ -6,11 +6,10 @@ This module provides a balance between retrieval quality and operational cost, m
 
 ## Overview
 
-- Result caching with configurable TTL to avoid repeated identical searches
-- Batch processing for efficient embedding generation and document upserts
-- Pre-filtering capabilities to reduce the number of vectors scanned per query
-- Cost monitoring and metrics collection for operational visibility
-- Configurable trade-offs between quality and cost
+- Hybrid search using Weaviate's native BM25 + dense vector fusion
+- Single dense embedding API call per query for cost efficiency
+- Configurable alpha parameter to balance vector vs. keyword search
+- Optional RAG generation with LLM for answer synthesis
 - Lazy initialization of expensive components like language models
 - Support for all five vector databases with database-specific optimizations
 - 25 pre-built configuration files covering all database and dataset combinations
@@ -23,15 +22,15 @@ The indexing pipeline loads documents from a configured dataset, embeds them usi
 
 ### Search Phase
 
-The search pipeline embeds the incoming query and executes a vector search against the database. If caching is enabled and the query has been seen recently, results are returned from cache without hitting the database. For cache misses, the pipeline retrieves documents and optionally applies post-processing such as reranking or compression. Retrieved documents are passed to a language model for answer generation when RAG is enabled. Cost metrics are collected throughout the pipeline execution for monitoring and optimization.
+The search pipeline embeds the incoming query using a dense embedding model and executes a hybrid search against the Weaviate database. The hybrid search combines dense vector similarity with BM25 keyword matching in a single query, controlled by the alpha parameter. Retrieved documents are passed to a language model for answer generation when RAG is enabled. Cost metrics are collected throughout the pipeline execution for monitoring and optimization.
 
 ### Cost Optimization Strategies
 
-**Caching** stores recent search results in memory with a configurable time-to-live. Repeated queries within the TTL window are served from cache, eliminating database read costs and embedding computation. The cache uses an LRU eviction policy to manage memory.
+**Hybrid Search** leverages Weaviate's native hybrid search capability that combines dense semantic vectors with BM25 lexical search in a single query. This eliminates the need for separate sparse embedding generation and client-side fusion, reducing computational overhead.
 
-**Batch Processing** groups multiple documents or queries for efficient embedding generation. Rather than processing one document at a time, the pipeline processes them in batches to maximize throughput and reduce API call overhead.
+**Single API Call** generates only one dense embedding per query using a cost-effective API-based model. The sparse component is handled by Weaviate's built-in BM25, avoiding additional embedding API calls.
 
-**Pre-filtering** applies metadata filters before vector search to reduce the candidate set size. This is particularly effective when queries can be constrained by known attributes like category, date range, or source.
+**Configurable Alpha** allows tuning the balance between vector search (semantic matching) and BM25 (keyword matching) to optimize for both quality and cost based on use case requirements.
 
 **Lazy Initialization** defers the creation of expensive components like language models until they are actually needed. This reduces startup time and resource consumption for pipelines that may not always require answer generation.
 
@@ -39,59 +38,79 @@ The search pipeline embeds the incoming query and executes a vector search again
 
 | Database | Status | Cost Optimization Notes |
 |----------|--------|-------------------------|
-| Pinecone | Supported | Namespace-based caching, batch upserts, read unit monitoring |
-| Weaviate | Supported | Collection-level caching, GraphQL query optimization |
-| Chroma | Supported | Local storage optimization, minimal API costs |
-| Milvus | Supported | Partition-based filtering, batch operations |
-| Qdrant | Supported | Payload indexing for pre-filtering, batch search |
+| Pinecone | Supported | Hybrid search with RRF fusion, batch upserts |
+| Weaviate | Supported | Native hybrid search (BM25 + vector), alpha parameter tuning |
+| Chroma | Supported | Client-side hybrid search with RRF fusion |
+| Milvus | Supported | Native hybrid search with RRF fusion |
+| Qdrant | Supported | Native hybrid search with RRF fusion |
 
 ## Configuration
 
-Each database has per-dataset YAML configuration files organized by database and dataset. The configuration controls caching behavior, batch sizes, pre-filtering settings, cost monitoring, and all standard pipeline parameters.
+Each database has per-dataset YAML configuration files organized by database and dataset. The configuration controls all standard pipeline parameters including embeddings, chunking, search, and RAG generation.
 
 ```yaml
-pinecone:
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "cost-optimized-index"
-  namespace: ""
+dataloader:
+  type: "triviaqa"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
 
 embeddings:
-  model: "Qwen/Qwen3-Embedding-0.6B"
-  batch_size: 64  # Larger batches for efficiency
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32  # Batch size for embedding generation
 
-optimization:
-  caching:
-    enabled: true
-    ttl_seconds: 300
-    max_size: 1000
-  batch_processing:
-    enabled: true
-    batch_size: 32
-  cost_monitoring:
-    enabled: true
-    track_tokens: true
-    track_api_calls: true
+chunking:
+  chunk_size: 1000
+  chunk_overlap: 200
+  separators:
+    - "\n\n"
+    - "\n"
+    - " "
+    - ""
 
-pre_filtering:
-  enabled: false
-  metadata_fields:
-    - "category"
-    - "date"
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "lc-cost-optimized-rag-triviaqa"
+  namespace: ""
+  dimension: 384
+  metric: "cosine"
+  recreate: false
 
 search:
   top_k: 10
-  reranking_enabled: false
+  alpha: 0.5  # Weaviate hybrid search parameter (1.0 = vector only, 0.0 = BM25 only)
 
 rag:
-  enabled: true
+  enabled: false
   model: "llama-3.3-70b-versatile"
   api_key: "${GROQ_API_KEY}"
   temperature: 0.7
-  max_tokens: 1024  # Limit token usage
+  max_tokens: 2048
 
 logging:
+  name: "lc_cost_optimized_rag_pinecone"
   level: "INFO"
 ```
+
+### Configuration Sections
+
+- **dataloader**: Dataset source configuration including type, split, and document limit
+- **embeddings**: Embedding model settings with batch size for efficient processing
+- **chunking**: Document splitting parameters (chunk size, overlap, separators)
+- **<database>**: Database-specific connection settings (pinecone, weaviate, chroma, milvus, qdrant)
+- **search**: Search parameters including top_k results and alpha for Weaviate hybrid search
+- **rag**: Optional RAG generation with LLM model, API key, and token limits
+- **logging**: Logging configuration with custom name and log level
+
+### Cost Optimization Notes
+
+The cost optimization is implemented in the pipeline code itself rather than through configuration flags:
+
+- **Hybrid Search**: Combines dense (API-based) embeddings with BM25 lexical search using Weaviate's native hybrid search
+- **Weaviate Native Hybrid**: Uses Weaviate's built-in BM25 + vector fusion with configurable alpha parameter
+- **Optional RAG**: The `rag.enabled` flag controls whether to invoke the LLM for answer generation
+- **Batch Processing**: Embedding batch sizes are configurable to optimize API throughput
 
 ## Directory Structure
 

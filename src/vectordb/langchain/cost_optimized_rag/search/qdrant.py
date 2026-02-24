@@ -6,7 +6,7 @@ combines dense semantic search with sparse lexical search using RRF fusion.
 Cost Optimization:
     - Single dense query embedding: One API call for semantic search
     - Local sparse embedding: TF-IDF generated locally (zero cost)
-    - RRF fusion: Lightweight local algorithm, no API calls
+    - Native hybrid search: Single API call with RRF fusion done server-side
     - Optional LLM: RAG generation can be disabled for retrieval-only
 
 Qdrant Features:
@@ -15,9 +15,8 @@ Qdrant Features:
 
 Search Strategy:
     1. Generate dual embeddings (dense API + sparse local)
-    2. Execute parallel dense and sparse searches
-    3. Merge using Reciprocal Rank Fusion (RRF)
-    4. Optionally generate RAG answer
+    2. Execute native hybrid search (dense + sparse + RRF in one call)
+    3. Optionally generate RAG answer
 
 Example:
     >>> pipeline = QdrantCostOptimizedRAGSearchPipeline("config.yaml")
@@ -36,7 +35,6 @@ from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
     RAGHelper,
-    ResultMerger,
     SparseEmbedder,
 )
 
@@ -97,18 +95,13 @@ class QdrantCostOptimizedRAGSearchPipeline:
         self.sparse_embedder = SparseEmbedder()
 
         # Configure Qdrant connection
-        qdrant_config = self.config["qdrant"]
-        self.db = QdrantVectorDB(
-            url=qdrant_config.get("url", "http://localhost:6333"),
-            api_key=qdrant_config.get("api_key"),
-        )
-
-        self.collection_name = qdrant_config.get("collection_name")
+        self.db = QdrantVectorDB(config=self.config)
+        self.collection_name = self.config["qdrant"]["collection_name"]
 
         # Initialize optional LLM
         self.llm = RAGHelper.create_llm(self.config)
 
-        # Configure search parameters
+        # Configure search parameters (rrf_k kept for config compatibility, not used)
         self.search_config = self.config.get("search", {})
         self.rrf_k = self.search_config.get("rrf_k", 60)
 
@@ -146,44 +139,28 @@ class QdrantCostOptimizedRAGSearchPipeline:
             "Embedded query with both dense and sparse embeddings: %s", query[:50]
         )
 
-        # Execute dense semantic search
-        dense_documents = self.db.query(
-            vector=dense_query_embedding,
+        # Use native hybrid search - single API call with RRF fusion done internally
+        documents = self.db.search(
+            query_vector={
+                "dense": dense_query_embedding,
+                "sparse": sparse_query_embedding,
+            },
+            search_type="hybrid",
+            scope=self.collection_name,
             top_k=top_k,
-            collection_name=self.collection_name,
-            query_filter=filters,
+            filters=filters,
         )
-        logger.info("Retrieved %d documents from dense search", len(dense_documents))
-
-        # Execute sparse lexical search
-        sparse_documents = self.db.query_with_sparse(
-            vector=dense_query_embedding,
-            sparse_vector=sparse_query_embedding,
-            top_k=top_k,
-            collection_name=self.collection_name,
-            query_filter=filters,
-        )
-        logger.info("Retrieved %d documents from sparse search", len(sparse_documents))
-
-        # Fuse results using RRF (zero API cost)
-        merged_documents = ResultMerger.merge_and_deduplicate(
-            [dense_documents, sparse_documents],
-            method="rrf",
-            weights=[0.5, 0.5],
-        )
-        logger.info(
-            "Fused %d unique documents from both searches", len(merged_documents)
-        )
+        logger.info("Retrieved %d documents from hybrid search", len(documents))
 
         # Prepare result
         result = {
-            "documents": merged_documents[:top_k],
+            "documents": documents,
             "query": query,
         }
 
         # Generate RAG answer if LLM configured
         if self.llm is not None:
-            answer = RAGHelper.generate(self.llm, query, merged_documents[:top_k])
+            answer = RAGHelper.generate(self.llm, query, documents)
             result["answer"] = answer
             logger.info("Generated RAG answer")
 

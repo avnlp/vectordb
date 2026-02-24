@@ -26,7 +26,7 @@ weaviate:
 
 search:
   top_k: 10
-  rrf_k: 60
+  alpha: 0.5
 
 rag:
   enabled: false

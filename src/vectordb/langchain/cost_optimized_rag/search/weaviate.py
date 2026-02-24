@@ -1,26 +1,25 @@
 """Weaviate cost-optimized RAG search pipeline for LangChain.
 
 This module implements a cost-optimized search pipeline for Weaviate that
-combines dense semantic search with sparse lexical search using RRF fusion.
+leverages native hybrid search combining dense semantic vectors with BM25
+lexical search.
 
 Cost Optimization:
     - Single dense query embedding: One API call for semantic search
     - Local sparse embedding: TF-IDF generated locally (zero cost)
-    - RRF fusion: Local algorithm for merging results (zero cost)
-    - Weaviate BM25: Native lexical search support
+    - Weaviate native hybrid search: Built-in BM25 + vector fusion
     - Optional LLM: RAG generation can be disabled
 
 Weaviate Features:
     Weaviate provides native hybrid search with BM25 lexical matching,
-    but this pipeline uses explicit RRF fusion for consistent behavior
-    across all vector databases.
+    combining dense vector similarity with keyword-based search in a
+    single query. The alpha parameter controls the weighting between
+    vector (1.0) and BM25 (0.0) components.
 
 Search Strategy:
-    1. Generate dual embeddings (dense API + sparse local)
-    2. Execute dense vector search in Weaviate
-    3. Execute sparse BM25 search in Weaviate
-    4. Merge results using RRF
-    5. Optionally generate RAG answer
+    1. Generate dense query embedding via API
+    2. Execute hybrid search in Weaviate (dense vector + BM25)
+    3. Optionally generate RAG answer
 
 Example:
     >>> pipeline = WeaviateCostOptimizedRAGSearchPipeline("config.yaml")
@@ -39,8 +38,6 @@ from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
     RAGHelper,
-    ResultMerger,
-    SparseEmbedder,
 )
 
 
@@ -51,23 +48,21 @@ class WeaviateCostOptimizedRAGSearchPipeline:
     """Weaviate search pipeline for cost-optimized RAG using LangChain.
 
     This pipeline implements hybrid search for Weaviate vector database,
-    combining dense semantic vectors with sparse lexical (BM25) search.
-    Results are fused using Reciprocal Rank Fusion for optimal quality.
+    leveraging Weaviate's native hybrid search that combines dense semantic
+    vectors with BM25 lexical search in a single query.
 
     Attributes:
         config: Pipeline configuration dictionary.
         dense_embedder: API-based dense embedding model.
-        sparse_embedder: Local sparse embedding generator.
         db: WeaviateVectorDB client instance.
         collection_name: Name of the Weaviate collection.
         llm: Optional language model for RAG generation.
         search_config: Search-specific configuration.
-        rrf_k: RRF fusion parameter.
-        alpha: Weaviate hybrid weight parameter.
+        alpha: Weaviate hybrid weight parameter (1.0 = vector only, 0.0 = BM25 only).
 
     Note:
-        While Weaviate has native hybrid search, this pipeline uses
-        explicit RRF fusion for consistent cross-database behavior.
+        This pipeline uses Weaviate's native hybrid search instead of
+        manual RRF fusion for better performance and simplicity.
 
     Example:
         >>> pipeline = WeaviateCostOptimizedRAGSearchPipeline("config.yaml")
@@ -96,7 +91,6 @@ class WeaviateCostOptimizedRAGSearchPipeline:
 
         # Initialize embedders
         self.dense_embedder = EmbedderHelper.create_embedder(self.config)
-        self.sparse_embedder = SparseEmbedder()
 
         # Configure Weaviate connection
         weaviate_config = self.config["weaviate"]
@@ -112,7 +106,6 @@ class WeaviateCostOptimizedRAGSearchPipeline:
 
         # Configure search parameters
         self.search_config = self.config.get("search", {})
-        self.rrf_k = self.search_config.get("rrf_k", 60)
         self.alpha = self.search_config.get("alpha", 0.5)  # Weaviate hybrid parameter
 
         logger.info(
@@ -125,10 +118,11 @@ class WeaviateCostOptimizedRAGSearchPipeline:
         top_k: int = 10,
         filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Execute cost-optimized RAG search with hybrid fusion.
+        """Execute cost-optimized RAG search with Weaviate hybrid search.
 
-        Performs hybrid search by combining dense semantic and sparse lexical
-        results using RRF. Optionally generates a RAG answer if LLM is configured.
+        Performs hybrid search combining dense semantic vectors with BM25
+        lexical search using Weaviate's native hybrid search capability.
+        Optionally generates a RAG answer if LLM is configured.
 
         Args:
             query: Search query text.
@@ -144,40 +138,22 @@ class WeaviateCostOptimizedRAGSearchPipeline:
         Raises:
             RuntimeError: If search fails due to API or database errors.
         """
-        # Generate dual embeddings for hybrid search
-        dense_query_embedding = EmbedderHelper.embed_query(self.dense_embedder, query)
-        sparse_query_embedding = self.sparse_embedder.embed_query(query)
-        logger.info(
-            "Embedded query with both dense and sparse embeddings: %s", query[:50]
-        )
+        # Select the collection for operations
+        self.db._select_collection(self.collection_name)
+        logger.info("Selected collection: %s", self.collection_name)
 
-        # Execute dense vector search
-        dense_documents = self.db.query(
-            vector=dense_query_embedding,
+        # Execute hybrid search (dense vector + BM25 lexical search)
+        # Weaviate provides native hybrid search with BM25 keyword matching
+        merged_documents = self.db.hybrid_search(
+            query=query,
+            vector=EmbedderHelper.embed_query(self.dense_embedder, query),
             top_k=top_k,
-            collection_name=self.collection_name,
-            where=filters,
-        )
-        logger.info("Retrieved %d documents from dense search", len(dense_documents))
-
-        # Execute sparse BM25 search
-        sparse_documents = self.db.query_with_sparse(
-            vector=dense_query_embedding,
-            sparse_vector=sparse_query_embedding,
-            top_k=top_k,
-            collection_name=self.collection_name,
-            where=filters,
-        )
-        logger.info("Retrieved %d documents from sparse search", len(sparse_documents))
-
-        # Fuse results using RRF
-        merged_documents = ResultMerger.merge_and_deduplicate(
-            [dense_documents, sparse_documents],
-            method="rrf",
-            weights=[0.5, 0.5],
+            alpha=self.alpha,
+            filters=filters,
+            include_vectors=False,
         )
         logger.info(
-            "Fused %d unique documents from both searches", len(merged_documents)
+            "Executed hybrid search, retrieved %d documents", len(merged_documents)
         )
 
         # Prepare result

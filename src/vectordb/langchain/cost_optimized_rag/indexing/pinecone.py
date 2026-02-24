@@ -103,15 +103,21 @@ class PineconeCostOptimizedRAGIndexingPipeline:
         self.namespace = pinecone_config.get("namespace", "")
         self.dimension = pinecone_config.get("dimension", 384)
 
-        chunking_config = self.config.get("chunking", {})
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunking_config.get("chunk_size", 1000),
-            chunk_overlap=chunking_config.get("chunk_overlap", 200),
-            separators=chunking_config.get(
-                "separators",
-                ["\n\n", "\n", " ", ""],
-            ),
+        self.use_text_splitter = self.config.get("dataloader", {}).get(
+            "use_text_splitter", True
         )
+        if self.use_text_splitter:
+            chunking_config = self.config.get("chunking", {})
+            self.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunking_config.get("chunk_size", 1000),
+                chunk_overlap=chunking_config.get("chunk_overlap", 200),
+                separators=chunking_config.get(
+                    "separators",
+                    ["\n\n", "\n", " ", ""],
+                ),
+            )
+        else:
+            self.text_splitter = None
 
         logger.info(
             "Initialized Pinecone cost-optimized RAG indexing pipeline (LangChain)"
@@ -157,12 +163,16 @@ class PineconeCostOptimizedRAGIndexingPipeline:
             logger.warning("No documents to index")
             return {"documents_indexed": 0, "chunks_created": 0}
 
-        chunks = self.text_splitter.split_documents(documents)
-        logger.info("Created %d chunks from documents", len(chunks))
+        if self.use_text_splitter:
+            chunks = self.text_splitter.split_documents(documents)
+            logger.info("Created %d chunks from documents", len(chunks))
+        else:
+            chunks = documents
+            logger.info("Using %d documents without splitting", len(chunks))
 
         if not chunks:
             logger.warning("No chunks created")
-            return {"documents_indexed": 0, "chunks_created": 0}
+            return {"documents_indexed": len(documents), "chunks_created": 0}
 
         _, dense_embeddings = EmbedderHelper.embed_documents(
             self.dense_embedder, chunks

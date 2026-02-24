@@ -110,8 +110,7 @@ search:
             mock_sparse_cls.return_value = mock_sparse_embedder
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = []
-            mock_db_instance.query_with_sparse.return_value = []
+            mock_db_instance.search.return_value = []
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
@@ -156,8 +155,7 @@ search:
             mock_sparse_cls.return_value = mock_sparse_embedder
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = []
-            mock_db_instance.query_with_sparse.return_value = []
+            mock_db_instance.search.return_value = []
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
@@ -168,8 +166,7 @@ search:
             filters = {"metadata.field": "value"}
             pipeline.search("test query", filters=filters)
 
-            mock_db_instance.query.assert_called_once()
-            mock_db_instance.query_with_sparse.assert_called_once()
+            assert mock_db_instance.search.call_count == 2
 
         @patch("vectordb.langchain.cost_optimized_rag.search.milvus.MilvusVectorDB")
         @patch(
@@ -203,8 +200,7 @@ search:
             mock_sparse_cls.return_value = mock_sparse_embedder
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = []
-            mock_db_instance.query_with_sparse.return_value = []
+            mock_db_instance.search.return_value = []
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
@@ -258,8 +254,7 @@ search:
             ]
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = dense_docs
-            mock_db_instance.query_with_sparse.return_value = sparse_docs
+            mock_db_instance.search.side_effect = [dense_docs, sparse_docs]
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384

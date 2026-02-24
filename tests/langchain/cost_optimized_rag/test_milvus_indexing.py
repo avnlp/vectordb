@@ -208,7 +208,8 @@ chunking:
             pipeline = MilvusCostOptimizedRAGIndexingPipeline(milvus_config)
             result = pipeline.run()
 
-            assert result["documents_indexed"] == 0
+            # Documents were processed but produced no chunks
+            assert result["documents_indexed"] == len(sample_documents)
             assert result["chunks_created"] == 0
 
     class TestChunkingParameters:
@@ -275,3 +276,129 @@ chunking:
             assert pipeline is not None
             assert pipeline.text_splitter._chunk_size == 1000
             assert pipeline.text_splitter._chunk_overlap == 200
+
+    class TestUseTextSplitter:
+        """Tests for use_text_splitter flag."""
+
+        @patch("vectordb.langchain.cost_optimized_rag.indexing.milvus.MilvusVectorDB")
+        @patch(
+            "vectordb.langchain.cost_optimized_rag.indexing.milvus.EmbedderHelper.create_embedder"
+        )
+        @patch("vectordb.langchain.cost_optimized_rag.indexing.milvus.SparseEmbedder")
+        def test_use_text_splitter_false(
+            self, mock_sparse_cls, mock_embedder_helper, mock_db_cls
+        ):
+            """Test initialization with use_text_splitter=False."""
+            config = {
+                "dataloader": {
+                    "type": "arc",
+                    "limit": 10,
+                    "use_text_splitter": False,
+                },
+                "embeddings": {"model": "test-model", "device": "cpu"},
+                "milvus": {
+                    "uri": "http://localhost:19530",
+                    "db_name": "default",
+                    "collection_name": "test_cost_optimized_rag",
+                    "dimension": 384,
+                },
+            }
+
+            mock_embedder = MagicMock()
+            mock_embedder_helper.return_value = mock_embedder
+
+            mock_sparse_embedder = MagicMock()
+            mock_sparse_cls.return_value = mock_sparse_embedder
+
+            mock_db_instance = MagicMock()
+            mock_db_cls.return_value = mock_db_instance
+
+            pipeline = MilvusCostOptimizedRAGIndexingPipeline(config)
+            assert pipeline.use_text_splitter is False
+            assert pipeline.text_splitter is None
+
+        @patch("vectordb.langchain.cost_optimized_rag.indexing.milvus.MilvusVectorDB")
+        @patch(
+            "vectordb.langchain.cost_optimized_rag.indexing.milvus.EmbedderHelper.create_embedder"
+        )
+        @patch(
+            "vectordb.langchain.cost_optimized_rag.indexing.milvus.EmbedderHelper.embed_documents"
+        )
+        @patch("vectordb.langchain.cost_optimized_rag.indexing.milvus.SparseEmbedder")
+        @patch(
+            "vectordb.langchain.cost_optimized_rag.indexing.milvus.DataloaderCatalog.create"
+        )
+        def test_run_with_use_text_splitter_false(
+            self,
+            mock_get_docs,
+            mock_sparse_cls,
+            mock_embed_docs,
+            mock_embedder_helper,
+            mock_db_cls,
+            sample_documents,
+        ):
+            """Test run() with use_text_splitter=False (no splitting)."""
+            mock_dataset = MagicMock()
+            mock_dataset.to_langchain.return_value = sample_documents
+            mock_loader = MagicMock()
+            mock_loader.load.return_value = mock_dataset
+            mock_get_docs.return_value = mock_loader
+            mock_embed_docs.return_value = (
+                sample_documents,
+                [[0.1] * 384 for _ in range(len(sample_documents))],
+            )
+
+            mock_sparse_embedder = MagicMock()
+            mock_sparse_embedder.embed_documents.return_value = [
+                {"indices": [0, 1, 2], "values": [0.5, 0.3, 0.2]}
+                for _ in range(len(sample_documents))
+            ]
+            mock_sparse_cls.return_value = mock_sparse_embedder
+
+            mock_db_instance = MagicMock()
+            mock_db_instance.upsert.return_value = len(sample_documents)
+            mock_db_cls.return_value = mock_db_instance
+
+            config = {
+                "dataloader": {
+                    "type": "arc",
+                    "limit": 10,
+                    "use_text_splitter": False,
+                },
+                "embeddings": {"model": "test-model", "device": "cpu"},
+                "milvus": {
+                    "uri": "http://localhost:19530",
+                    "db_name": "default",
+                    "collection_name": "test_cost_optimized_rag",
+                    "dimension": 384,
+                },
+            }
+
+            pipeline = MilvusCostOptimizedRAGIndexingPipeline(config)
+            result = pipeline.run()
+
+            # Documents should be used as-is without splitting
+            assert result["documents_indexed"] == len(sample_documents)
+            assert result["chunks_created"] == len(sample_documents)
+
+        @patch("vectordb.langchain.cost_optimized_rag.indexing.milvus.MilvusVectorDB")
+        @patch(
+            "vectordb.langchain.cost_optimized_rag.indexing.milvus.EmbedderHelper.create_embedder"
+        )
+        @patch("vectordb.langchain.cost_optimized_rag.indexing.milvus.SparseEmbedder")
+        def test_use_text_splitter_default_true(
+            self, mock_sparse_cls, mock_embedder_helper, mock_db_cls, milvus_config
+        ):
+            """Test that use_text_splitter defaults to True when not specified."""
+            mock_embedder = MagicMock()
+            mock_embedder_helper.return_value = mock_embedder
+
+            mock_sparse_embedder = MagicMock()
+            mock_sparse_cls.return_value = mock_sparse_embedder
+
+            mock_db_instance = MagicMock()
+            mock_db_cls.return_value = mock_db_instance
+
+            pipeline = MilvusCostOptimizedRAGIndexingPipeline(milvus_config)
+            assert pipeline.use_text_splitter is True
+            assert pipeline.text_splitter is not None

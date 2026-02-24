@@ -107,6 +107,7 @@ class PineconeCostOptimizedRAGSearchPipeline:
 
         self.index_name = pinecone_config.get("index_name")
         self.namespace = pinecone_config.get("namespace", "")
+        self.dimension = pinecone_config.get("dimension", 384)
 
         # Initialize optional LLM for RAG generation
         self.llm = RAGHelper.create_llm(self.config)
@@ -174,7 +175,8 @@ class PineconeCostOptimizedRAGSearchPipeline:
         # Execute sparse lexical search
         # Note: Pinecone requires a placeholder dense vector for sparse-only queries
         sparse_documents = self.db.query_with_sparse(
-            vector=[0.0] * 384,  # Placeholder dense vector (not used in sparse search)
+            vector=[0.0]
+            * self.dimension,  # Placeholder dense vector (not used in sparse search)
             sparse_vector=sparse_query_embedding,
             top_k=top_k,
             filter=filters,

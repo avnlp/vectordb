@@ -317,40 +317,28 @@ class TestQdrantCostOptimizedSearch:
     )
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.RAGHelper.create_llm")
-    @patch(
-        "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-    )
     def test_search_hybrid_execution(
         self,
-        mock_merge,
         mock_llm_helper,
         mock_sparse_embedder_class,
         mock_embed_query,
         mock_embedder_helper,
         mock_db,
     ):
-        """Test hybrid search execution with dense and sparse retrieval."""
+        """Test hybrid search execution using native Qdrant hybrid search."""
         from vectordb.langchain.cost_optimized_rag.search.qdrant import (
             QdrantCostOptimizedRAGSearchPipeline,
         )
 
-        dense_docs = [
-            Document(page_content="Dense result 1", metadata={"id": "1"}),
-            Document(page_content="Dense result 2", metadata={"id": "2"}),
-        ]
-        sparse_docs = [
-            Document(page_content="Sparse result 1", metadata={"id": "3"}),
-        ]
-        merged_docs = [
-            Document(page_content="Merged result 1", metadata={"id": "1"}),
-            Document(page_content="Merged result 2", metadata={"id": "3"}),
-            Document(page_content="Merged result 3", metadata={"id": "2"}),
+        hybrid_docs = [
+            Document(page_content="Hybrid result 1", metadata={"id": "1"}),
+            Document(page_content="Hybrid result 2", metadata={"id": "2"}),
+            Document(page_content="Hybrid result 3", metadata={"id": "3"}),
         ]
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = dense_docs
-        mock_db_inst.query_with_sparse.return_value = sparse_docs
+        mock_db_inst.search.return_value = hybrid_docs
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -360,8 +348,6 @@ class TestQdrantCostOptimizedSearch:
             "values": [1.0],
         }
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
-
-        mock_merge.return_value = merged_docs
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -377,9 +363,11 @@ class TestQdrantCostOptimizedSearch:
         result = pipeline.search("What is Python?", top_k=3)
 
         assert result["query"] == "What is Python?"
-        mock_db_inst.query.assert_called_once()
-        mock_db_inst.query_with_sparse.assert_called_once()
-        mock_merge.assert_called_once()
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args[1]
+        assert call_kwargs["search_type"] == "hybrid"
+        assert "dense" in call_kwargs["query_vector"]
+        assert "sparse" in call_kwargs["query_vector"]
 
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.QdrantVectorDB")
     @patch(
@@ -391,13 +379,9 @@ class TestQdrantCostOptimizedSearch:
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.RAGHelper.create_llm")
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.RAGHelper.generate")
-    @patch(
-        "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-    )
     def test_search_with_rag_generation(
         self,
         mock_rag_generate,
-        mock_merge,
         mock_llm_helper,
         mock_sparse_embedder_class,
         mock_embed_query,
@@ -409,7 +393,7 @@ class TestQdrantCostOptimizedSearch:
             QdrantCostOptimizedRAGSearchPipeline,
         )
 
-        merged_docs = [
+        hybrid_docs = [
             Document(
                 page_content="Python is a programming language", metadata={"id": "1"}
             ),
@@ -417,8 +401,7 @@ class TestQdrantCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
-        mock_db_inst.query_with_sparse.return_value = []
+        mock_db_inst.search.return_value = hybrid_docs
         mock_db.return_value = mock_db_inst
 
         mock_llm = MagicMock()
@@ -431,8 +414,6 @@ class TestQdrantCostOptimizedSearch:
             "values": [1.0],
         }
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
-
-        mock_merge.return_value = merged_docs
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -448,8 +429,9 @@ class TestQdrantCostOptimizedSearch:
         result = pipeline.search("What is Python?", top_k=1)
 
         assert "answer" in result
-        # Result contains merged docs when LLM mock unavailable.
+        assert result["answer"] == "Python is a popular programming language."
         mock_rag_generate.assert_called_once()
+        mock_db_inst.search.assert_called_once()
 
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.QdrantVectorDB")
     @patch(
@@ -460,12 +442,8 @@ class TestQdrantCostOptimizedSearch:
     )
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.RAGHelper.create_llm")
-    @patch(
-        "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-    )
     def test_search_with_filters(
         self,
-        mock_merge,
         mock_llm_helper,
         mock_sparse_embedder_class,
         mock_embed_query,
@@ -477,7 +455,7 @@ class TestQdrantCostOptimizedSearch:
             QdrantCostOptimizedRAGSearchPipeline,
         )
 
-        merged_docs = [
+        hybrid_docs = [
             Document(
                 page_content="Python programming", metadata={"category": "programming"}
             ),
@@ -485,8 +463,7 @@ class TestQdrantCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
-        mock_db_inst.query_with_sparse.return_value = []
+        mock_db_inst.search.return_value = hybrid_docs
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -496,8 +473,6 @@ class TestQdrantCostOptimizedSearch:
             "values": [1.0],
         }
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
-
-        mock_merge.return_value = merged_docs
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -514,7 +489,9 @@ class TestQdrantCostOptimizedSearch:
         result = pipeline.search("Python", top_k=1, filters=filters)
 
         assert len(result["documents"]) == 1
-        mock_db_inst.query.assert_called_once()
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args[1]
+        assert call_kwargs["filters"] == filters
 
     @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.QdrantVectorDB")
     @patch(

@@ -281,10 +281,9 @@ class TestWeaviateCostOptimizedSearch:
     @patch(
         "vectordb.langchain.cost_optimized_rag.search.weaviate.EmbedderHelper.create_embedder"
     )
-    @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.RAGHelper.create_llm")
     def test_search_initialization(
-        self, mock_llm_helper, mock_sparse_embedder, mock_embedder_helper, mock_db
+        self, mock_llm_helper, mock_embedder_helper, mock_db
     ):
         """Test search pipeline initialization."""
         from vectordb.langchain.cost_optimized_rag.search.weaviate import (
@@ -306,7 +305,6 @@ class TestWeaviateCostOptimizedSearch:
         pipeline = WeaviateCostOptimizedRAGSearchPipeline(config)
         assert pipeline.config == config
         assert pipeline.llm is None
-        assert pipeline.rrf_k == 60
         assert pipeline.alpha == 0.5
 
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.WeaviateVectorDB")
@@ -316,53 +314,30 @@ class TestWeaviateCostOptimizedSearch:
     @patch(
         "vectordb.langchain.cost_optimized_rag.search.weaviate.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.RAGHelper.create_llm")
-    @patch(
-        "vectordb.langchain.cost_optimized_rag.search.weaviate.ResultMerger.merge_and_deduplicate"
-    )
     def test_search_hybrid_execution(
         self,
-        mock_merge,
         mock_llm_helper,
-        mock_sparse_embedder_class,
         mock_embed_query,
         mock_embedder_helper,
         mock_db,
     ):
-        """Test hybrid search execution with dense and sparse retrieval."""
+        """Test hybrid search execution with Weaviate native hybrid search."""
         from vectordb.langchain.cost_optimized_rag.search.weaviate import (
             WeaviateCostOptimizedRAGSearchPipeline,
         )
 
-        dense_docs = [
-            Document(page_content="Dense result 1", metadata={"id": "1"}),
-            Document(page_content="Dense result 2", metadata={"id": "2"}),
-        ]
-        sparse_docs = [
-            Document(page_content="Sparse result 1", metadata={"id": "3"}),
-        ]
-        merged_docs = [
-            Document(page_content="Merged result 1", metadata={"id": "1"}),
-            Document(page_content="Merged result 2", metadata={"id": "3"}),
-            Document(page_content="Merged result 3", metadata={"id": "2"}),
+        hybrid_docs = [
+            Document(page_content="Hybrid result 1", metadata={"id": "1"}),
+            Document(page_content="Hybrid result 2", metadata={"id": "2"}),
+            Document(page_content="Hybrid result 3", metadata={"id": "3"}),
         ]
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = dense_docs
-        mock_db_inst.query_with_sparse.return_value = sparse_docs
+        mock_db_inst.hybrid_search.return_value = hybrid_docs
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
-
-        mock_sparse_embedder = MagicMock()
-        mock_sparse_embedder.embed_query.return_value = {
-            "indices": [1],
-            "values": [1.0],
-        }
-        mock_sparse_embedder_class.return_value = mock_sparse_embedder
-
-        mock_merge.return_value = merged_docs
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -378,9 +353,7 @@ class TestWeaviateCostOptimizedSearch:
         result = pipeline.search("What is Python?", top_k=3)
 
         assert result["query"] == "What is Python?"
-        mock_db_inst.query.assert_called_once()
-        mock_db_inst.query_with_sparse.assert_called_once()
-        mock_merge.assert_called_once()
+        mock_db_inst.hybrid_search.assert_called_once()
 
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.WeaviateVectorDB")
     @patch(
@@ -389,18 +362,12 @@ class TestWeaviateCostOptimizedSearch:
     @patch(
         "vectordb.langchain.cost_optimized_rag.search.weaviate.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.RAGHelper.create_llm")
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.RAGHelper.generate")
-    @patch(
-        "vectordb.langchain.cost_optimized_rag.search.weaviate.ResultMerger.merge_and_deduplicate"
-    )
     def test_search_with_rag_generation(
         self,
         mock_rag_generate,
-        mock_merge,
         mock_llm_helper,
-        mock_sparse_embedder_class,
         mock_embed_query,
         mock_embedder_helper,
         mock_db,
@@ -410,7 +377,7 @@ class TestWeaviateCostOptimizedSearch:
             WeaviateCostOptimizedRAGSearchPipeline,
         )
 
-        merged_docs = [
+        hybrid_docs = [
             Document(
                 page_content="Python is a programming language", metadata={"id": "1"}
             ),
@@ -418,22 +385,12 @@ class TestWeaviateCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
-        mock_db_inst.query_with_sparse.return_value = []
+        mock_db_inst.hybrid_search.return_value = hybrid_docs
         mock_db.return_value = mock_db_inst
 
         mock_llm = MagicMock()
         mock_llm_helper.return_value = mock_llm
         mock_rag_generate.return_value = "Python is a popular programming language."
-
-        mock_sparse_embedder = MagicMock()
-        mock_sparse_embedder.embed_query.return_value = {
-            "indices": [1],
-            "values": [1.0],
-        }
-        mock_sparse_embedder_class.return_value = mock_sparse_embedder
-
-        mock_merge.return_value = merged_docs
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -449,7 +406,6 @@ class TestWeaviateCostOptimizedSearch:
         result = pipeline.search("What is Python?", top_k=1)
 
         assert "answer" in result
-        # Result contains merged docs when LLM mock unavailable.
         mock_rag_generate.assert_called_once()
 
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.WeaviateVectorDB")
@@ -459,16 +415,10 @@ class TestWeaviateCostOptimizedSearch:
     @patch(
         "vectordb.langchain.cost_optimized_rag.search.weaviate.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.RAGHelper.create_llm")
-    @patch(
-        "vectordb.langchain.cost_optimized_rag.search.weaviate.ResultMerger.merge_and_deduplicate"
-    )
     def test_search_with_filters(
         self,
-        mock_merge,
         mock_llm_helper,
-        mock_sparse_embedder_class,
         mock_embed_query,
         mock_embedder_helper,
         mock_db,
@@ -478,7 +428,7 @@ class TestWeaviateCostOptimizedSearch:
             WeaviateCostOptimizedRAGSearchPipeline,
         )
 
-        merged_docs = [
+        hybrid_docs = [
             Document(
                 page_content="Python programming", metadata={"category": "programming"}
             ),
@@ -486,19 +436,9 @@ class TestWeaviateCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
-        mock_db_inst.query_with_sparse.return_value = []
+        mock_db_inst.hybrid_search.return_value = hybrid_docs
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
-
-        mock_sparse_embedder = MagicMock()
-        mock_sparse_embedder.embed_query.return_value = {
-            "indices": [1],
-            "values": [1.0],
-        }
-        mock_sparse_embedder_class.return_value = mock_sparse_embedder
-
-        mock_merge.return_value = merged_docs
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -515,17 +455,14 @@ class TestWeaviateCostOptimizedSearch:
         result = pipeline.search("Python", top_k=1, filters=filters)
 
         assert len(result["documents"]) == 1
-        mock_db_inst.query.assert_called_once()
+        mock_db_inst.hybrid_search.assert_called_once()
 
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.WeaviateVectorDB")
     @patch(
         "vectordb.langchain.cost_optimized_rag.search.weaviate.EmbedderHelper.create_embedder"
     )
-    @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.SparseEmbedder")
     @patch("vectordb.langchain.cost_optimized_rag.search.weaviate.RAGHelper.create_llm")
-    def test_search_custom_alpha(
-        self, mock_llm_helper, mock_sparse_embedder, mock_embedder_helper, mock_db
-    ):
+    def test_search_custom_alpha(self, mock_llm_helper, mock_embedder_helper, mock_db):
         """Test search with custom alpha parameter for hybrid search."""
         from vectordb.langchain.cost_optimized_rag.search.weaviate import (
             WeaviateCostOptimizedRAGSearchPipeline,
@@ -541,12 +478,10 @@ class TestWeaviateCostOptimizedSearch:
                 "collection_name": "test_cost_optimized",
             },
             "search": {
-                "rrf_k": 120,
                 "alpha": 0.7,
             },
             "rag": {"enabled": False},
         }
 
         pipeline = WeaviateCostOptimizedRAGSearchPipeline(config)
-        assert pipeline.rrf_k == 120
         assert pipeline.alpha == 0.7

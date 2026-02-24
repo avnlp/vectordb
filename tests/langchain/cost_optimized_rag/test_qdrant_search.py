@@ -86,12 +86,8 @@ search:
             "vectordb.langchain.cost_optimized_rag.search.qdrant.EmbedderHelper.embed_query"
         )
         @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
-        @patch(
-            "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-        )
         def test_search_returns_documents(
             self,
-            mock_merger,
             mock_sparse_cls,
             mock_embed_query,
             mock_embedder_helper,
@@ -110,13 +106,10 @@ search:
             mock_sparse_cls.return_value = mock_sparse_embedder
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = []
-            mock_db_instance.query_with_sparse.return_value = []
+            mock_db_instance.search.return_value = []
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
-
-            mock_merger.return_value = []
 
             pipeline = QdrantCostOptimizedRAGSearchPipeline(qdrant_config)
             result = pipeline.search("test query")
@@ -132,12 +125,8 @@ search:
             "vectordb.langchain.cost_optimized_rag.search.qdrant.EmbedderHelper.embed_query"
         )
         @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
-        @patch(
-            "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-        )
         def test_search_with_filters(
             self,
-            mock_merger,
             mock_sparse_cls,
             mock_embed_query,
             mock_embedder_helper,
@@ -156,20 +145,16 @@ search:
             mock_sparse_cls.return_value = mock_sparse_embedder
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = []
-            mock_db_instance.query_with_sparse.return_value = []
+            mock_db_instance.search.return_value = []
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
-
-            mock_merger.return_value = []
 
             pipeline = QdrantCostOptimizedRAGSearchPipeline(qdrant_config)
             filters = {"metadata.field": "value"}
             pipeline.search("test query", filters=filters)
 
-            mock_db_instance.query.assert_called_once()
-            mock_db_instance.query_with_sparse.assert_called_once()
+            mock_db_instance.search.assert_called_once()
 
         @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.QdrantVectorDB")
         @patch(
@@ -179,12 +164,8 @@ search:
             "vectordb.langchain.cost_optimized_rag.search.qdrant.EmbedderHelper.embed_query"
         )
         @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
-        @patch(
-            "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-        )
         def test_search_with_top_k(
             self,
-            mock_merger,
             mock_sparse_cls,
             mock_embed_query,
             mock_embedder_helper,
@@ -203,13 +184,10 @@ search:
             mock_sparse_cls.return_value = mock_sparse_embedder
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = []
-            mock_db_instance.query_with_sparse.return_value = []
+            mock_db_instance.search.return_value = []
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
-
-            mock_merger.return_value = []
 
             pipeline = QdrantCostOptimizedRAGSearchPipeline(qdrant_config)
             result = pipeline.search("test query", top_k=5)
@@ -224,19 +202,15 @@ search:
             "vectordb.langchain.cost_optimized_rag.search.qdrant.EmbedderHelper.embed_query"
         )
         @patch("vectordb.langchain.cost_optimized_rag.search.qdrant.SparseEmbedder")
-        @patch(
-            "vectordb.langchain.cost_optimized_rag.search.qdrant.ResultMerger.merge_and_deduplicate"
-        )
         def test_search_fuses_results(
             self,
-            mock_merger,
             mock_sparse_cls,
             mock_embed_query,
             mock_embedder_helper,
             mock_db_cls,
             qdrant_config,
         ):
-            """Test that search fuses results from dense and sparse search."""
+            """Test that search uses native hybrid search."""
             mock_embedder = MagicMock()
             mock_embedder_helper.return_value = mock_embedder
 
@@ -247,26 +221,20 @@ search:
             }
             mock_sparse_cls.return_value = mock_sparse_embedder
 
-            # Simulate some documents returned
-            dense_docs = [
+            # Simulate hybrid search results
+            hybrid_docs = [
                 {"id": "1", "text": "doc1", "score": 0.9},
                 {"id": "2", "text": "doc2", "score": 0.8},
             ]
-            sparse_docs = [
-                {"id": "2", "text": "doc2", "score": 0.85},
-                {"id": "3", "text": "doc3", "score": 0.7},
-            ]
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = dense_docs
-            mock_db_instance.query_with_sparse.return_value = sparse_docs
+            mock_db_instance.search.return_value = hybrid_docs
             mock_db_cls.return_value = mock_db_instance
 
             mock_embed_query.return_value = [0.1] * 384
-
-            mock_merger.return_value = dense_docs + sparse_docs
 
             pipeline = QdrantCostOptimizedRAGSearchPipeline(qdrant_config)
             result = pipeline.search("test query")
 
             assert "documents" in result
+            mock_db_instance.search.assert_called_once()

@@ -349,8 +349,7 @@ class TestMilvusCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = dense_docs
-        mock_db_inst.query_with_sparse.return_value = sparse_docs
+        mock_db_inst.search.side_effect = [dense_docs, sparse_docs]
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -377,8 +376,7 @@ class TestMilvusCostOptimizedSearch:
         result = pipeline.search("What is Python?", top_k=3)
 
         assert result["query"] == "What is Python?"
-        mock_db_inst.query.assert_called_once()
-        mock_db_inst.query_with_sparse.assert_called_once()
+        assert mock_db_inst.search.call_count == 2
         mock_merge.assert_called_once()
 
     @patch("vectordb.langchain.cost_optimized_rag.search.milvus.MilvusVectorDB")
@@ -417,8 +415,7 @@ class TestMilvusCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
-        mock_db_inst.query_with_sparse.return_value = []
+        mock_db_inst.search.side_effect = [merged_docs, []]
         mock_db.return_value = mock_db_inst
 
         mock_llm = MagicMock()
@@ -485,8 +482,7 @@ class TestMilvusCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
-        mock_db_inst.query_with_sparse.return_value = []
+        mock_db_inst.search.side_effect = [merged_docs, []]
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -514,7 +510,7 @@ class TestMilvusCostOptimizedSearch:
         result = pipeline.search("Python", top_k=1, filters=filters)
 
         assert len(result["documents"]) == 1
-        mock_db_inst.query.assert_called_once()
+        assert mock_db_inst.search.call_count == 2
 
     @patch("vectordb.langchain.cost_optimized_rag.search.milvus.MilvusVectorDB")
     @patch(

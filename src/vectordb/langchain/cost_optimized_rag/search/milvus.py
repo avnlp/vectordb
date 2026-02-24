@@ -165,21 +165,20 @@ class MilvusCostOptimizedRAGSearchPipeline:
         )
 
         # Execute dense semantic search
-        dense_documents = self.db.query(
-            vector=dense_query_embedding,
+        dense_documents = self.db.search(
+            query_embedding=dense_query_embedding,
             top_k=top_k,
             collection_name=self.collection_name,
-            filter=filters,
+            filters=filters,
         )
         logger.info("Retrieved %d documents from dense search", len(dense_documents))
 
         # Execute sparse lexical search
-        sparse_documents = self.db.query_with_sparse(
-            vector=dense_query_embedding,
-            sparse_vector=sparse_query_embedding,
+        sparse_documents = self.db.search(
+            query_sparse_embedding=sparse_query_embedding,
             top_k=top_k,
             collection_name=self.collection_name,
-            filter=filters,
+            filters=filters,
         )
         logger.info("Retrieved %d documents from sparse search", len(sparse_documents))
 
