@@ -16,7 +16,7 @@ Every feature follows a two-phase pattern:
 
 2. **Search phase** - Embeds the incoming query, retrieves candidates from the database, applies optional post-processing (reranking, compression, diversification, or filtering), and optionally generates an answer using a large language model.
 
-All behavior is parameterized via YAML configuration files located in each feature's `configs/` subdirectory. Each feature maintains 25 configuration files covering every combination of five databases and five datasets (TriviaQA, ARC, PopQA, FactScore, and EarningsCall).
+All behavior is parameterized via YAML configuration files located in each feature's `configs/` subdirectory. For each feature, configuration files cover all supported combinations of five databases and five datasets (TriviaQA, ARC, PopQA, FactScore, and EarningsCall).
 
 ## Supported Databases
 
@@ -24,7 +24,7 @@ All behavior is parameterized via YAML configuration files located in each featu
 |----------|-------------|
 | Pinecone | Managed vector database with native sparse vector and namespace support |
 | Weaviate | Open-source vector search engine with BM25 and vector merge via alpha parameter |
-| Chroma | Lightweight embedding database for dense retrieval |
+| Chroma | Lightweight embedding database with support for dense and client-side hybrid retrieval |
 | Milvus | Scalable vector database with hybrid search and partition-based isolation |
 | Qdrant | High-performance vector search with collection-based multi-tenancy |
 
