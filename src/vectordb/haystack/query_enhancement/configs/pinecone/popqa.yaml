@@ -1,0 +1,31 @@
+dataloader:
+  type: "popqa"
+  params:
+    limit: 1000
+
+embeddings:
+  model: "all-MiniLM-L6-v2"
+  params: {}
+
+query_enhancement:
+  type: "multi_query"
+  num_queries: 3
+  num_hyde_docs: 3
+  llm:
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+  fusion_method: "rrf"
+  rrf_k: 60
+  top_k: 10
+
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "popqa-query-enhancement"
+  namespace: "default"
+
+logging:
+  level: "INFO"
+  name: "pinecone_query_enhancement"
+
+rag:
+  enabled: true

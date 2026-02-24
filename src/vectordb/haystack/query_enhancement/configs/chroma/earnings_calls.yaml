@@ -1,0 +1,30 @@
+dataloader:
+  type: "earnings_calls"
+  params:
+    limit: 1000
+
+embeddings:
+  model: "all-MiniLM-L6-v2"
+  params: {}
+
+query_enhancement:
+  type: "multi_query"
+  num_queries: 5
+  num_hyde_docs: 3
+  llm:
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+  fusion_method: "rrf"
+  rrf_k: 60
+  top_k: 15
+
+chroma:
+  collection_name: "earnings-calls-query-enhancement"
+  persist_directory: "./data/chroma"
+
+logging:
+  level: "INFO"
+  name: "chroma_query_enhancement"
+
+rag:
+  enabled: true

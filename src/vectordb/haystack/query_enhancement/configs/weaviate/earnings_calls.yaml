@@ -1,0 +1,31 @@
+dataloader:
+  type: "earnings_calls"
+  params:
+    limit: 1000
+
+embeddings:
+  model: "all-MiniLM-L6-v2"
+  params: {}
+
+query_enhancement:
+  type: "hyde"
+  num_queries: 3
+  num_hyde_docs: 5
+  llm:
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+  fusion_method: "rrf"
+  rrf_k: 60
+  top_k: 10
+
+weaviate:
+  url: "${WEAVIATE_URL}"
+  api_key: "${WEAVIATE_API_KEY}"
+  class_name: "EarningsCallsQueryEnhancement"
+
+logging:
+  level: "INFO"
+  name: "weaviate_query_enhancement"
+
+rag:
+  enabled: true
