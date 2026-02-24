@@ -3,7 +3,6 @@
 from pathlib import Path
 from typing import Any
 
-from haystack import Document
 from haystack.dataclasses import SparseEmbedding
 
 from vectordb.databases.pinecone import PineconeVectorDB
@@ -64,30 +63,13 @@ class PineconeSparseSearchPipeline:
         sparse_values = _to_pinecone_sparse(sparse_embedding)
 
         # 3. Query Pinecone with sparse vector only
-        response = self.db.query(
+        documents = self.db.query_with_sparse(
             vector=[0.0],  # Dummy dense vector for sparse-only search
             sparse_vector=sparse_values,
             top_k=top_k,
             namespace=self.namespace,
             include_metadata=True,
         )
-
-        # 4. Convert results to Haystack Documents
-        documents = []
-        if response and response.get("matches"):
-            for match in response["matches"]:
-                metadata = match.get("metadata", {})
-                content = metadata.pop("content", "")
-
-                doc = Document(
-                    content=content,
-                    id=match.get("id"),
-                    meta={
-                        "score": match.get("score", 0.0),
-                        **metadata,
-                    },
-                )
-                documents.append(doc)
 
         logger.info(f"Found {len(documents)} documents for query: {query[:50]}...")
         return {"query": query, "documents": documents}

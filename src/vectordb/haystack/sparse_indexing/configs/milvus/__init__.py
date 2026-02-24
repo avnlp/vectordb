@@ -6,14 +6,11 @@ connection parameters optimized for lexical and hybrid search scenarios.
 
 Directory Structure:
     configs/milvus/
-    ├── triviaqa/
-    │   ├── sparse_bm25.yaml              # BM25 sparse indexing config
-    │   ├── sparse_splade.yaml            # SPLADE sparse indexing config
-    │   └── hybrid.yaml                   # Hybrid sparse+dense config
-    ├── arc/                              # ARC dataset configs
-    ├── popqa/                            # PopQA dataset configs
-    ├── factscore/                        # FactScore dataset configs
-    └── earnings_calls/                   # EarningsCall dataset configs
+    ├── triviaqa.yaml                     # TriviaQA dataset configs
+    ├── arc.yaml                          # ARC dataset configs
+    ├── popqa.yaml                        # PopQA dataset configs
+    ├── factscore.yaml                    # FactScore dataset configs
+    └── earnings_calls.yaml               # EarningsCall dataset configs
 
 Configuration Sections:
     - embeddings: Sparse model (BM25/SPLADE), tokenizer, batch_size

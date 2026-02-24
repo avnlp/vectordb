@@ -30,7 +30,7 @@ Database-Specific Implementation:
     - Milvus: SPARSE_FLOAT_VECTOR field with SPARSE_INVERTED_INDEX
     - Qdrant: Sparse vectors with named vector configuration
     - Weaviate: Native BM25 (no sparse embedder needed)
-    - Chroma: Manual sparse vector storage in metadata
+    - Chroma: Not supported in open-source version (Chroma Cloud only)
 
 Usage:
     >>> from vectordb.haystack.sparse_indexing import MilvusSparseIndexingPipeline

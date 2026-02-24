@@ -188,18 +188,16 @@ class TestPineconeSparseSearch:
         mock_make_embedder.return_value = mock_embedder
 
         mock_db = MagicMock()
-        mock_db.query.return_value = {
-            "matches": [
-                {"id": "1", "score": 0.9, "metadata": {"content": "Test content 1"}},
-                {"id": "2", "score": 0.8, "metadata": {"content": "Test content 2"}},
-            ]
-        }
+        mock_db.query_with_sparse.return_value = [
+            {"id": "1", "score": 0.9, "metadata": {"content": "Test content 1"}},
+            {"id": "2", "score": 0.8, "metadata": {"content": "Test content 2"}},
+        ]
         mock_db_class.return_value = mock_db
 
         pipeline = PineconeSparseSearchPipeline(pinecone_config)
         result = pipeline.search("test query", top_k=5)
 
-        mock_db.query.assert_called_once()
+        mock_db.query_with_sparse.assert_called_once()
         assert "documents" in result
         assert "query" in result
         assert len(result["documents"]) == 2
@@ -221,7 +219,7 @@ class TestPineconeSparseSearch:
         mock_make_embedder.return_value = mock_embedder
 
         mock_db = MagicMock()
-        mock_db.query.return_value = {"matches": []}
+        mock_db.query_with_sparse.return_value = []
         mock_db_class.return_value = mock_db
 
         pipeline = PineconeSparseSearchPipeline(pinecone_config)

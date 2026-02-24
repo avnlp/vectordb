@@ -67,11 +67,7 @@ class QdrantSparseSearchPipeline:
 
         # 3. Query Qdrant with sparse vector
         results = self.db.search(
-            query_vector={
-                "name": "sparse",  # Named sparse vector
-                "vector": sparse_vector,
-                "query_filter": None,
-            },
+            query_vector={"sparse": sparse_vector},
             top_k=top_k,
         )
 

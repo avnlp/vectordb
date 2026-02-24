@@ -61,8 +61,7 @@ class MilvusSparseSearchPipeline:
 
         # 3. Query Milvus with sparse vector
         results = self.db.search(
-            query_texts=[query],  # Pass original query for BM25 fallback
-            query_sparse=[sparse_vector],
+            query_sparse_embedding=sparse_vector,
             top_k=top_k,
         )
 

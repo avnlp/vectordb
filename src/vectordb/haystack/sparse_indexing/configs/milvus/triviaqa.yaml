@@ -14,7 +14,7 @@ sparse:
   device: null
 
 dataloader:
-  name: "triviaqa"  # Example: triviaqa, arc, popqa, factscore, earnings_calls
+  type: "triviaqa"  # Example: triviaqa, arc, popqa, factscore, earnings_calls
   limit: null
   batch_size: 32
 
