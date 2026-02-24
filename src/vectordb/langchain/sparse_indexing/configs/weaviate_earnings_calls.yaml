@@ -1,0 +1,33 @@
+dataloader:
+  type: "earnings_calls"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+sparse_embeddings:
+  model: "bm25"
+  device: "cpu"
+
+weaviate:
+  url: "${WEAVIATE_URL:-http://localhost:8080}"
+  api_key: "${WEAVIATE_API_KEY:-}"
+  collection_name: "sparse_indexing_earnings_calls"
+
+search:
+  top_k: 10
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+logging:
+  name: "lc_sparse_indexing_weaviate"
+  level: "INFO"

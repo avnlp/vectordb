@@ -1,0 +1,39 @@
+dataloader:
+  type: "earnings_calls"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+chunking:
+  chunk_size: 1000
+  chunk_overlap: 200
+  separators:
+    - "\n\n"
+    - "\n"
+    - " "
+    - ""
+
+chroma:
+  persist_directory: "./chroma_db"
+  collection_name: "lc_cost_optimized_rag_earnings_calls"
+  recreate: false
+
+search:
+  top_k: 10
+  rrf_k: 60
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+logging:
+  name: "lc_cost_optimized_rag_chroma"
+  level: "INFO"
