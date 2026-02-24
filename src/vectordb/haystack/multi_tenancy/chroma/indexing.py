@@ -3,27 +3,30 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any
 
 from haystack import Document
 
 from vectordb.databases.chroma import ChromaVectorDB
 from vectordb.dataloaders import DataloaderCatalog
-from vectordb.haystack.multi_tenancy.common.config import load_config
+from vectordb.haystack.multi_tenancy.base import BaseMultitenancyPipeline
 from vectordb.haystack.multi_tenancy.common.embeddings import (
     create_document_embedder,
     truncate_embeddings,
 )
-from vectordb.haystack.multi_tenancy.common.tenant_context import TenantContext
-from vectordb.haystack.multi_tenancy.common.timing import Timer
-from vectordb.haystack.multi_tenancy.common.types import TenantIndexResult
+from vectordb.haystack.multi_tenancy.common.types import (
+    MultitenancyTimingMetrics,
+    TenantIndexResult,
+    TenantIsolationStrategy,
+    TenantStats,
+    TenantStatus,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
-class ChromaMultitenancyIndexingPipeline:
+class ChromaMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
     """Chroma indexing pipeline with database/tenant scoping.
 
     Chroma provides multi-tenancy through:
@@ -36,21 +39,19 @@ class ChromaMultitenancyIndexingPipeline:
 
     def __init__(
         self,
-        config_or_path: dict[str, Any] | str | Path,
-        tenant_context: TenantContext | None = None,
+        config_path: str,
+        tenant_context: Any = None,
     ) -> None:
         """Initialize Chroma indexing pipeline.
 
         Args:
-            config_or_path: Config dict or path to YAML file.
+            config_path: Path to YAML configuration file.
             tenant_context: Explicit tenant context. If None, resolves from
                 environment (TENANT_ID) or config (tenant.id).
         """
-        self.config = load_config(config_or_path)
-        self.tenant_context = TenantContext.resolve(tenant_context, self.config)
         self._db: ChromaVectorDB | None = None
-        self._embedder = None
-        self._connect()
+        self._embedder: Any = None
+        super().__init__(config_path=config_path, tenant_context=tenant_context)
 
     def _connect(self) -> None:
         """Connect to Chroma and initialize embedder."""
@@ -65,9 +66,14 @@ class ChromaMultitenancyIndexingPipeline:
         self._embedder.warm_up()
 
     def _get_collection_name(self) -> str:
-        """Get collection name from config."""
-        # For Chroma, use a combination of the configured name and tenant for isolation
+        """Get collection name from config with tenant suffix for isolation."""
         base_name = self.config.get("collection", {}).get("name", "multitenancy")
+
+        # Resolve placeholders from dataset config
+        dataset_config = self.config.get("dataset", {})
+        dataset_name = dataset_config.get("name", "dataset")
+        base_name = base_name.replace("{dataset}", dataset_name)
+
         tenant_suffix = self.tenant_context.tenant_id.replace("-", "_").replace(
             ".", "_"
         )
@@ -75,8 +81,273 @@ class ChromaMultitenancyIndexingPipeline:
 
     def close(self) -> None:
         """Close Chroma connection."""
-        # Chroma doesn't have a specific close method in most implementations
+        # Chroma doesn't have a specific close method
         pass
+
+    def _get_document_store(self) -> ChromaVectorDB | None:
+        """Return configured Chroma database instance.
+
+        Returns:
+            ChromaVectorDB instance or None if not initialized.
+        """
+        return self._db
+
+    @property
+    def isolation_strategy(self) -> TenantIsolationStrategy:
+        """Return the isolation strategy for Chroma.
+
+        Returns:
+            TenantIsolationStrategy.DATABASE_SCOPING
+        """
+        return TenantIsolationStrategy.DATABASE_SCOPING
+
+    def create_tenant(self, tenant_id: str) -> bool:
+        """Create a new tenant in Chroma.
+
+        Chroma uses collection-per-tenant isolation, so creating a tenant
+        means creating a dedicated collection.
+
+        Args:
+            tenant_id: Tenant identifier to create.
+
+        Returns:
+            True if tenant was created, False if already exists.
+        """
+        # Chroma creates collections automatically on first upsert
+        # Check if collection exists by trying to get it
+        # Create collection by upserting a dummy document
+        return not (self._db and self._db._collection is not None)
+
+    def tenant_exists(self, tenant_id: str) -> bool:
+        """Check if a tenant exists in Chroma.
+
+        Args:
+            tenant_id: Tenant identifier to check.
+
+        Returns:
+            True if tenant collection exists, False otherwise.
+        """
+        # In Chroma, tenant = collection, check if collection exists
+        if self._db is None:
+            return False
+
+        try:
+            # Try to access the collection
+            return self._db._collection is not None
+        except Exception:
+            return False
+
+    def get_tenant_stats(self, tenant_id: str) -> TenantStats:
+        """Get statistics for a tenant.
+
+        Args:
+            tenant_id: Tenant identifier.
+
+        Returns:
+            TenantStats with tenant statistics.
+        """
+        if self._db is None:
+            return TenantStats(
+                tenant_id=tenant_id,
+                document_count=0,
+                vector_count=0,
+                status=TenantStatus.UNKNOWN,
+            )
+
+        try:
+            # Get count from Chroma collection
+            count = self._db._collection.count() if self._db._collection else 0
+            return TenantStats(
+                tenant_id=tenant_id,
+                document_count=count,
+                vector_count=count,
+                status=TenantStatus.ACTIVE,
+            )
+        except Exception:
+            return TenantStats(
+                tenant_id=tenant_id,
+                document_count=0,
+                vector_count=0,
+                status=TenantStatus.UNKNOWN,
+            )
+
+    def list_tenants(self) -> list[str]:
+        """List all tenants (collections) in Chroma.
+
+        Returns:
+            List of tenant identifiers.
+        """
+        if self._db is None:
+            return []
+
+        try:
+            # Get all collections from Chroma
+            client = self._db._client
+            collections = client.list_collections()
+            return [col.name for col in collections]
+        except Exception:
+            return []
+
+    def delete_tenant(self, tenant_id: str) -> bool:
+        """Delete a tenant and all its data.
+
+        Args:
+            tenant_id: Tenant identifier to delete.
+
+        Returns:
+            True if tenant was deleted, False if not found.
+        """
+        if self._db is None:
+            return False
+
+        try:
+            # Delete the collection for this tenant
+            collection_name = self._get_collection_name()
+            client = self._db._client
+            client.delete_collection(collection_name)
+            return True
+        except Exception:
+            return False
+
+    def index_documents(
+        self,
+        documents: list[Document],
+        tenant_id: str | None = None,
+    ) -> int:
+        """Index documents for a tenant.
+
+        Args:
+            documents: List of Haystack Documents to index.
+            tenant_id: Target tenant. Uses current context if None.
+
+        Returns:
+            Number of documents indexed.
+        """
+        target_tenant = tenant_id or self.tenant_context.tenant_id
+
+        if not documents:
+            self.logger.warning("No documents to index")
+            return 0
+
+        # Embed documents
+        result = self._embedder.run(documents=documents)
+        embedded_docs = result["documents"]
+
+        # Truncate if output_dimension specified
+        output_dim = self.config.get("embedding", {}).get("output_dimension")
+        embedded_docs = truncate_embeddings(embedded_docs, output_dim)
+
+        # Add tenant metadata
+        for doc in embedded_docs:
+            doc.meta[self.TENANT_FIELD] = target_tenant
+
+        # Insert documents into Chroma
+        if self._db:
+            self._db.upsert(data=embedded_docs)
+
+        self.logger.info(
+            "Indexed %d documents for tenant %s",
+            len(embedded_docs),
+            target_tenant,
+        )
+
+        return len(embedded_docs)
+
+    def query(
+        self,
+        query: str,
+        top_k: int = 10,
+        tenant_id: str | None = None,
+    ) -> list[Document]:
+        """Query documents within tenant scope.
+
+        Args:
+            query: Query string.
+            top_k: Number of results to return.
+            tenant_id: Target tenant. Uses current context if None.
+
+        Returns:
+            List of retrieved Documents.
+        """
+        target_tenant = tenant_id or self.tenant_context.tenant_id
+
+        if self._db is None:
+            return []
+
+        # Embed query
+        from vectordb.haystack.multi_tenancy.common.embeddings import (
+            create_query_embedder,
+        )
+
+        query_embedder = create_query_embedder(self.config)
+        query_embedder.warm_up()
+        query_result = query_embedder.run(text=query)
+        query_embedding = query_result["embedding"]
+
+        # Query Chroma with tenant filter
+        return self._db.query(
+            query_embedding=query_embedding,
+            top_k=top_k,
+            filter={self.TENANT_FIELD: target_tenant},
+        )
+
+    def run(
+        self,
+        documents: list[Document] | None = None,
+        tenant_id: str | None = None,
+    ) -> TenantIndexResult:
+        """Index documents for a tenant (convenience method).
+
+        This method provides a convenient way to index documents while
+        capturing timing metrics. For simple indexing without metrics,
+        use index_documents() directly.
+
+        Args:
+            documents: Documents to index. If None, loads from dataloader.
+            tenant_id: Target tenant. Uses context if None.
+
+        Returns:
+            TenantIndexResult with indexing metrics.
+        """
+        from vectordb.haystack.multi_tenancy.base import Timer
+
+        target_tenant = tenant_id or self.tenant_context.tenant_id
+
+        with Timer() as timer:
+            if documents is None:
+                documents = self._load_documents_from_dataloader()
+
+            if not documents:
+                self.logger.warning("No documents to index")
+                return TenantIndexResult(
+                    tenant_id=target_tenant,
+                    documents_indexed=0,
+                    collection_name=self._get_collection_name(),
+                    timing=MultitenancyTimingMetrics(
+                        tenant_resolution_ms=0.0,
+                        index_operation_ms=timer.elapsed_ms,
+                        retrieval_ms=0.0,
+                        total_ms=timer.elapsed_ms,
+                        tenant_id=target_tenant,
+                        num_documents=0,
+                    ),
+                )
+
+            num_indexed = self.index_documents(documents, tenant_id)
+
+        return TenantIndexResult(
+            tenant_id=target_tenant,
+            documents_indexed=num_indexed,
+            collection_name=self._get_collection_name(),
+            timing=MultitenancyTimingMetrics(
+                tenant_resolution_ms=0.0,
+                index_operation_ms=timer.elapsed_ms,
+                retrieval_ms=0.0,
+                total_ms=timer.elapsed_ms,
+                tenant_id=target_tenant,
+                num_documents=num_indexed,
+            ),
+        )
 
     def _load_documents_from_dataloader(self) -> list[Document]:
         """Load documents from configured dataloader.
@@ -100,94 +371,3 @@ class ChromaMultitenancyIndexingPipeline:
         )
 
         return loader.load().to_haystack()
-
-    def run(
-        self,
-        documents: list[Document] | None = None,
-        tenant_id: str | None = None,
-    ) -> TenantIndexResult:
-        """Index documents for a tenant.
-
-        Args:
-            documents: Documents to index. If None, loads from dataloader.
-            tenant_id: Target tenant. Uses context if None.
-
-        Returns:
-            TenantIndexResult with indexing metrics.
-        """
-        target_tenant = tenant_id or self.tenant_context.tenant_id
-
-        with Timer() as timer:
-            if documents is None:
-                documents = self._load_documents_from_dataloader()
-
-            if not documents:
-                logger.warning("No documents to index")
-                return TenantIndexResult(
-                    tenant_id=target_tenant,
-                    documents_indexed=0,
-                    collection_name=self._get_collection_name(),
-                    timing=self._create_timing_metrics(0, timer.elapsed_ms),
-                )
-
-            # Embed documents
-            result = self._embedder.run(documents=documents)
-            embedded_docs = result["documents"]
-
-            # Truncate if output_dimension specified
-            output_dim = self.config.get("embedding", {}).get("output_dimension")
-            embedded_docs = truncate_embeddings(embedded_docs, output_dim)
-
-            for doc in embedded_docs:
-                doc.meta[self.TENANT_FIELD] = target_tenant
-
-            # Insert documents into Chroma with tenant metadata
-            if self._db:
-                self._db.upsert(
-                    data=embedded_docs,
-                )
-
-        metrics = self._create_timing_metrics(len(embedded_docs), timer.elapsed_ms)
-
-        result = TenantIndexResult(
-            tenant_id=target_tenant,
-            documents_indexed=len(embedded_docs),
-            collection_name=self._get_collection_name(),
-            timing=metrics,
-        )
-
-        logger.info(
-            "Indexed %d documents for tenant %s in %.1fms",
-            len(embedded_docs),
-            target_tenant,
-            timer.elapsed_ms,
-        )
-
-        return result
-
-    def _create_timing_metrics(
-        self,
-        num_documents: int,
-        total_ms: float,
-    ) -> Any:
-        """Create timing metrics for indexing operation.
-
-        Args:
-            num_documents: Number of documents processed.
-            total_ms: Total operation time in milliseconds.
-
-        Returns:
-            Timing metrics object.
-        """
-        return type(
-            "TimingMetrics",
-            (),
-            {
-                "tenant_resolution_ms": 0.0,
-                "index_operation_ms": total_ms,
-                "retrieval_ms": 0.0,
-                "total_ms": total_ms,
-                "tenant_id": self.tenant_context.tenant_id,
-                "num_documents": num_documents,
-            },
-        )()

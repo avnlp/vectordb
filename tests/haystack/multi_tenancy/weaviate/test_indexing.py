@@ -13,16 +13,35 @@ This module tests the WeaviateMultitenancyIndexingPipeline class with focus on:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from haystack import Document
 
+from vectordb.haystack.multi_tenancy.base import BaseMultitenancyPipeline
 from vectordb.haystack.multi_tenancy.common.tenant_context import TenantContext
 from vectordb.haystack.multi_tenancy.weaviate.indexing import (
     WeaviateMultitenancyIndexingPipeline,
 )
+
+
+@pytest.fixture
+def config_file(tmp_path: Path) -> Path:
+    """Create a temporary config file with default settings."""
+    config_path = tmp_path / "config.yaml"
+    config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+    config_path.write_text(config_content)
+    return config_path
 
 
 class TestWeaviateMultitenancyIndexingPipeline:
@@ -30,10 +49,28 @@ class TestWeaviateMultitenancyIndexingPipeline:
 
     @patch("weaviate.Client")
     @patch("vectordb.haystack.multi_tenancy.weaviate.indexing.create_document_embedder")
-    @patch("vectordb.haystack.multi_tenancy.weaviate.indexing.load_config")
+    def test_inherits_from_base_multitenancy_pipeline(
+        self,
+        mock_create_embedder: MagicMock,
+        mock_weaviate_client: MagicMock,
+        config_file: Path,
+    ) -> None:
+        """Test that pipeline inherits from BaseMultitenancyPipeline."""
+        mock_client = MagicMock()
+        mock_weaviate_client.return_value = mock_client
+
+        mock_embedder = MagicMock()
+        mock_embedder.warm_up = MagicMock()
+        mock_create_embedder.return_value = mock_embedder
+
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
+
+        assert isinstance(pipeline, BaseMultitenancyPipeline)
+
+    @patch("weaviate.Client")
+    @patch("vectordb.haystack.multi_tenancy.weaviate.indexing.create_document_embedder")
     def test_initialization_with_config_path(
         self,
-        mock_load_config: MagicMock,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
         tmp_path: Path,
@@ -56,20 +93,6 @@ tenant:
         config_file.write_text(config_content)
 
         # Setup mocks
-        mock_config = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-                "api_key": "test-key",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
-                "dimension": 384,
-            },
-            "tenant": {"id": "test-tenant"},
-        }
-        mock_load_config.return_value = mock_config
-
         mock_client = MagicMock()
         mock_weaviate_client.return_value = mock_client
 
@@ -81,9 +104,8 @@ tenant:
         pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
-        assert pipeline.config == mock_config
         assert pipeline.tenant_context.tenant_id == "test-tenant"
-        mock_load_config.assert_called_once_with(str(config_file))
+        assert "weaviate" in pipeline.config
 
     @patch("weaviate.Client")
     @patch("vectordb.haystack.multi_tenancy.weaviate.indexing.create_document_embedder")
@@ -91,20 +113,24 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test pipeline initialization with dictionary config."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-                "api_key": "test-key",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
-                "dimension": 384,
-            },
-            "tenant": {"id": "dict-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+  api_key: test-key
+collection:
+  name: TestCollection
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  dimension: 384
+tenant:
+  id: dict-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -114,12 +140,12 @@ tenant:
         mock_embedder.warm_up = MagicMock()
         mock_create_embedder.return_value = mock_embedder
 
-        # Create pipeline with dict config
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        # Create pipeline with config path
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
-        assert pipeline.config == config
         assert pipeline.tenant_context.tenant_id == "dict-tenant"
+        assert "weaviate" in pipeline.config
 
     @patch("weaviate.Client")
     @patch("vectordb.haystack.multi_tenancy.weaviate.indexing.create_document_embedder")
@@ -127,18 +153,21 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test pipeline initialization with explicit tenant context."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
-                "dimension": 384,
-            },
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  dimension: 384
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -152,7 +181,9 @@ tenant:
         tenant_context = TenantContext(tenant_id="explicit-tenant")
 
         # Create pipeline with tenant context
-        pipeline = WeaviateMultitenancyIndexingPipeline(config, tenant_context)
+        pipeline = WeaviateMultitenancyIndexingPipeline(
+            str(config_file), tenant_context
+        )
 
         # Assertions
         assert pipeline.tenant_context.tenant_id == "explicit-tenant"
@@ -163,17 +194,23 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that API key authentication is configured."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-                "api_key": "my-secret-key",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+  api_key: my-secret-key
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -184,7 +221,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        WeaviateMultitenancyIndexingPipeline(config)
+        WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions - verify client was created with auth
         mock_weaviate_client.assert_called_once()
@@ -198,17 +235,24 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that additional headers are passed to client."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-                "headers": {"X-OpenAI-Api-Key": "test-key"},
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+  headers:
+    X-OpenAI-Api-Key: test-key
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -219,7 +263,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        WeaviateMultitenancyIndexingPipeline(config)
+        WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         call_kwargs = mock_weaviate_client.call_args.kwargs
@@ -232,16 +276,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that _connect initializes Weaviate client and embedder."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -252,7 +302,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         assert pipeline._client == mock_client
@@ -266,15 +316,22 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
         monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
     ) -> None:
         """Test that _connect uses WEAVIATE_URL from environment."""
         monkeypatch.setenv("WEAVIATE_URL", "http://env:8080")
 
-        config: dict[str, Any] = {
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -285,7 +342,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        WeaviateMultitenancyIndexingPipeline(config)
+        WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         call_kwargs = mock_weaviate_client.call_args.kwargs
@@ -299,20 +356,26 @@ tenant:
         mock_catalog_class: MagicMock,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test document loading from dataloader registry."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "dataloader": {
-                "dataset": "triviaqa",
-                "params": {"limit": 10},
-            },
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+dataloader:
+  dataset: triviaqa
+  params:
+    limit: 10
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -336,7 +399,7 @@ tenant:
         mock_catalog_class.create.return_value = mock_loader
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Load documents
         documents = pipeline._load_documents_from_dataloader()
@@ -356,16 +419,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test successful indexing run with provided documents."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -381,7 +450,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run with documents
         documents = [
@@ -403,16 +472,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that documents are indexed with correct tenant."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "tenant-a"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: tenant-a
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -427,7 +502,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run with explicit tenant_id
         documents = [Document(content="Doc 1", meta={"id": "1"})]
@@ -442,16 +517,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test behavior when no documents are provided."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -462,7 +543,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run with empty documents
         result = pipeline.run(documents=[])
@@ -480,17 +561,24 @@ tenant:
         mock_catalog_class: MagicMock,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that run() loads documents from dataloader when not provided."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "dataloader": {"dataset": "triviaqa"},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+dataloader:
+  dataset: triviaqa
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -521,7 +609,7 @@ tenant:
         mock_embedder.run.return_value = {"documents": embedded_docs}
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run without providing documents
         result = pipeline.run()
@@ -542,19 +630,23 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that embeddings are truncated when output_dimension is specified."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {
-                "dimension": 384,
-                "output_dimension": 256,
-            },
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+  output_dimension: 256
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -570,7 +662,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [Document(content="Doc 1", meta={"id": "1"})]
@@ -585,16 +677,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that _ensure_tenant_exists creates tenant when not exists."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -608,7 +706,7 @@ tenant:
         mock_client.schema.get_tenant.return_value = []
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Call _ensure_tenant_exists
         pipeline._ensure_tenant_exists("TestCollection", "new-tenant")
@@ -624,16 +722,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that _ensure_tenant_exists skips when tenant already exists."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -647,7 +751,7 @@ tenant:
         mock_client.schema.get_tenant.return_value = [{"name": "existing-tenant"}]
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Call _ensure_tenant_exists with existing tenant
         pipeline._ensure_tenant_exists("TestCollection", "existing-tenant")
@@ -661,16 +765,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that tenant creation falls back to creating class with multi-tenancy."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -680,11 +790,13 @@ tenant:
         mock_embedder.warm_up = MagicMock()
         mock_create_embedder.return_value = mock_embedder
 
-        # Mock get_tenant to raise exception
+        # Mock get_tenant to raise exception (class doesn't exist)
         mock_client.schema.get_tenant.side_effect = Exception("Class not found")
+        # Also mock get to raise exception so create_class is called
+        mock_client.schema.get.side_effect = Exception("Class not found")
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Call _ensure_tenant_exists
         pipeline._ensure_tenant_exists("TestCollection", "new-tenant")
@@ -701,16 +813,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test timing metrics creation."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -721,10 +839,14 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Create timing metrics
-        metrics = pipeline._create_timing_metrics(num_documents=100, total_ms=1500.5)
+        metrics = pipeline._create_timing_metrics(
+            index_operation_ms=1500.5,
+            total_ms=1500.5,
+            num_documents=100,
+        )
 
         # Assertions
         assert metrics.tenant_id == "test-tenant"
@@ -740,16 +862,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test _get_class_name returns configured class name."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "CustomCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: CustomCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -760,7 +888,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         assert pipeline._get_class_name() == "CustomCollection"
@@ -771,15 +899,20 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test _get_class_name returns default when not configured."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -790,7 +923,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         assert pipeline._get_class_name() == "MultiTenancy"
@@ -801,16 +934,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test close method calls client.close()."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -821,7 +960,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline and close
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
         pipeline.close()
 
         # Assertions
@@ -831,24 +970,30 @@ tenant:
     def test_error_handling_on_connection_failure(
         self,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test error handling when Weaviate connection fails."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-                "api_key": "invalid-key",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+  api_key: invalid-key
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mock to raise exception
         mock_weaviate_client.side_effect = Exception("Connection failed")
 
         # Attempt to create pipeline should raise exception
         with pytest.raises(Exception, match="Connection failed"):
-            WeaviateMultitenancyIndexingPipeline(config)
+            WeaviateMultitenancyIndexingPipeline(str(config_file))
 
     @patch("weaviate.Client")
     @patch("vectordb.haystack.multi_tenancy.weaviate.indexing.create_document_embedder")
@@ -856,16 +1001,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test pipeline falls back to 'database' config if 'weaviate' not present."""
-        config: dict[str, Any] = {
-            "database": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+database:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -880,7 +1031,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run to verify everything works
         result = pipeline.run(documents=[Document(content="Doc 1", meta={"id": "1"})])
@@ -892,16 +1043,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that document metadata is properly handled in batch."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -920,7 +1077,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [
@@ -937,16 +1094,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test close method handles None client gracefully."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -957,7 +1120,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Manually set _client to None to test the edge case
         pipeline._client = None
@@ -971,16 +1134,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that tenant_id in document meta is handled correctly."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1000,7 +1169,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [
@@ -1019,16 +1188,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that _ensure_tenant_exists handles when create_class also fails."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1038,19 +1213,23 @@ tenant:
         mock_embedder.warm_up = MagicMock()
         mock_create_embedder.return_value = mock_embedder
 
-        # Mock get_tenant to raise exception
+        # Mock get_tenant to raise exception (class doesn't exist)
         mock_client.schema.get_tenant.side_effect = Exception("Class not found")
+        # Mock get to also raise exception so create_class is attempted
+        mock_client.schema.get.side_effect = Exception("Class not found")
         # Mock create_class to also raise exception
         mock_client.schema.create_class.side_effect = Exception("Create failed")
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
-        # Call _ensure_tenant_exists - should not raise, just log error
-        pipeline._ensure_tenant_exists("TestCollection", "new-tenant")
+        # Call _ensure_tenant_exists - should raise since create_class fails
+        with pytest.raises(Exception, match="Create failed"):
+            pipeline._ensure_tenant_exists("TestCollection", "new-tenant")
 
-        # Assertions - both methods should have been called
+        # Assertions - all methods should have been called
         mock_client.schema.get_tenant.assert_called_once()
+        mock_client.schema.get.assert_called_once()
         mock_client.schema.create_class.assert_called_once()
 
     @patch("weaviate.Client")
@@ -1059,16 +1238,22 @@ tenant:
         self,
         mock_create_embedder: MagicMock,
         mock_weaviate_client: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that complex metadata types are converted to strings."""
-        config: dict[str, Any] = {
-            "weaviate": {
-                "url": "http://localhost:8080",
-            },
-            "collection": {"name": "TestCollection"},
-            "embedding": {"dimension": 384},
-            "tenant": {"id": "test-tenant"},
-        }
+        # Create a temporary config file
+        config_file = tmp_path / "test_config.yaml"
+        config_content = """
+weaviate:
+  url: http://localhost:8080
+collection:
+  name: TestCollection
+embedding:
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+        config_file.write_text(config_content)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1088,7 +1273,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = WeaviateMultitenancyIndexingPipeline(config)
+        pipeline = WeaviateMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [

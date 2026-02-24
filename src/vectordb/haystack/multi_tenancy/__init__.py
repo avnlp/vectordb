@@ -4,6 +4,7 @@ This package provides multi-tenancy support for various vector databases
 with explicit per-database pipeline implementations.
 """
 
+from vectordb.haystack.multi_tenancy.base import BaseMultitenancyPipeline
 from vectordb.haystack.multi_tenancy.chroma.indexing import (
     ChromaMultitenancyIndexingPipeline,
 )
@@ -47,6 +48,8 @@ from vectordb.haystack.multi_tenancy.weaviate.search import (
 
 
 __all__ = [
+    # Base class
+    "BaseMultitenancyPipeline",
     # Milvus pipelines
     "MilvusMultitenancyIndexingPipeline",
     "MilvusMultitenancySearchPipeline",

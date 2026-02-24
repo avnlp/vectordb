@@ -1,12 +1,13 @@
 """Comprehensive unit tests for Pinecone multi-tenancy indexing pipeline.
 
 This module tests the PineconeMultitenancyIndexingPipeline class with focus on:
-- Initialization with various config formats
+- Initialization with config file path
 - Connection handling and index management
 - Document loading from dataloaders
 - Indexing run operations with tenant namespace isolation
 - Batch processing and timing metrics
 - Error handling scenarios
+- Inheritance from BaseMultitenancyPipeline
 """
 
 from __future__ import annotations
@@ -18,22 +19,60 @@ from unittest.mock import MagicMock, patch
 import pytest
 from haystack import Document
 
+from vectordb.haystack.multi_tenancy.base import BaseMultitenancyPipeline
 from vectordb.haystack.multi_tenancy.common.tenant_context import TenantContext
 from vectordb.haystack.multi_tenancy.pinecone.indexing import (
     PineconeMultitenancyIndexingPipeline,
 )
 
 
+@pytest.fixture
+def pinecone_config_file(tmp_path: Path) -> Path:
+    """Create a temporary Pinecone config file with default settings."""
+    config_file = tmp_path / "pinecone_config.yaml"
+    config_content = """
+pinecone:
+  api_key: test-key
+  index: test-index
+  dimension: 384
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  dimension: 384
+tenant:
+  id: test-tenant
+"""
+    config_file.write_text(config_content)
+    return config_file
+
+
+def create_config_file(
+    tmp_path: Path, config_dict: dict[str, Any], filename: str = "config.yaml"
+) -> Path:
+    """Helper to create a temporary YAML config file from a dictionary."""
+    import yaml
+
+    config_file = tmp_path / filename
+    with open(config_file, "w") as f:
+        yaml.dump(config_dict, f)
+    return config_file
+
+
 class TestPineconeMultitenancyIndexingPipeline:
     """Test suite for PineconeMultitenancyIndexingPipeline."""
+
+    def test_inherits_from_base_multitenancy_pipeline(
+        self, pinecone_config_file: Path
+    ) -> None:
+        """Test PineconeMultitenancyIndexingPipeline inherits from BasePipeline."""
+        with patch.object(PineconeMultitenancyIndexingPipeline, "_connect"):
+            pipeline = PineconeMultitenancyIndexingPipeline(str(pinecone_config_file))
+            assert isinstance(pipeline, BaseMultitenancyPipeline)
 
     @patch("pinecone.Pinecone")
     @patch("pinecone.ServerlessSpec")
     @patch("vectordb.haystack.multi_tenancy.pinecone.indexing.create_document_embedder")
-    @patch("vectordb.haystack.multi_tenancy.pinecone.indexing.load_config")
     def test_initialization_with_config_path(
         self,
-        mock_load_config: MagicMock,
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
@@ -55,21 +94,6 @@ tenant:
 """
         config_file.write_text(config_content)
 
-        # Setup mocks
-        mock_config = {
-            "pinecone": {
-                "api_key": "test-key",
-                "index": "test-index",
-                "dimension": 384,
-            },
-            "embedding": {
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
-                "dimension": 384,
-            },
-            "tenant": {"id": "test-tenant"},
-        }
-        mock_load_config.return_value = mock_config
-
         mock_client = MagicMock()
         mock_index = MagicMock()
         mock_client.list_indexes.return_value = []
@@ -84,9 +108,8 @@ tenant:
         pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
-        assert pipeline.config == mock_config
         assert pipeline.tenant_context.tenant_id == "test-tenant"
-        mock_load_config.assert_called_once_with(str(config_file))
+        assert "pinecone" in pipeline.config
 
     @patch("pinecone.Pinecone")
     @patch("pinecone.ServerlessSpec")
@@ -96,8 +119,9 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
-        """Test pipeline initialization with dictionary config."""
+        """Test pipeline initialization with dict config (converted to YAML file)."""
         config: dict[str, Any] = {
             "pinecone": {
                 "api_key": "test-key",
@@ -114,6 +138,8 @@ tenant:
             "tenant": {"id": "dict-tenant"},
         }
 
+        config_file = create_config_file(tmp_path, config)
+
         # Setup mocks
         mock_client = MagicMock()
         mock_index = MagicMock()
@@ -125,11 +151,10 @@ tenant:
         mock_embedder.warm_up = MagicMock()
         mock_create_embedder.return_value = mock_embedder
 
-        # Create pipeline with dict config
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        # Create pipeline with config path
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
-        assert pipeline.config == config
         assert pipeline.tenant_context.tenant_id == "dict-tenant"
 
     @patch("pinecone.Pinecone")
@@ -140,6 +165,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test pipeline initialization with explicit tenant context."""
         config: dict[str, Any] = {
@@ -153,6 +179,8 @@ tenant:
                 "dimension": 384,
             },
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -169,7 +197,9 @@ tenant:
         tenant_context = TenantContext(tenant_id="explicit-tenant")
 
         # Create pipeline with tenant context
-        pipeline = PineconeMultitenancyIndexingPipeline(config, tenant_context)
+        pipeline = PineconeMultitenancyIndexingPipeline(
+            str(config_file), tenant_context
+        )
 
         # Assertions
         assert pipeline.tenant_context.tenant_id == "explicit-tenant"
@@ -182,6 +212,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that _connect creates index when it doesn't exist."""
         config: dict[str, Any] = {
@@ -193,9 +224,14 @@ tenant:
                 "cloud": "gcp",
                 "region": "us-west1",
             },
-            "embedding": {"dimension": 512},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 512,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -210,7 +246,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         mock_client.create_index.assert_called_once()
@@ -230,6 +266,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that _connect uses existing index without creating new one."""
         config: dict[str, Any] = {
@@ -238,9 +275,14 @@ tenant:
                 "index": "existing-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -257,7 +299,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         mock_client.create_index.assert_not_called()
@@ -272,6 +314,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that _connect uses PINECONE_API_KEY from environment."""
@@ -282,9 +325,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -298,7 +346,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        PineconeMultitenancyIndexingPipeline(config)
+        PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         mock_pinecone_class.assert_called_once_with(api_key="env-api-key")
@@ -311,6 +359,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that _connect uses PINECONE_INDEX from environment."""
@@ -321,9 +370,14 @@ tenant:
                 "api_key": "test-key",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -337,7 +391,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         mock_client.Index.assert_called_once_with("env-index-name")
@@ -353,6 +407,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test document loading from dataloader registry."""
         config: dict[str, Any] = {
@@ -361,13 +416,18 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "dataloader": {
                 "dataset": "triviaqa",
                 "params": {"limit": 10},
             },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -394,7 +454,7 @@ tenant:
         mock_catalog_class.create.return_value = mock_loader
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Load documents
         documents = pipeline._load_documents_from_dataloader()
@@ -418,6 +478,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test document loading uses default dataset when not specified."""
         config: dict[str, Any] = {
@@ -426,9 +487,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -451,7 +517,7 @@ tenant:
         mock_catalog_class.create.return_value = mock_loader
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Load documents
         pipeline._load_documents_from_dataloader()
@@ -472,6 +538,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test successful indexing run with provided documents."""
         config: dict[str, Any] = {
@@ -480,9 +547,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -501,7 +573,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run with documents
         documents = [
@@ -529,6 +601,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that documents are indexed with correct tenant namespace."""
         config: dict[str, Any] = {
@@ -537,9 +610,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "tenant-a"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -557,7 +635,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run with explicit tenant_id
         documents = [Document(content="Doc 1", meta={"id": "1"})]
@@ -576,6 +654,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test batch processing with more than 100 documents."""
         config: dict[str, Any] = {
@@ -584,9 +663,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -606,7 +690,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run with 150 documents
         documents = [
@@ -627,6 +711,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test behavior when no documents are provided."""
         config: dict[str, Any] = {
@@ -635,9 +720,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -651,7 +741,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run with empty documents
         result = pipeline.run(documents=[])
@@ -672,6 +762,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that run() loads documents from dataloader when not provided."""
         config: dict[str, Any] = {
@@ -680,10 +771,15 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "dataloader": {"dataset": "triviaqa"},
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -717,7 +813,7 @@ tenant:
         mock_embedder.run.return_value = {"documents": embedded_docs}
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run without providing documents
         result = pipeline.run()
@@ -740,6 +836,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that embeddings are truncated when output_dimension is specified."""
         config: dict[str, Any] = {
@@ -749,11 +846,14 @@ tenant:
                 "dimension": 384,
             },
             "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
                 "dimension": 384,
                 "output_dimension": 256,  # Truncate to 256
             },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -772,7 +872,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [Document(content="Doc 1", meta={"id": "1"})]
@@ -790,6 +890,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test timing metrics creation."""
         config: dict[str, Any] = {
@@ -798,9 +899,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -814,10 +920,14 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Create timing metrics
-        metrics = pipeline._create_timing_metrics(num_documents=100, total_ms=1500.5)
+        metrics = pipeline._create_timing_metrics(
+            index_operation_ms=1500.5,
+            total_ms=1500.5,
+            num_documents=100,
+        )
 
         # Assertions
         assert metrics.tenant_id == "test-tenant"
@@ -831,6 +941,7 @@ tenant:
     def test_error_handling_on_connection_failure(
         self,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test error handling when Pinecone connection fails."""
         config: dict[str, Any] = {
@@ -839,16 +950,21 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mock to raise exception
         mock_pinecone_class.side_effect = Exception("Connection failed")
 
         # Attempt to create pipeline should raise exception
         with pytest.raises(Exception, match="Connection failed"):
-            PineconeMultitenancyIndexingPipeline(config)
+            PineconeMultitenancyIndexingPipeline(str(config_file))
 
     @patch("pinecone.Pinecone")
     @patch("pinecone.ServerlessSpec")
@@ -858,6 +974,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test pipeline falls back to 'database' config if 'pinecone' not present."""
         config: dict[str, Any] = {
@@ -866,9 +983,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -886,7 +1008,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions
         assert pipeline._get_index_name() == "test-index"
@@ -903,6 +1025,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that default index name 'multitenancy' is used when not specified."""
         config: dict[str, Any] = {
@@ -910,9 +1033,14 @@ tenant:
                 "api_key": "test-key",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -926,7 +1054,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions - should use default "multitenancy"
         assert pipeline._get_index_name() == "multitenancy"
@@ -940,6 +1068,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that document metadata includes tenant_id when upserting."""
         config: dict[str, Any] = {
@@ -948,9 +1077,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -972,7 +1106,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [
@@ -997,6 +1131,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that documents without embeddings are skipped."""
         config: dict[str, Any] = {
@@ -1005,9 +1140,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1026,7 +1166,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run with documents that will have no embeddings
         documents = [Document(content="Doc 1", meta={"id": "1"})]
@@ -1044,6 +1184,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that only documents with embeddings are indexed."""
         config: dict[str, Any] = {
@@ -1052,9 +1193,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1075,7 +1221,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run
         documents = [
@@ -1099,6 +1245,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that close method is callable and does not raise."""
         config: dict[str, Any] = {
@@ -1107,9 +1254,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1123,7 +1275,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline and close
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
         pipeline.close()  # Should not raise
 
     @patch("pinecone.Pinecone")
@@ -1134,6 +1286,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test batch processing with exactly 1 document (single batch)."""
         config: dict[str, Any] = {
@@ -1142,9 +1295,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1162,7 +1320,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        pipeline = PineconeMultitenancyIndexingPipeline(config)
+        pipeline = PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Run with 1 document
         documents = [Document(content="Single doc", meta={"id": "1"})]
@@ -1180,6 +1338,7 @@ tenant:
         mock_create_embedder: MagicMock,
         mock_serverless_spec: MagicMock,
         mock_pinecone_class: MagicMock,
+        tmp_path: Path,
     ) -> None:
         """Test that embedder warm_up is called during initialization."""
         config: dict[str, Any] = {
@@ -1188,9 +1347,14 @@ tenant:
                 "index": "test-index",
                 "dimension": 384,
             },
-            "embedding": {"dimension": 384},
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+            },
             "tenant": {"id": "test-tenant"},
         }
+
+        config_file = create_config_file(tmp_path, config)
 
         # Setup mocks
         mock_client = MagicMock()
@@ -1204,7 +1368,7 @@ tenant:
         mock_create_embedder.return_value = mock_embedder
 
         # Create pipeline
-        PineconeMultitenancyIndexingPipeline(config)
+        PineconeMultitenancyIndexingPipeline(str(config_file))
 
         # Assertions - warm_up should be called
         mock_embedder.warm_up.assert_called_once()

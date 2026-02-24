@@ -2,11 +2,12 @@
 
 This module provides tenant-isolated data management for Retrieval-Augmented Generation pipelines. Each supported vector database uses its native isolation mechanism to ensure that documents and queries are scoped to a specific tenant. The module handles tenant lifecycle management including creation, indexing, querying, retrieval, RAG generation, statistics tracking, and deletion.
 
-Tenant isolation strategies vary by database. Pinecone uses namespaces, Weaviate uses native multi-tenancy with per-tenant shards, Milvus uses partition keys with filter-enforced isolation, Qdrant uses tiered multitenancy with payload-based filtering, and Chroma uses tenant and database scoping. Despite these differences, all databases expose a consistent pipeline interface for indexing, retrieval, and RAG operations.
+Tenant isolation strategies vary by database. Pinecone uses namespaces, Weaviate uses native multi-tenancy with per-tenant shards, Milvus uses partition keys with filter-enforced isolation, Qdrant uses tiered multitenancy with payload-based filtering, and Chroma uses tenant and database scoping. Despite these differences, all databases expose a consistent pipeline interface through `BaseMultitenancyPipeline` for indexing, retrieval, and RAG operations.
 
 ## Overview
 
 - Provides tenant-scoped indexing, retrieval, and RAG pipelines for all five databases
+- All indexing pipelines inherit from `BaseMultitenancyPipeline` for a consistent interface
 - Uses each database's native isolation mechanism for secure data separation
 - Manages the full tenant lifecycle: creation, existence checks, listing, statistics, and deletion
 - Resolves tenant context from explicit values, environment variables, or configuration files
@@ -32,7 +33,46 @@ Each database implements tenant isolation using its strongest available mechanis
 
 ### Pipeline Types
 
-The module provides three pipeline types per database. The indexing pipeline ingests documents with tenant-scoped metadata. The retrieval pipeline searches within a tenant's scope and returns ranked documents with scores. The RAG pipeline combines retrieval with language model generation to produce tenant-scoped answers grounded in retrieved context.
+The module provides three pipeline types per database, all inheriting from `BaseMultitenancyPipeline`:
+
+- **Indexing Pipeline** (`*MultitenancyIndexingPipeline`): Ingests documents with tenant-scoped metadata using the `index_documents()` method
+- **Retrieval Pipeline** (`*MultitenancySearchPipeline`): Searches within a tenant's scope and returns ranked documents with scores
+- **RAG Pipeline**: Combines retrieval with language model generation to produce tenant-scoped answers grounded in retrieved context
+
+All indexing pipelines implement the unified interface defined by `BaseMultitenancyPipeline`:
+
+```python
+from vectordb.haystack.multi_tenancy import (
+    BaseMultitenancyPipeline,
+    ChromaMultitenancyIndexingPipeline,
+    MilvusMultitenancyIndexingPipeline,
+    PineconeMultitenancyIndexingPipeline,
+    QdrantMultitenancyIndexingPipeline,
+    WeaviateMultitenancyIndexingPipeline,
+)
+
+# All pipelines inherit from BaseMultitenancyPipeline
+assert issubclass(ChromaMultitenancyIndexingPipeline, BaseMultitenancyPipeline)
+
+# Initialize with config path
+pipeline = ChromaMultitenancyIndexingPipeline(
+    config_path="configs/chroma_triviaqa.yaml",
+    tenant_context=TenantContext(tenant_id="tenant-123"),
+)
+
+# Index documents using the standard interface
+num_indexed = pipeline.index_documents(documents, tenant_id="tenant-123")
+
+# Query with tenant isolation
+results = pipeline.query("your query", top_k=10, tenant_id="tenant-123")
+
+# Tenant lifecycle management
+pipeline.create_tenant("new-tenant")
+exists = pipeline.tenant_exists("tenant-123")
+stats = pipeline.get_tenant_stats("tenant-123")
+tenants = pipeline.list_tenants()
+pipeline.delete_tenant("old-tenant")
+```
 
 ## Supported Databases
 

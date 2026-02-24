@@ -14,15 +14,17 @@ def resolve_env_vars(value: Any) -> Any:
     """Resolve environment variables in configuration values.
 
     Supports both simple ${VAR} and ${VAR:-default} syntax.
+    Allows interpolation within larger strings (e.g., "http://${HOST}:${PORT}").
     """
     if isinstance(value, str):
         pattern = r"\$\{([^}:]+)(?::-([^}]*))?\}"
-        match = re.match(pattern, value)
-        if match:
+
+        def replace(match: re.Match) -> str:
             env_var = match.group(1)
             default = match.group(2) if match.group(2) is not None else ""
             return os.environ.get(env_var, default)
-        return value
+
+        return re.sub(pattern, replace, value)
     if isinstance(value, dict):
         return {k: resolve_env_vars(v) for k, v in value.items()}
     if isinstance(value, list):

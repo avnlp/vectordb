@@ -18,6 +18,7 @@ from vectordb.haystack.multi_tenancy.common.rag import create_rag_pipeline
 from vectordb.haystack.multi_tenancy.common.tenant_context import TenantContext
 from vectordb.haystack.multi_tenancy.common.timing import Timer
 from vectordb.haystack.multi_tenancy.common.types import (
+    MultitenancyTimingMetrics,
     TenantQueryResult,
     TenantRAGResult,
     TenantRetrievalResult,
@@ -212,7 +213,7 @@ class MilvusMultitenancySearchPipeline:
     def _create_timing_metrics(
         self,
         total_ms: float,
-    ) -> Any:
+    ) -> MultitenancyTimingMetrics:
         """Create timing metrics for search operation.
 
         Args:
@@ -221,16 +222,11 @@ class MilvusMultitenancySearchPipeline:
         Returns:
             Timing metrics object.
         """
-        # In a real implementation, you might want to use the types from common.types
-        return type(
-            "TimingMetrics",
-            (),
-            {
-                "tenant_resolution_ms": 0.0,
-                "index_operation_ms": 0.0,
-                "retrieval_ms": total_ms,
-                "total_ms": total_ms,
-                "tenant_id": self.tenant_context.tenant_id,
-                "num_documents": 0,  # Will be populated based on actual results
-            },
-        )()
+        return MultitenancyTimingMetrics(
+            tenant_resolution_ms=0.0,
+            index_operation_ms=0.0,
+            retrieval_ms=total_ms,
+            total_ms=total_ms,
+            tenant_id=self.tenant_context.tenant_id,
+            num_documents=0,
+        )
