@@ -73,7 +73,7 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
-override-dependencies = ["multiprocess>=0.70.19", "dill>=0.4.1"]
+override-dependencies = ["multiprocess>=0.70.19", "dill>=0.4.1", "chardet>=3.0.2,<6"]
 
 
 [tool.mypy]
