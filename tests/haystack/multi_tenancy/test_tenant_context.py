@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from vectordb.haystack.multi_tenancy.tenant_context import (
+from vectordb.haystack.multi_tenancy.common.tenant_context import (
     TenantContext,
     TenantContextError,
 )

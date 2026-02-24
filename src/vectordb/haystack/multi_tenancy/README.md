@@ -140,7 +140,6 @@ multi_tenancy/
 ├── __init__.py                          # Package exports for all pipelines and types
 ├── README.md                            # This file
 ├── base.py                              # Abstract base class for multi-tenancy pipelines
-├── tenant_context.py                    # Tenant context resolution
 ├── vectordb_multitenancy_type.py        # Shared type definitions and dataclasses
 ├── common/                              # Shared utilities
 │   ├── __init__.py

@@ -116,6 +116,12 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         Returns:
             True if tenant was created, False if already exists.
         """
+        from weaviate.exceptions import (
+            SchemaValidationError,
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         class_name = self._get_class_name()
 
         try:
@@ -127,16 +133,19 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
             self._client.schema.add_tenant(class_name, tenant_id)
             logger.info(f"Created tenant {tenant_id} in class {class_name}")
             return True
-        except Exception:
-            # If getting tenants fails, try to create the class with multi-tenancy
+        except (UnexpectedStatusCodeError, SchemaValidationError):
+            # Class doesn't exist, create it with multi-tenancy
             try:
                 self._ensure_class_exists(class_name)
                 self._client.schema.add_tenant(class_name, tenant_id)
                 logger.info(f"Created tenant {tenant_id} in class {class_name}")
                 return True
-            except Exception as e:
+            except WeaviateBaseError as e:
                 logger.error(f"Error creating tenant: {e}")
                 return False
+        except WeaviateBaseError as e:
+            logger.error(f"Error creating tenant: {e}")
+            return False
 
     def tenant_exists(self, tenant_id: str) -> bool:
         """Check if a tenant exists in Weaviate.
@@ -147,6 +156,11 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         Returns:
             True if tenant exists, False otherwise.
         """
+        from weaviate.exceptions import (
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         if self._client is None:
             return False
 
@@ -156,7 +170,7 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
             tenants = self._client.schema.get_tenant(class_name)
             existing_tenant_names = [t["name"] for t in tenants]
             return tenant_id in existing_tenant_names
-        except Exception:
+        except (UnexpectedStatusCodeError, WeaviateBaseError):
             return False
 
     def get_tenant_stats(self, tenant_id: str) -> TenantStats:
@@ -168,6 +182,11 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         Returns:
             TenantStats with tenant statistics.
         """
+        from weaviate.exceptions import (
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         if self._client is None:
             return TenantStats(
                 tenant_id=tenant_id,
@@ -198,7 +217,7 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
                 vector_count=count,
                 status=TenantStatus.ACTIVE,
             )
-        except Exception:
+        except (UnexpectedStatusCodeError, WeaviateBaseError):
             return TenantStats(
                 tenant_id=tenant_id,
                 document_count=0,
@@ -212,6 +231,11 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         Returns:
             List of tenant identifiers.
         """
+        from weaviate.exceptions import (
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         if self._client is None:
             return []
 
@@ -220,7 +244,7 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         try:
             tenants = self._client.schema.get_tenant(class_name)
             return [t["name"] for t in tenants]
-        except Exception:
+        except (UnexpectedStatusCodeError, WeaviateBaseError):
             return []
 
     def delete_tenant(self, tenant_id: str) -> bool:
@@ -232,6 +256,11 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         Returns:
             True if tenant was deleted, False if not found.
         """
+        from weaviate.exceptions import (
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         if self._client is None:
             return False
 
@@ -252,7 +281,7 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
             # Then delete the tenant itself
             self._client.schema.delete_tenant(class_name, tenant_id)
             return True
-        except Exception:
+        except (UnexpectedStatusCodeError, WeaviateBaseError):
             return False
 
     def index_documents(
@@ -437,10 +466,15 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
         Args:
             class_name: Name of the class to create.
         """
+        from weaviate.exceptions import (
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         try:
             # Check if class exists
             self._client.schema.get(class_name)
-        except Exception:
+        except (UnexpectedStatusCodeError, WeaviateBaseError, Exception):
             # Create the class with multi-tenancy
             class_obj = {
                 "class": class_name,
@@ -461,13 +495,18 @@ class WeaviateMultitenancyIndexingPipeline(BaseMultitenancyPipeline):
             class_name: Name of the class to add tenant to.
             tenant_name: Name of the tenant to create.
         """
+        from weaviate.exceptions import (
+            UnexpectedStatusCodeError,
+            WeaviateBaseError,
+        )
+
         try:
             tenants = self._client.schema.get_tenant(class_name)
             existing_tenant_names = [t["name"] for t in tenants]
             if tenant_name not in existing_tenant_names:
                 self._client.schema.add_tenant(class_name, tenant_name)
                 logger.info(f"Created tenant {tenant_name} in class {class_name}")
-        except Exception:
+        except (UnexpectedStatusCodeError, WeaviateBaseError, Exception):
             # If getting tenants fails, create the class first
             self._ensure_class_exists(class_name)
             self._client.schema.add_tenant(class_name, tenant_name)
