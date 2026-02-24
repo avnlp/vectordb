@@ -140,7 +140,7 @@ class TestChromaJSONIndexing:
         )
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = None
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -256,7 +256,7 @@ class TestChromaJSONIndexing:
         )
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = None
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -278,8 +278,8 @@ class TestChromaJSONIndexing:
 
         assert result["documents_indexed"] == len(sample_documents)
         mock_db_inst.create_collection.assert_called_once_with(
-            collection_name="test_json_indexing",
-            recreate=True,
+            name="test_json_indexing",
+            get_or_create=True,
         )
 
 
@@ -349,7 +349,13 @@ class TestChromaJSONSearch:
         """Test search execution."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
+        mock_db_inst.query_to_documents.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
         mock_filter_json.return_value = sample_documents[:1]
@@ -404,7 +410,13 @@ class TestChromaJSONSearch:
         """Test search with RAG generation."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
+        mock_db_inst.query_to_documents.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()

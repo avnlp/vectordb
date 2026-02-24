@@ -165,10 +165,10 @@ class QdrantJsonIndexingPipeline:
         self.db.create_collection(dimension=dimension)
         logger.info("Created Qdrant collection: %s", self.collection_name)
 
-        num_indexed = self.db.upsert_documents(
+        self.db.index_documents(
             documents=docs,
-            embeddings=embeddings,
         )
+        num_indexed = len(docs)
         logger.info("Indexed %d JSON documents to Qdrant", num_indexed)
 
         return {

@@ -972,33 +972,3 @@ class QdrantVectorDB:
                 # Use filter_obj with custom Qdrant client operations
         """
         return self._build_filter(filters)
-
-    def query(
-        self,
-        query_vector: Union[List[float], Dict[str, Any]],
-        top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-        **kwargs: Any,
-    ) -> List[Any]:
-        """Query the collection for similar vectors (alias for search).
-
-        This is an alias for the search method, provided for API consistency
-        with other vector database wrappers that use 'query' as the primary
-        search method name.
-
-        Args:
-            query_vector: Dense vector for standard search, or Dict with vector
-                components for hybrid/sparse search.
-            top_k: Maximum number of results to return. Default 10.
-            filters: Metadata filters in MongoDB-style syntax.
-            **kwargs: Additional arguments passed to search().
-
-        Returns:
-            List of Haystack Document objects ordered by relevance score.
-        """
-        return self.search(
-            query_vector=query_vector,
-            top_k=top_k,
-            filters=filters,
-            **kwargs,
-        )

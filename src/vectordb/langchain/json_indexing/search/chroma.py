@@ -91,11 +91,12 @@ class ChromaJsonSearchPipeline:
         self.logger.info("Embedded query: %s", query[:50])
 
         # Query vector DB - returns documents directly
-        results: list[Document] = self.vector_db.query(
-            query_embedding=query_embedding,
+        results_dict = self.vector_db.search(
+            query_embeddings=query_embedding,
             n_results=top_k,
             where=filters,
         )
+        results: list[Document] = self.vector_db.query_to_documents(results_dict)
         self.logger.info("Search returned %d results", len(results))
 
         # Apply JSON metadata filters if specified in config or passed as param

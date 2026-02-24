@@ -158,17 +158,14 @@ class ChromaJsonIndexingPipeline:
         docs, embeddings = EmbedderHelper.embed_documents(self.embedder, documents)
         logger.info("Generated embeddings for %d JSON documents", len(docs))
 
-        recreate = self.config.get("chroma", {}).get("recreate", False)
+        self.config.get("chroma", {}).get("recreate", False)
         self.db.create_collection(
-            collection_name=self.collection_name,
-            recreate=recreate,
+            name=self.collection_name,
+            get_or_create=True,
         )
 
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
-            collection_name=self.collection_name,
-        )
+        self.db.upsert(data=docs)
+        num_indexed = len(docs)
         logger.info("Indexed %d JSON documents to Chroma", num_indexed)
 
         return {

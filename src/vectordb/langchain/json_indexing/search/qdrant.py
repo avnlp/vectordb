@@ -91,7 +91,7 @@ class QdrantJsonSearchPipeline:
         self.logger.info("Embedded query: %s", query[:50])
 
         # Query vector DB
-        results: list[Document] = self.vector_db.query(
+        results: list[Document] = self.vector_db.search(
             query_vector=query_embedding,
             top_k=top_k,
             filters=filters,

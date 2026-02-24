@@ -95,7 +95,7 @@ class TestMilvusJSONIndexing:
         )
 
         mock_db_inst = MagicMock()
-        mock_db_inst.insert.return_value = len(sample_documents)
+        mock_db_inst.insert_documents.return_value = None
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -116,7 +116,7 @@ class TestMilvusJSONIndexing:
 
         assert result["documents_indexed"] == len(sample_documents)
         assert result["collection_name"] == "test_json_indexing"
-        mock_db_inst.insert.assert_called_once()
+        mock_db_inst.insert_documents.assert_called_once()
 
     @patch("vectordb.langchain.json_indexing.indexing.milvus.MilvusVectorDB")
     @patch(
@@ -164,7 +164,7 @@ class TestMilvusJSONIndexing:
         assert result["documents_indexed"] == 0
         assert result["collection_name"] == "test_json_indexing"
         # Verify insert was not called since there were no documents
-        mock_db_inst.insert.assert_not_called()
+        mock_db_inst.insert_documents.assert_not_called()
 
 
 class TestMilvusJSONSearch:
@@ -225,7 +225,7 @@ class TestMilvusJSONSearch:
         """Test search execution."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -268,7 +268,7 @@ class TestMilvusJSONSearch:
         """Test search with RAG generation."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()
@@ -316,7 +316,7 @@ class TestMilvusJSONSearch:
         """Test search with JSON metadata filters."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
         mock_filter.return_value = sample_documents[:2]
@@ -367,7 +367,7 @@ class TestMilvusJSONSearch:
         """Test search with filters parameter."""
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -390,6 +390,6 @@ class TestMilvusJSONSearch:
         result = pipeline.search("test query", top_k=5, filters=filters)
 
         assert result["query"] == "test query"
-        mock_db_inst.query.assert_called_once()
-        call_kwargs = mock_db_inst.query.call_args.kwargs
+        mock_db_inst.search.assert_called_once()
+        call_kwargs = mock_db_inst.search.call_args.kwargs
         assert call_kwargs["filters"] == filters

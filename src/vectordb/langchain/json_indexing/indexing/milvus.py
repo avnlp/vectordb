@@ -170,11 +170,11 @@ class MilvusJsonIndexingPipeline:
         )
         logger.info("Created Milvus collection: %s", self.collection_name)
 
-        num_indexed = self.db.insert(
+        self.db.insert_documents(
             documents=docs,
-            embeddings=embeddings,
             collection_name=self.collection_name,
         )
+        num_indexed = len(docs)
         logger.info("Indexed %d JSON documents to Milvus", num_indexed)
 
         return {
