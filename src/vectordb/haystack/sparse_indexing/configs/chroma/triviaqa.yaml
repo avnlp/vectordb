@@ -1,0 +1,28 @@
+# Chroma Sparse Index Configuration (Not Supported)
+chroma:
+  collection_name: "sparse_bm25_collection"
+  persist_directory: "./chroma_data"
+
+sparse:
+  model: "splade-v2"  # Uses prithivida/Splade_PP_en_v2 alias
+  backend: "torch"
+  device: null
+
+dataloader:
+  name: "triviaqa"  # Example: triviaqa, arc, popqa, factscore, earnings_calls
+  limit: null
+  batch_size: 32
+
+indexing:
+  batch_size: 100
+  show_progress: true
+
+query:
+  top_k: 20
+
+logging:
+  level: "INFO"
+  name: "chroma_sparse"
+
+# Note: Chroma OSS does not support sparse vectors. Only Chroma Cloud supports sparse vectors.
+# This configuration will result in NotImplementedError when used.

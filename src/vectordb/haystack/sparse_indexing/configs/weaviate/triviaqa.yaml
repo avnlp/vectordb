@@ -1,0 +1,26 @@
+# Weaviate BM25 Index Configuration
+weaviate:
+  url: "${WEAVIATE_URL}"
+  api_key: "${WEAVIATE_API_KEY}"
+  index_name: "BM25SparseIndex"
+
+sparse:
+  model: "splade-v2"  # Uses prithivida/Splade_PP_en_v2 alias (not used for Weaviate)
+  backend: "torch"
+  device: null
+
+dataloader:
+  name: "triviaqa"  # Example: triviaqa, arc, popqa, factscore, earnings_calls
+  limit: null
+  batch_size: 32
+
+indexing:
+  batch_size: 100
+  show_progress: true
+
+query:
+  top_k: 20
+
+logging:
+  level: "INFO"
+  name: "weaviate_sparse"
