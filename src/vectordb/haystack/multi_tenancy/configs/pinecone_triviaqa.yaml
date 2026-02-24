@@ -1,0 +1,60 @@
+# PINECONE + TRIVIAQA Multi-Tenancy Configuration
+# Dataset: triviaqa
+# Strategy: namespace
+
+pipeline:
+  name: "pinecone_triviaqa_multitenancy"
+  description: "Multi-tenant RAG for triviaqa using pinecone"
+
+database:
+  type: "pinecone"
+  api_key: "${PINECONE_API_KEY}"
+  environment: "${PINECONE_ENV:-us-east-1}"
+  index_name: "{dataset}-multitenancy"
+
+multitenancy:
+  strategy: "namespace"
+  field_name: "tenant_id"
+  auto_create_tenant: true
+embedding:
+  model_name: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  output_dimension: null
+  batch_size: 32
+  device: "auto"
+
+dataset:
+  name: "trivia_qa"
+  config: "rc"
+  split: "train"
+  max_samples: 10000
+  source: "huggingface"
+
+retrieval:
+  top_k: 10
+  metric: "cosine"
+
+rag:
+  prompt_template: |
+    Answer based on the retrieved documents.
+
+    Context:
+    {% for doc in documents %}
+    - {{ doc.content }}
+    {% endfor %}
+
+    Question: {{ query }}
+
+    Answer:
+
+generator:
+  type: "openai"
+  model: "gpt-3.5-turbo"
+  api_key: "${OPENAI_API_KEY}"
+  kwargs:
+    temperature: 0.7
+    max_tokens: 2048
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

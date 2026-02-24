@@ -1,0 +1,66 @@
+# MILVUS + POPQA Multi-Tenancy Configuration
+# Dataset: popqa
+# Strategy: partition_key
+
+pipeline:
+  name: "milvus_popqa_multitenancy"
+  description: "Multi-tenant RAG for popqa using milvus"
+
+database:
+  type: "milvus"
+  host: "${MILVUS_HOST:-localhost}"
+  port: "${MILVUS_PORT:-19530}"
+  user: "${MILVUS_USER:-}"
+  password: "${MILVUS_PASSWORD:-}"
+
+collection:
+  name: "{dataset}_multitenancy"
+  description: "{dataset} documents with multi-tenancy"
+
+multitenancy:
+  strategy: "partition_key"
+  field_name: "tenant_id"
+  auto_create_tenant: true
+  partition_key_isolation: true
+  num_partitions: 64
+embedding:
+  model_name: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  output_dimension: null
+  batch_size: 32
+  device: "auto"
+
+dataset:
+  name: "akariasai/PopQA"
+  split: "train"
+  max_samples: 3000
+  source: "huggingface"
+
+retrieval:
+  top_k: 10
+  metric: "cosine"
+
+rag:
+  prompt_template: |
+    Answer based on the retrieved documents.
+
+    Context:
+    {% for doc in documents %}
+    - {{ doc.content }}
+    {% endfor %}
+
+    Question: {{ query }}
+
+    Answer:
+
+generator:
+  type: "openai"
+  model: "gpt-3.5-turbo"
+  api_key: "${OPENAI_API_KEY}"
+  kwargs:
+    temperature: 0.7
+    max_tokens: 2048
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
