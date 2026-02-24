@@ -1,0 +1,30 @@
+# Milvus Sparse Index Configuration
+milvus:
+  connection_args:
+    host: "${MILVUS_HOST}"
+    port: "${MILVUS_PORT}"
+    user: "${MILVUS_USER}"
+    password: "${MILVUS_PASSWORD}"
+    secure: false
+  collection_name: "sparse_bm25_collection"
+
+sparse:
+  model: "splade-v2"  # Uses prithivida/Splade_PP_en_v2 alias
+  backend: "torch"
+  device: null
+
+dataloader:
+  type: "earnings_calls"  # Example: triviaqa, arc, popqa, factscore, earnings_calls
+  limit: null
+  batch_size: 32
+
+indexing:
+  batch_size: 100
+  show_progress: true
+
+query:
+  top_k: 20
+
+logging:
+  level: "INFO"
+  name: "milvus_sparse"

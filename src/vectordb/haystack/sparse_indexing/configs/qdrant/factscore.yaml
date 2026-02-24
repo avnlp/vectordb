@@ -1,0 +1,26 @@
+# Qdrant Sparse Index Configuration
+qdrant:
+  location: "${QDRANT_LOCATION}"  # Can be URL, path, or "localhost"
+  collection_name: "sparse_bm25_collection"
+  api_key: "${QDRANT_API_KEY}"
+
+sparse:
+  model: "splade-v2"  # Uses prithivida/Splade_PP_en_v2 alias
+  backend: "torch"
+  device: null
+
+dataloader:
+  type: "factscore"  # Example: triviaqa, arc, popqa, factscore, earnings_calls
+  limit: null
+  batch_size: 32
+
+indexing:
+  batch_size: 100
+  show_progress: true
+
+query:
+  top_k: 20
+
+logging:
+  level: "INFO"
+  name: "qdrant_sparse"
