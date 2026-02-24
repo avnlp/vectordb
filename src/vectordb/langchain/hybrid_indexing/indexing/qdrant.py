@@ -37,7 +37,10 @@ Advantages over metadata storage:
 """
 
 import logging
+import uuid
 from typing import Any
+
+from qdrant_client.http.models import PointStruct
 
 from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.dataloaders import DataloaderCatalog
@@ -115,15 +118,16 @@ class QdrantHybridIndexingPipeline:
         else:
             host = url_parsed
             port = 6333
+
+        self.collection_name = qdrant_config.get("collection_name")
+        self.dimension = qdrant_config.get("dimension", 384)
+
         self.db = QdrantVectorDB(
             host=host,
             port=port,
             api_key=qdrant_config.get("api_key"),
-            collection_name=qdrant_config.get("collection_name"),
+            collection_name=self.collection_name,
         )
-
-        self.collection_name = qdrant_config.get("collection_name")
-        self.dimension = qdrant_config.get("dimension", 384)
 
         logger.info("Initialized Qdrant hybrid indexing pipeline (LangChain)")
 
@@ -173,36 +177,38 @@ class QdrantHybridIndexingPipeline:
         sparse_embeddings = self.sparse_embedder.embed_documents(texts)
         logger.info("Generated %d sparse embeddings", len(sparse_embeddings))
 
-        self.db.create_collection(
-            collection_name=self.collection_name,
-            vector_size=self.dimension,
-        )
+        self.db.create_collection(dimension=self.dimension)
         logger.info("Created Qdrant collection: %s", self.collection_name)
 
-        upsert_data = []
-        for i, (doc, dense_emb, sparse_emb) in enumerate(
+        points = []
+        for _i, (doc, dense_emb, sparse_emb) in enumerate(
             zip(docs, dense_embeddings, sparse_embeddings)
         ):
-            upsert_data.append(
-                {
-                    "id": f"{self.collection_name}_{i}",
-                    "values": dense_emb,
-                    "sparse_values": sparse_emb,
-                    "metadata": {
+            points.append(
+                PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector={
+                        self.db.dense_vector_name: dense_emb,
+                        self.db.sparse_vector_name: sparse_emb,
+                    },
+                    payload={
                         "text": doc.page_content,
                         **(doc.metadata or {}),
                     },
-                }
+                )
             )
 
-        num_indexed = self.db.upsert(
-            data=upsert_data,
-            collection_name=self.collection_name,
-        )
-        logger.info("Indexed %d documents to Qdrant", num_indexed)
+        batch_size = 100
+        for i in range(0, len(points), batch_size):
+            self.db.client.upsert(
+                collection_name=self.collection_name,
+                points=points[i : i + batch_size],
+                wait=False,
+            )
+        logger.info("Indexed %d documents to Qdrant", len(docs))
 
         return {
-            "documents_indexed": num_indexed,
+            "documents_indexed": len(docs),
             "db": "qdrant",
             "collection_name": self.collection_name,
         }

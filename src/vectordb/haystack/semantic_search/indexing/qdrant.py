@@ -116,13 +116,14 @@ class QdrantSemanticIndexingPipeline:
         self.embedder = EmbedderFactory.create_document_embedder(self.config)
 
         qdrant_config = self.config["qdrant"]
+        self.collection_name = qdrant_config["collection_name"]
+        self.dimension = qdrant_config.get("dimension", 384)
+
         self.db = QdrantVectorDB(
             url=qdrant_config.get("url", "http://localhost:6333"),
             api_key=qdrant_config.get("api_key", ""),
+            collection_name=self.collection_name,
         )
-
-        self.collection_name = qdrant_config["collection_name"]
-        self.dimension = qdrant_config.get("dimension", 384)
 
         logger.info("Initialized Qdrant indexing pipeline")
 
@@ -157,10 +158,7 @@ class QdrantSemanticIndexingPipeline:
         )
 
         # Insert documents
-        self.db.insert_documents(
-            documents=embedded_docs,
-            collection_name=self.collection_name,
-        )
+        self.db.insert_documents(documents=embedded_docs)
         logger.info("Indexed %d documents to Qdrant", len(embedded_docs))
 
         return {"documents_indexed": len(embedded_docs)}

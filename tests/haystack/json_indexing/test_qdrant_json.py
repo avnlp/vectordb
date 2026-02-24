@@ -68,7 +68,7 @@ class TestQdrantJSONIndexing:
 
         mock_db_cls.assert_called_once_with(config=qdrant_config)
         mock_db.create_collection.assert_called_once()
-        mock_db.upsert_documents.assert_called_once()
+        mock_db.index_documents.assert_called_once()
         assert result["documents_indexed"] == 3
 
     @patch("vectordb.haystack.json_indexing.search.qdrant.QdrantVectorDB")

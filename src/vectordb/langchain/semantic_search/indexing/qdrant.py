@@ -174,7 +174,7 @@ class QdrantSemanticIndexingPipeline:
         logger.info("Generated embeddings for %d documents", len(docs))
 
         dimension = len(embeddings[0]) if embeddings else 0
-        self.db.create_collection(dimension=dimension)
+        self.db.create_collection(dimension)
 
         points = [
             PointStruct(

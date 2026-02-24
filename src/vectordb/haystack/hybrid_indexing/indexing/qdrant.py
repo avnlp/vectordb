@@ -103,11 +103,18 @@ class QdrantHybridIndexingPipeline:
         url = qdrant_config.get("url", "http://localhost:6333")
         api_key = qdrant_config.get("api_key")
         path = qdrant_config.get("path")
+        self.collection_name = qdrant_config.get("collection_name")
 
-        config_dict = {"qdrant": {"url": url, "api_key": api_key, "path": path}}
+        config_dict = {
+            "qdrant": {
+                "url": url,
+                "api_key": api_key,
+                "path": path,
+                "collection_name": self.collection_name,
+            }
+        }
         self.db = QdrantVectorDB(config=config_dict)
 
-        self.collection_name = qdrant_config.get("collection_name")
         self.dimension = qdrant_config.get("dimension", 768)
         self.batch_size = qdrant_config.get("batch_size", 100)
         self.recreate = qdrant_config.get("recreate", False)
@@ -155,7 +162,6 @@ class QdrantHybridIndexingPipeline:
         # Create collection with sparse vector support if configured
         use_sparse = bool(self.sparse_embedder)
         self.db.create_collection(
-            collection_name=self.collection_name,
             dimension=self.dimension,
             use_sparse=use_sparse,
             recreate=self.recreate,
@@ -167,10 +173,7 @@ class QdrantHybridIndexingPipeline:
         # Upsert documents in batches
         for i in range(0, len(embedded_docs), self.batch_size):
             batch = embedded_docs[i : i + self.batch_size]
-            self.db.upsert(
-                documents=batch,
-                collection_name=self.collection_name,
-            )
+            self.db.index_documents(documents=batch)
             logger.debug(
                 "Indexed batch %d/%d (%d docs)",
                 i // self.batch_size + 1,

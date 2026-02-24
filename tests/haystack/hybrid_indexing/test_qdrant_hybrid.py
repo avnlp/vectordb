@@ -78,7 +78,7 @@ class TestQdrantHybridIndexing:
         assert result["collection_name"] == "test_hybrid"
         mock_loader.load.assert_called_once()
         mock_db.create_collection.assert_called_once()
-        mock_db.upsert.assert_called()
+        mock_db.index_documents.assert_called()
 
     @patch("vectordb.haystack.hybrid_indexing.indexing.qdrant.QdrantVectorDB")
     @patch("vectordb.haystack.hybrid_indexing.indexing.qdrant.EmbedderFactory")
