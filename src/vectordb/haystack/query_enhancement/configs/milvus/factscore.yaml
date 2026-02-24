@@ -1,0 +1,32 @@
+dataloader:
+  type: "factscore"
+  params:
+    limit: 1000
+
+embeddings:
+  model: "all-MiniLM-L6-v2"
+  params: {}
+
+query_enhancement:
+  type: "step_back"
+  num_queries: 3
+  num_hyde_docs: 3
+  llm:
+    model: "llama-3.3-70b-versatile"
+    api_key: "${GROQ_API_KEY}"
+  fusion_method: "rrf"
+  rrf_k: 60
+  top_k: 10
+
+milvus:
+  uri: "${MILVUS_URI}"
+  user: "${MILVUS_USER}"
+  password: "${MILVUS_PASSWORD}"
+  collection_name: "factscore-query-enhancement"
+
+logging:
+  level: "INFO"
+  name: "milvus_query_enhancement"
+
+rag:
+  enabled: true
