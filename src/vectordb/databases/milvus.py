@@ -783,6 +783,38 @@ class MilvusVectorDB:
             # Filter deletion removes all matching documents in one operation
             self.client.delete(collection_name=collection_name, filter=filter_expr)
 
+    def query(
+        self,
+        query_embedding: Optional[List[float]] = None,
+        top_k: int = 10,
+        collection_name: Optional[str] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """Query the collection for similar vectors (alias for search).
+
+        This is an alias for the search method, provided for API consistency
+        with other vector database wrappers that use 'query' as the primary
+        search method name.
+
+        Args:
+            query_embedding: Dense query vector for semantic search.
+            top_k: Maximum number of results to return. Default 10.
+            collection_name: Target collection. Uses default from constructor if None.
+            filters: Metadata filter conditions as nested dict.
+            **kwargs: Additional arguments passed to search().
+
+        Returns:
+            List of Haystack Document objects ordered by relevance score.
+        """
+        return self.search(
+            query_embedding=query_embedding,
+            top_k=top_k,
+            collection_name=collection_name,
+            filters=filters,
+            **kwargs,
+        )
+
     def drop_collection(self, collection_name: Optional[str] = None):
         """Drop (delete) a Milvus collection and all its data.
 

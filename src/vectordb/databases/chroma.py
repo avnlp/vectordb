@@ -326,7 +326,7 @@ class ChromaVectorDB:
             f"Upserted {len(formatted_data['ids'])} records to collection '{self.collection_name}'"
         )
 
-    def query(
+    def _query(
         self,
         query_embedding: Optional[list[float]] = None,
         query_text: Optional[str] = None,
@@ -484,9 +484,9 @@ class ChromaVectorDB:
                         s = s.rank(Knn(query=emb))
                     elif query_text:
                         # Text-only search requires native embedding support
-                        # Fall back to query() since Search API needs embeddings
+                        # Fall back to _query() since Search API needs embeddings
                         logger.debug("Falling back to query() for text-only search.")
-                        return self.query(
+                        return self._query(
                             query_text=query_text,
                             n_results=n_results,
                             where=where,
@@ -501,7 +501,7 @@ class ChromaVectorDB:
                 )
 
         # Standard query fallback for local/non-hosted deployments
-        return self.query(
+        return self._query(
             query_text=query_text,
             query_embedding=query_embeddings[0]
             if isinstance(query_embeddings, list)
@@ -589,6 +589,44 @@ class ChromaVectorDB:
             ssl=self.ssl,
             tracing_project_name=self.tracing_project_name,
         )
+
+    def query(
+        self,
+        query_embedding: Optional[list[float]] = None,
+        query_text: Optional[str] = None,
+        n_results: int = 10,
+        where: Optional[dict[str, Any]] = None,
+        where_document: Optional[dict[str, Any]] = None,
+        include_vectors: bool = False,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """Query the collection and return documents directly.
+
+        This is a convenience method that combines query() and query_to_documents()
+        for simpler API usage.
+
+        Args:
+            query_embedding: Vector embedding to search for.
+            query_text: Raw text to embed and search for.
+            n_results: Maximum number of results to return.
+            where: Metadata filter conditions.
+            where_document: Document content filter conditions.
+            include_vectors: Whether to include embeddings in results.
+            **kwargs: Additional parameters.
+
+        Returns:
+            List of LangChain Document objects.
+        """
+        results_dict = self._query(
+            query_embedding=query_embedding,
+            query_text=query_text,
+            n_results=n_results,
+            where=where,
+            where_document=where_document,
+            include_vectors=include_vectors,
+            **kwargs,
+        )
+        return self.query_to_documents(results_dict)
 
     def flatten_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Recursively flatten nested metadata for Chroma compatibility.

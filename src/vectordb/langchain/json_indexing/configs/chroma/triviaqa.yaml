@@ -1,0 +1,25 @@
+# Chroma JSON Indexing Configuration - TriviaQA Dataset
+
+dataloader:
+  type: "triviaqa"
+  dataset_name: "trivia_qa"
+  config: "rc"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+chroma:
+  path: "./chroma_json_data"
+  collection_name: "triviaqa_json_indexed"
+  recreate: false
+
+search:
+  top_k: 10
+
+logging:
+  level: "INFO"
+  name: "chroma_triviaqa_json_indexing"

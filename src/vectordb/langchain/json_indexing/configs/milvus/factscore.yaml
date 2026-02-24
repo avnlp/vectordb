@@ -1,0 +1,25 @@
+# Milvus JSON Indexing Configuration - FActScore Dataset
+
+dataloader:
+  type: "factscore"
+  dataset_name: "Alab-NLP/factscore"
+  config: "unprocessed"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+milvus:
+  uri: "http://localhost:19530"
+  token: ""
+  collection_name: "factscore_json_indexed"
+
+search:
+  top_k: 10
+
+logging:
+  level: "INFO"
+  name: "milvus_factscore_json_indexing"
