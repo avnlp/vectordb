@@ -41,6 +41,9 @@ class TestRunSearch:
         ]
 
     @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.weaviate_search.SentenceTransformersDiversityRanker"
+    )
+    @patch(
         "vectordb.haystack.diversity_filtering.pipelines.weaviate_search.WeaviateVectorDB"
     )
     @patch(
@@ -54,6 +57,7 @@ class TestRunSearch:
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
         mock_db_class: MagicMock,
+        mock_ranker_class: MagicMock,
         mock_config: MagicMock,
         sample_candidates: list[Document],
         tmp_path: pytest.TempPathFactory,
@@ -70,11 +74,18 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         # Setup database
         mock_db = MagicMock()
         mock_db_class.return_value = mock_db
         mock_db.search.return_value = sample_candidates
+
+        # Setup ranker
+        mock_ranker = MagicMock()
+        mock_ranker_class.return_value = mock_ranker
+        mock_ranker.warm_up = MagicMock()
+        mock_ranker.run.return_value = {"documents": sample_candidates[:10]}
 
         result = run_search(str(config_file), "test query")
 
@@ -120,6 +131,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         # Setup database
         mock_db = MagicMock()
@@ -139,6 +151,7 @@ class TestRunSearch:
             model="sentence-transformers/all-MiniLM-L6-v2",
             top_k=10,
             similarity="cosine",
+            strategy="maximum_margin_relevance",
         )
         mock_ranker.run.assert_called_once_with(
             documents=sample_candidates,
@@ -178,6 +191,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         mock_db = MagicMock()
         mock_db_class.return_value = mock_db
@@ -193,6 +207,7 @@ class TestRunSearch:
             model="sentence-transformers/all-MiniLM-L6-v2",
             top_k=10,
             similarity="dot_product",
+            strategy="maximum_margin_relevance",
         )
 
     @patch(
@@ -221,6 +236,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         mock_db = MagicMock()
         mock_db_class.return_value = mock_db
@@ -288,6 +304,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         # Setup database
         mock_db = MagicMock()
@@ -375,6 +392,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         mock_db = MagicMock()
         mock_db_class.return_value = mock_db
@@ -437,6 +455,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         mock_db = MagicMock()
         mock_db_class.return_value = mock_db
@@ -488,6 +507,7 @@ class TestRunSearch:
         mock_embedder = MagicMock()
         mock_embedder_class.return_value = mock_embedder
         mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+        mock_embedder.warm_up = MagicMock()
 
         mock_db = MagicMock()
         mock_db_class.return_value = mock_db

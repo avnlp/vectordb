@@ -11,7 +11,7 @@ document_store:
   type: "qdrant"
   location: ":memory:"
   collection_name: "arc_diversity"
-  recreate_index: true
+  recreate_index: false  # Changed from true to false for safe incremental indexing
 
 embedding:
   model: "sentence-transformers/all-MiniLM-L6-v2"

@@ -62,6 +62,10 @@ class IndexConfig(BaseModel):
     """Configuration for vector index/collection."""
 
     name: str = Field(description="Index/collection name")
+    recreate: bool = Field(
+        default=False,
+        description="Whether to recreate the index on each run (True = destructive, False = incremental/upsert)",
+    )
 
 
 class RetrievalConfig(BaseModel):
@@ -198,6 +202,9 @@ class ConfigLoader:
         Returns:
             Object with environment variables resolved.
 
+        Raises:
+            ValueError: If a required environment variable is missing.
+
         Example:
             {"key": "${HOME}/path"} -> {"key": "/home/user/path"}
         """
@@ -210,7 +217,11 @@ class ConfigLoader:
         if isinstance(obj, str):
             if obj.startswith("${") and obj.endswith("}"):
                 env_var = obj[2:-1]
-                return os.getenv(env_var, "")
+                value = os.getenv(env_var)
+                if value is None:
+                    msg = f"Required environment variable '{env_var}' is not set"
+                    raise ValueError(msg)
+                return value
             return obj
 
         return obj

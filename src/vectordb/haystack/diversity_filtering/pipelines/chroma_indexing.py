@@ -6,13 +6,18 @@ retrieval. Supports TriviaQA, ARC, PopQA, FactScore, and Earnings Calls.
 Pipeline Flow:
 1. Load dataset via DatasetRegistry with configurable split and limit
 2. Convert to Haystack Document objects with metadata preservation
-3. Embed documents using SentenceTransformersDocumentEmbedder
+3. Embed documents in batches using SentenceTransformersDocumentEmbedder
 4. Index into Chroma with specified collection name and dimension
 
 Embedding Configuration:
 - Model: Configurable sentence-transformers model (default: all-MiniLM-L6-v2)
-- Batch size: Configurable for throughput optimization
+- Batch size: Configurable for memory efficiency (default: 32)
 - Device: Auto-detected (cuda/cpu/mps) or explicitly specified
+
+Memory Optimization:
+Documents are processed in batches to prevent high memory consumption or
+OutOfMemory errors for large datasets. Each batch is embedded sequentially
+before being added to the full document list.
 
 Index Management:
 Creates or updates Chroma collection with specified embedding dimension.
@@ -76,7 +81,13 @@ def run_indexing(config_path: str) -> dict:
     )
     embedder.warm_up()
 
-    embedded_docs = embedder.run(documents=documents)["documents"]
+    # Process documents in batches to reduce memory consumption
+    batch_size = config.embedding.batch_size or 32
+    embedded_docs: list[Document] = []
+    for i in range(0, len(documents), batch_size):
+        batch = documents[i : i + batch_size]
+        embedded_batch = embedder.run(documents=batch)["documents"]
+        embedded_docs.extend(embedded_batch)
 
     db = ChromaVectorDB(
         host=config.vectordb.chroma.host,
@@ -93,4 +104,5 @@ def run_indexing(config_path: str) -> dict:
         "index_name": config.index.name,
         "embedding_model": config.embedding.model,
         "embedding_dimension": config.embedding.dimension,
+        "batches_processed": (len(documents) + batch_size - 1) // batch_size,
     }

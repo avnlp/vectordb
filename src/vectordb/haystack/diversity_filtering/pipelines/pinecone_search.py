@@ -30,6 +30,7 @@ from haystack.components.generators import OpenAIGenerator
 from haystack.components.rankers import SentenceTransformersDiversityRanker
 
 from vectordb.databases.pinecone import PineconeVectorDB
+from vectordb.haystack.diversity_filtering.rankers import ClusteringDiversityRanker
 from vectordb.haystack.diversity_filtering.utils.config_loader import (
     ConfigLoader,
 )
@@ -82,14 +83,27 @@ def run_search(config_path: str, query: str) -> dict:
             "query": query,
         }
 
-    if config.diversity.algorithm == "maximum_margin_relevance":
+    if config.diversity.algorithm in (
+        "maximum_margin_relevance",
+        "greedy_diversity_order",
+    ):
         ranker = SentenceTransformersDiversityRanker(
             model=config.embedding.model,
             top_k=config.diversity.top_k,
             similarity="cosine"
             if config.diversity.similarity_metric == "cosine"
             else "dot_product",
+            strategy=config.diversity.algorithm,
         )
+        ranker.warm_up()
+        diverse_docs = ranker.run(documents=candidates, query=query)["documents"]
+    elif config.diversity.algorithm == "clustering":
+        ranker = ClusteringDiversityRanker(
+            model=config.embedding.model,
+            top_k=config.diversity.top_k,
+            similarity=config.diversity.similarity_metric,
+        )
+        ranker.warm_up()
         diverse_docs = ranker.run(documents=candidates, query=query)["documents"]
     else:
         diverse_docs = candidates[: config.diversity.top_k]

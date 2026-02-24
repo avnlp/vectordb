@@ -69,6 +69,21 @@ class TestConfigModels:
         """Test IndexConfig."""
         config = IndexConfig(name="my_index")
         assert config.name == "my_index"
+        assert (
+            config.recreate is False
+        )  # Default is False for safe incremental indexing
+
+    def test_index_config_recreate_false(self) -> None:
+        """Test IndexConfig with recreate=False for incremental indexing."""
+        config = IndexConfig(name="my_index", recreate=False)
+        assert config.name == "my_index"
+        assert config.recreate is False
+
+    def test_index_config_recreate_true(self) -> None:
+        """Test IndexConfig with recreate=True for destructive reindexing."""
+        config = IndexConfig(name="my_index", recreate=True)
+        assert config.name == "my_index"
+        assert config.recreate is True
 
     def test_retrieval_config_defaults(self) -> None:
         """Test RetrievalConfig default values."""
@@ -233,8 +248,11 @@ class TestConfigLoaderEnvVars:
             del os.environ["MISSING_VAR_XYZ"]
 
         data = {"key": "${MISSING_VAR_XYZ}"}
-        result = ConfigLoader._resolve_env_vars(data)
-        assert result["key"] == ""
+        with pytest.raises(
+            ValueError,
+            match="Required environment variable 'MISSING_VAR_XYZ' is not set",
+        ):
+            ConfigLoader._resolve_env_vars(data)
 
     def test_resolve_env_vars_non_string(self) -> None:
         """Test resolving env vars with non-string values."""

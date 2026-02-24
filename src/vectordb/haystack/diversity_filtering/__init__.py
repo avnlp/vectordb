@@ -27,14 +27,21 @@ Example usage:
 
     result = qdrant_indexing.run_indexing("configs/qdrant/triviaqa/indexing.yaml")
 
-    from vectordb.haystack.diversity_filtering.pipelines import qdrant_search
-
-    result = qdrant_search.run_search(
-        "configs/qdrant/triviaqa/search.yaml", "What is AI?"
+    from vectordb.haystack.diversity_filtering.pipelines.chroma_search import (
+        ChromaDiversitySearchPipeline,
     )
+
+    # Initialize pipeline once (components loaded once, reused across searches)
+    pipeline = ChromaDiversitySearchPipeline(
+        "configs/chroma/triviaqa/search.yaml"
+    )
+
+    # Execute multiple searches efficiently
+    result1 = pipeline.search("What is AI?")
+    result2 = pipeline.search("How does machine learning work?")
 """
 
-from vectordb.haystack.diversity_filtering import components, pipelines, utils
+from vectordb.haystack.diversity_filtering import pipelines, utils
 
 
-__all__ = ["pipelines", "components", "utils"]
+__all__ = ["pipelines", "utils"]

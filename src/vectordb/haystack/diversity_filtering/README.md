@@ -19,6 +19,8 @@ The module includes two custom Haystack components -- a clustering-based diversi
 
 Each database has a dedicated indexing pipeline that loads documents from a configured dataset (such as TriviaQA, ARC, PopQA, FactScore, or Earnings Calls), generates dense embeddings using a sentence transformer model, and writes the embedded documents to the target vector database.
 
+By default, indexing is **incremental** - documents are upserted into existing collections without data loss. Set `recreate: true` in the configuration to delete and recreate the collection before indexing.
+
 ### Search with Diversity Filtering
 
 The search pipeline first retrieves a broad set of candidate documents (controlled by the retrieval top-k setting). It then applies a diversity ranker -- either the built-in Haystack sentence transformer diversity ranker using MMR, or the custom clustering-based ranker -- to select a smaller number of documents that maximize both relevance and diversity. The MMR lambda parameter controls the trade-off: values closer to zero favor diversity while values closer to one favor relevance.
@@ -63,6 +65,7 @@ embedding:
 
 index:
   name: triviaqa_diversity
+  recreate: false  # Default: false (incremental/upsert). Set true to recreate collection
 
 retrieval:
   top_k_candidates: 100

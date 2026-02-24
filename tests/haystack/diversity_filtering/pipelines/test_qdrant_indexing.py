@@ -108,6 +108,7 @@ class TestRunIndexing:
         config.embedding.batch_size = 32
         config.embedding.device = None
         config.index.name = "test_index"
+        config.index.recreate = False
         config.vectordb.qdrant.url = "http://localhost:6333"
         config.vectordb.qdrant.api_key = None
         return config
@@ -247,7 +248,7 @@ class TestRunIndexing:
             api_key=None,
             index="test_index",
             embedding_dim=384,
-            recreate_index=True,
+            recreate_index=False,
         )
 
     @patch(
@@ -296,7 +297,7 @@ class TestRunIndexing:
             api_key="secret-api-key",
             index="test_index",
             embedding_dim=384,
-            recreate_index=True,
+            recreate_index=False,
         )
 
     @patch(
@@ -344,4 +345,102 @@ class TestRunIndexing:
             model="sentence-transformers/all-MiniLM-L6-v2",
             batch_size=32,
             device="cuda",
+        )
+
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.QdrantVectorDB"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.SentenceTransformersDocumentEmbedder"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.ConfigLoader"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.load_documents"
+    )
+    def test_run_indexing_recreate_index_false(
+        self,
+        mock_load_documents: MagicMock,
+        mock_config_loader: MagicMock,
+        mock_embedder_class: MagicMock,
+        mock_db_class: MagicMock,
+        mock_config: MagicMock,
+        tmp_path: pytest.TempPathFactory,
+    ) -> None:
+        """Test indexing with recreate_index=False for incremental indexing."""
+        mock_config.index.recreate = False
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config")
+
+        mock_config_loader.load.return_value = mock_config
+
+        docs = [Document(content="Test doc")]
+        mock_load_documents.return_value = docs
+
+        mock_embedder = MagicMock()
+        mock_embedder_class.return_value = mock_embedder
+        mock_embedder.run.return_value = {"documents": docs}
+
+        mock_db = MagicMock()
+        mock_db_class.return_value = mock_db
+
+        run_indexing(str(config_file))
+
+        mock_db_class.assert_called_once_with(
+            url="http://localhost:6333",
+            api_key=None,
+            index="test_index",
+            embedding_dim=384,
+            recreate_index=False,
+        )
+
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.QdrantVectorDB"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.SentenceTransformersDocumentEmbedder"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.ConfigLoader"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.qdrant_indexing.load_documents"
+    )
+    def test_run_indexing_recreate_index_true(
+        self,
+        mock_load_documents: MagicMock,
+        mock_config_loader: MagicMock,
+        mock_embedder_class: MagicMock,
+        mock_db_class: MagicMock,
+        mock_config: MagicMock,
+        tmp_path: pytest.TempPathFactory,
+    ) -> None:
+        """Test indexing with recreate_index=True for destructive reindexing."""
+        mock_config.index.recreate = True
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config")
+
+        mock_config_loader.load.return_value = mock_config
+
+        docs = [Document(content="Test doc")]
+        mock_load_documents.return_value = docs
+
+        mock_embedder = MagicMock()
+        mock_embedder_class.return_value = mock_embedder
+        mock_embedder.run.return_value = {"documents": docs}
+
+        mock_db = MagicMock()
+        mock_db_class.return_value = mock_db
+
+        run_indexing(str(config_file))
+
+        mock_db_class.assert_called_once_with(
+            url="http://localhost:6333",
+            api_key=None,
+            index="test_index",
+            embedding_dim=384,
+            recreate_index=True,
         )

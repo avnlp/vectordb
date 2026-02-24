@@ -11,6 +11,7 @@ embedding:
 
 index:
   name: triviaqa_diversity
+  recreate: false
 
 retrieval:
   top_k_candidates: 100

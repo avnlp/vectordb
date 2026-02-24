@@ -5,11 +5,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from haystack import Document
 
-from vectordb.haystack.diversity_filtering.pipelines.chroma_search import run_search
+from vectordb.haystack.diversity_filtering.pipelines.chroma_search import (
+    ChromaDiversitySearchPipeline,
+)
 
 
-class TestRunSearch:
-    """Tests for run_search function."""
+class TestChromaDiversitySearchPipeline:
+    """Tests for ChromaDiversitySearchPipeline class."""
 
     @pytest.fixture
     def mock_config(self) -> MagicMock:
@@ -42,17 +44,21 @@ class TestRunSearch:
         ]
 
     @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersDiversityRanker"
+    )
+    @patch(
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ChromaVectorDB"
     )
     @patch(
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
     )
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_success_no_diversity(
+    def test_search_success_no_diversity(
         self,
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
         mock_db_class: MagicMock,
+        mock_ranker_class: MagicMock,
         mock_config: MagicMock,
         sample_candidates: list[Document],
         tmp_path: pytest.TempPathFactory,
@@ -75,7 +81,13 @@ class TestRunSearch:
         mock_db_class.return_value = mock_db
         mock_db.search.return_value = sample_candidates
 
-        result = run_search(str(config_file), "test query")
+        # Setup ranker for greedy_diversity_order
+        mock_ranker = MagicMock()
+        mock_ranker_class.return_value = mock_ranker
+        mock_ranker.run.return_value = {"documents": sample_candidates[:10]}
+
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
 
         assert result["query"] == "test query"
         assert result["num_diverse"] == 10  # config.diversity.top_k
@@ -97,7 +109,7 @@ class TestRunSearch:
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
     )
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_with_mmr_diversity(
+    def test_search_with_mmr_diversity(
         self,
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
@@ -129,13 +141,15 @@ class TestRunSearch:
         diverse_docs = sample_candidates[:5]
         mock_ranker.run.return_value = {"documents": diverse_docs}
 
-        result = run_search(str(config_file), "test query")
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
 
         assert result["num_diverse"] == 5
         mock_ranker_class.assert_called_once_with(
             model="sentence-transformers/all-MiniLM-L6-v2",
             top_k=10,
             similarity="cosine",
+            strategy="maximum_margin_relevance",
         )
         mock_ranker.run.assert_called_once_with(
             documents=sample_candidates,
@@ -152,7 +166,7 @@ class TestRunSearch:
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
     )
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_with_dot_product_similarity(
+    def test_search_with_dot_product_similarity(
         self,
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
@@ -182,14 +196,19 @@ class TestRunSearch:
         mock_ranker_class.return_value = mock_ranker
         mock_ranker.run.return_value = {"documents": sample_candidates[:5]}
 
-        run_search(str(config_file), "test query")
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        pipeline.search("test query")
 
         mock_ranker_class.assert_called_once_with(
             model="sentence-transformers/all-MiniLM-L6-v2",
             top_k=10,
             similarity="dot_product",
+            strategy="maximum_margin_relevance",
         )
 
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersDiversityRanker"
+    )
     @patch(
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ChromaVectorDB"
     )
@@ -197,11 +216,12 @@ class TestRunSearch:
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
     )
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_no_candidates(
+    def test_search_no_candidates(
         self,
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
         mock_db_class: MagicMock,
+        mock_ranker_class: MagicMock,
         mock_config: MagicMock,
         tmp_path: pytest.TempPathFactory,
     ) -> None:
@@ -219,7 +239,11 @@ class TestRunSearch:
         mock_db_class.return_value = mock_db
         mock_db.search.return_value = []
 
-        result = run_search(str(config_file), "test query")
+        mock_ranker = MagicMock()
+        mock_ranker_class.return_value = mock_ranker
+
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
 
         assert result["documents"] == []
         assert result["num_diverse"] == 0
@@ -248,7 +272,7 @@ class TestRunSearch:
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
     )
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_with_rag(
+    def test_search_with_rag(
         self,
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
@@ -303,7 +327,8 @@ class TestRunSearch:
         mock_generator_class.return_value = mock_generator
         mock_generator.run.return_value = {"replies": ["Generated answer"]}
 
-        result = run_search(str(config_file), "test query")
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
 
         assert result["answer"] == "Generated answer"
         mock_get_template.assert_called_once_with("triviaqa")
@@ -339,7 +364,7 @@ class TestRunSearch:
         "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
     )
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_rag_error(
+    def test_search_rag_error(
         self,
         mock_config_loader: MagicMock,
         mock_embedder_class: MagicMock,
@@ -378,13 +403,13 @@ class TestRunSearch:
         mock_generator_class.return_value = mock_generator
         mock_generator.run.side_effect = Exception("API Error")
 
-        result = run_search(str(config_file), "test query")
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
 
-        assert "Error generating answer" in result["answer"]
-        assert "API Error" in result["answer"]
+        assert "Unable to generate an answer" in result["answer"]
 
     @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
-    def test_run_search_config_not_found(
+    def test_search_config_not_found(
         self,
         mock_config_loader: MagicMock,
     ) -> None:
@@ -392,4 +417,161 @@ class TestRunSearch:
         mock_config_loader.load.side_effect = FileNotFoundError("Config not found")
 
         with pytest.raises(FileNotFoundError, match="Config not found"):
-            run_search("/nonexistent/config.yaml", "test query")
+            ChromaDiversitySearchPipeline("/nonexistent/config.yaml")
+
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ClusteringDiversityRanker"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ChromaVectorDB"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
+    )
+    @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
+    def test_search_with_clustering_diversity(
+        self,
+        mock_config_loader: MagicMock,
+        mock_embedder_class: MagicMock,
+        mock_db_class: MagicMock,
+        mock_ranker_class: MagicMock,
+        mock_config: MagicMock,
+        sample_candidates: list[Document],
+        tmp_path: pytest.TempPathFactory,
+    ) -> None:
+        """Test search with clustering diversity filtering."""
+        mock_config.diversity.algorithm = "clustering"
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config")
+
+        mock_config_loader.load.return_value = mock_config
+
+        mock_embedder = MagicMock()
+        mock_embedder_class.return_value = mock_embedder
+        mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+
+        mock_db = MagicMock()
+        mock_db_class.return_value = mock_db
+        mock_db.search.return_value = sample_candidates
+
+        mock_ranker = MagicMock()
+        mock_ranker_class.return_value = mock_ranker
+        diverse_docs = sample_candidates[:5]
+        mock_ranker.run.return_value = {"documents": diverse_docs}
+
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
+
+        assert result["num_diverse"] == 5
+        mock_ranker_class.assert_called_once_with(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            top_k=10,
+            similarity="cosine",
+        )
+        mock_ranker.run.assert_called_once_with(
+            documents=sample_candidates,
+            query="test query",
+        )
+
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ClusteringDiversityRanker"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ChromaVectorDB"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
+    )
+    @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
+    def test_search_with_clustering_dot_product(
+        self,
+        mock_config_loader: MagicMock,
+        mock_embedder_class: MagicMock,
+        mock_db_class: MagicMock,
+        mock_ranker_class: MagicMock,
+        mock_config: MagicMock,
+        sample_candidates: list[Document],
+        tmp_path: pytest.TempPathFactory,
+    ) -> None:
+        """Test search with clustering diversity and dot product similarity."""
+        mock_config.diversity.algorithm = "clustering"
+        mock_config.diversity.similarity_metric = "dot_product"
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config")
+
+        mock_config_loader.load.return_value = mock_config
+
+        mock_embedder = MagicMock()
+        mock_embedder_class.return_value = mock_embedder
+        mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+
+        mock_db = MagicMock()
+        mock_db_class.return_value = mock_db
+        mock_db.search.return_value = sample_candidates
+
+        mock_ranker = MagicMock()
+        mock_ranker_class.return_value = mock_ranker
+        mock_ranker.run.return_value = {"documents": sample_candidates[:3]}
+
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        pipeline.search("test query")
+
+        mock_ranker_class.assert_called_once_with(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            top_k=10,
+            similarity="dot_product",
+        )
+
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersDiversityRanker"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.ChromaVectorDB"
+    )
+    @patch(
+        "vectordb.haystack.diversity_filtering.pipelines.chroma_search.SentenceTransformersTextEmbedder"
+    )
+    @patch("vectordb.haystack.diversity_filtering.pipelines.chroma_search.ConfigLoader")
+    def test_search_with_greedy_diversity_order(
+        self,
+        mock_config_loader: MagicMock,
+        mock_embedder_class: MagicMock,
+        mock_db_class: MagicMock,
+        mock_ranker_class: MagicMock,
+        mock_config: MagicMock,
+        sample_candidates: list[Document],
+        tmp_path: pytest.TempPathFactory,
+    ) -> None:
+        """Test search with greedy_diversity_order algorithm."""
+        mock_config.diversity.algorithm = "greedy_diversity_order"
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("dummy: config")
+
+        mock_config_loader.load.return_value = mock_config
+
+        mock_embedder = MagicMock()
+        mock_embedder_class.return_value = mock_embedder
+        mock_embedder.run.return_value = {"embedding": [0.1] * 384}
+
+        mock_db = MagicMock()
+        mock_db_class.return_value = mock_db
+        mock_db.search.return_value = sample_candidates
+
+        mock_ranker = MagicMock()
+        mock_ranker_class.return_value = mock_ranker
+        diverse_docs = sample_candidates[:5]
+        mock_ranker.run.return_value = {"documents": diverse_docs}
+
+        pipeline = ChromaDiversitySearchPipeline(str(config_file))
+        result = pipeline.search("test query")
+
+        assert result["num_diverse"] == 5
+        mock_ranker_class.assert_called_once_with(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            top_k=10,
+            similarity="cosine",
+            strategy="greedy_diversity_order",
+        )
