@@ -1,0 +1,54 @@
+# Diversity Filtering Configuration - ARC (AI2 Reasoning Challenge) Dataset
+
+dataset:
+  name: "arc"
+  loader_module: "vectordb.dataloaders.haystack.arc"
+  loader_class: "ARCDataLoader"
+  split: "train"
+  max_documents: null
+
+document_store:
+  type: "qdrant"
+  location: ":memory:"
+  collection_name: "arc_diversity"
+  recreate_index: false  # Changed from true to false for safe incremental indexing
+
+embedding:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+  query_instruction: ""
+  document_instruction: ""
+  batch_size: 32
+  device: null
+  trust_remote_code: false
+
+retrieval:
+  top_k_candidates: 100
+
+diversity:
+  algorithm: "mmr"
+  top_k: 10
+
+  mmr:
+    lambda_threshold: 0.5
+    use_native_qdrant: false
+
+  greedy:
+    similarity_metric: "cosine"
+
+  clustering:
+    algorithm: "kmeans"
+    n_clusters: 5
+    min_cluster_size: 3
+    selection_strategy: "centroid_closest"
+
+metrics:
+  enabled: true
+  compute_pairwise_distance: true
+  compute_cluster_coverage: true
+  embedding_model: null
+
+output:
+  include_embeddings: false
+  include_scores: true
+  include_diversity_metrics: true

@@ -1,0 +1,58 @@
+# Diversity Filtering Configuration - TriviaQA Dataset
+# Supports three diversity algorithms: mmr, greedy_diversity_order, clustering
+
+dataset:
+  name: "triviaqa"
+  loader_module: "vectordb.dataloaders.haystack.triviaqa"
+  loader_class: "TriviaQADataLoader"
+  split: "train"
+  max_documents: null  # null = all documents
+
+document_store:
+  type: "qdrant"  # qdrant | in_memory
+  location: ":memory:"  # ":memory:" | "localhost:6333" | "./qdrant_data"
+  collection_name: "triviaqa_diversity"
+  recreate_index: false  # Changed from true to false for safe incremental indexing
+
+embedding:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+  query_instruction: ""
+  document_instruction: ""
+  batch_size: 32
+  device: null  # null = auto-detect (cuda if available)
+  trust_remote_code: false
+
+retrieval:
+  top_k_candidates: 100  # Fetch more candidates for diversity re-ranking
+
+diversity:
+  algorithm: "mmr"  # mmr | greedy_diversity_order | clustering
+  top_k: 10  # Final number of diverse results
+
+  # MMR-specific parameters (algorithm: mmr)
+  mmr:
+    lambda_threshold: 0.5  # 0.0 = max diversity, 1.0 = max relevance
+    use_native_qdrant: false  # Use Qdrant's native MMR when available
+
+  # Greedy Diversity Order parameters (algorithm: greedy_diversity_order)
+  greedy:
+    similarity_metric: "cosine"  # cosine | dot_product
+
+  # Clustering-based parameters (algorithm: clustering)
+  clustering:
+    algorithm: "kmeans"  # kmeans | hdbscan
+    n_clusters: 5  # For kmeans; ignored for hdbscan
+    min_cluster_size: 3  # For hdbscan; ignored for kmeans
+    selection_strategy: "centroid_closest"  # centroid_closest | highest_relevance
+
+metrics:
+  enabled: true
+  compute_pairwise_distance: true
+  compute_cluster_coverage: true
+  embedding_model: null  # null = use same as retrieval embedding
+
+output:
+  include_embeddings: false
+  include_scores: true
+  include_diversity_metrics: true
