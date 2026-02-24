@@ -138,8 +138,8 @@ class TestPineconeParentDocIndexing:
 
         PineconeParentDocIndexingPipeline("config.yaml")
 
-        mock_db.create_collection.assert_called_once()
-        call_kwargs = mock_db.create_collection.call_args[1]
+        mock_db.create_index.assert_called_once()
+        call_kwargs = mock_db.create_index.call_args[1]
         assert call_kwargs["dimension"] == 1024
 
     @patch(

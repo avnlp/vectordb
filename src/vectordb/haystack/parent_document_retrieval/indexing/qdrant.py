@@ -186,16 +186,17 @@ class QdrantParentDocIndexingPipeline:
             Qwen/Qwen3-Embedding-0.6B model.
         """
         db_config = self.config.get("database", {})
-        self.vector_db = QdrantVectorDB(config={"qdrant": db_config.get("qdrant", {})})
-
         index_name = db_config.get("qdrant", {}).get(
             "collection_name", "parent_doc_leaves"
         )
         embedding_dim = 1024  # Qwen3-Embedding-0.6B dimension
-        self.vector_db.create_collection(
-            collection_name=index_name,
-            dimension=embedding_dim,
+
+        self.vector_db = QdrantVectorDB(
+            config={
+                "qdrant": {**db_config.get("qdrant", {}), "collection_name": index_name}
+            }
         )
+        self.vector_db.create_collection(embedding_dim)
         self.index_name = index_name
 
     def run(self, limit: int | None = None) -> dict:
@@ -244,7 +245,7 @@ class QdrantParentDocIndexingPipeline:
 
         # Embed leaves and index in Qdrant for similarity search
         embedded_leaves = self.doc_embedder.run(documents=leaves)["documents"]
-        self.vector_db.upsert(data=embedded_leaves)
+        self.vector_db.index_documents(documents=embedded_leaves)
 
         return {
             "num_documents": len(documents),

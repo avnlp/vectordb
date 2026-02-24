@@ -213,10 +213,11 @@ class ChromaParentDocSearchPipeline:
 
         # Search for matching child chunks in Chroma
         # Oversample (top_k * 3) to ensure good recall before merging
-        leaves = self.vector_db.query(
-            vector=query_embedding,
-            top_k=top_k * 3,  # Oversample leaves for better recall before merging
+        results = self.vector_db.query(
+            query_embedding=query_embedding,
+            n_results=top_k * 3,  # Oversample leaves for better recall before merging
         )
+        leaves = self.vector_db.query_to_documents(results)
 
         # Resolve child matches to their parent documents
         merged = self.auto_merger.run(documents=leaves)["documents"]

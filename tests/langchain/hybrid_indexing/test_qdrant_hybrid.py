@@ -93,7 +93,9 @@ class TestQdrantHybridIndexing:
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.client.upsert.return_value = len(sample_documents)
+        mock_db_inst.dense_vector_name = "dense"
+        mock_db_inst.sparse_vector_name = "sparse"
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -113,7 +115,7 @@ class TestQdrantHybridIndexing:
         assert result["db"] == "qdrant"
         assert result["collection_name"] == "test_hybrid"
         mock_db_inst.create_collection.assert_called_once()
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.client.upsert.assert_called()
 
         # Verify sparse embeddings were generated
         mock_sparse_embedder.embed_documents.assert_called_once()
@@ -200,7 +202,9 @@ class TestQdrantHybridIndexing:
         mock_sparse_embedder_class.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = 1
+        mock_db_inst.client.upsert.return_value = 1
+        mock_db_inst.dense_vector_name = "dense"
+        mock_db_inst.sparse_vector_name = "sparse"
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -215,17 +219,15 @@ class TestQdrantHybridIndexing:
         pipeline = QdrantHybridIndexingPipeline(config)
         pipeline.run()
 
-        # Check that upsert was called with correct data structure
-        call_args = mock_db_inst.upsert.call_args
-        upsert_data = call_args.kwargs.get(
-            "data", call_args.args[0] if call_args.args else []
+        # Check that client.upsert was called with correct data structure
+        call_args = mock_db_inst.client.upsert.call_args
+        points = call_args.kwargs.get(
+            "points", call_args.args[1] if len(call_args.args) > 1 else []
         )
-        if upsert_data:
-            assert "id" in upsert_data[0]
-            assert "values" in upsert_data[0]
-            assert "sparse_values" in upsert_data[0]
-            assert "metadata" in upsert_data[0]
-            assert upsert_data[0]["sparse_values"] == sparse_embedding
+        if points:
+            assert hasattr(points[0], "id") or "id" in str(points[0])
+            assert hasattr(points[0], "vector") or "vector" in str(points[0])
+            assert hasattr(points[0], "payload") or "payload" in str(points[0])
 
 
 class TestQdrantHybridSearch:

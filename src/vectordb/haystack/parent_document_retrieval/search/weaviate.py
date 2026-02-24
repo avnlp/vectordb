@@ -217,7 +217,8 @@ class WeaviateParentDocSearchPipeline:
         # Oversample (top_k * 3) to ensure good recall before merging
         leaves = self.vector_db.query(
             vector=query_embedding,
-            top_k=top_k * 3,  # Oversample leaves for better recall before merging
+            limit=top_k * 3,  # Oversample leaves for better recall before merging
+            return_documents=True,
         )
 
         # Resolve child matches to their parent documents

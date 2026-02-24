@@ -350,7 +350,7 @@ class TestWeaviateParentDocSearch:
         pipeline.search("test query", top_k=5)
 
         call_kwargs = mock_db.query.call_args[1]
-        assert call_kwargs["top_k"] == 15  # 5 * 3
+        assert call_kwargs["limit"] == 15  # 5 * 3
 
     @patch(
         "vectordb.haystack.parent_document_retrieval.search.weaviate.load_parent_doc_config"

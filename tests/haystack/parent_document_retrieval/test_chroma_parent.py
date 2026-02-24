@@ -133,8 +133,6 @@ class TestChromaParentDocIndexing:
         ChromaParentDocIndexingPipeline("config.yaml")
 
         mock_db.create_collection.assert_called_once()
-        call_kwargs = mock_db.create_collection.call_args[1]
-        assert call_kwargs["dimension"] == 1024
 
     @patch(
         "vectordb.haystack.parent_document_retrieval.indexing.chroma.load_parent_doc_config"
@@ -392,7 +390,7 @@ class TestChromaParentDocSearch:
         pipeline.search("test query", top_k=5)
 
         call_kwargs = mock_db.query.call_args[1]
-        assert call_kwargs["top_k"] == 15  # 5 * 3
+        assert call_kwargs["n_results"] == 15  # 5 * 3
 
     @patch(
         "vectordb.haystack.parent_document_retrieval.search.chroma.load_parent_doc_config"
@@ -429,7 +427,8 @@ class TestChromaParentDocSearch:
         mock_embedder_class.return_value = mock_embedder
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_leaf_documents
+        mock_db.query.return_value = {"ids": [["1"]], "documents": [["test"]]}
+        mock_db.query_to_documents.return_value = sample_leaf_documents
         mock_db_class.return_value = mock_db
 
         merged_docs = [Document(content="Merged parent content")]
@@ -513,7 +512,8 @@ class TestChromaParentDocSearch:
         mock_embedder_class.return_value = mock_embedder
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_leaf_documents
+        mock_db.query.return_value = {"ids": [["1"]], "documents": [["test"]]}
+        mock_db.query_to_documents.return_value = sample_leaf_documents
         mock_db_class.return_value = mock_db
 
         mock_merger = MagicMock()

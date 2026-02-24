@@ -14,7 +14,7 @@ while parent documents provide the comprehensive context needed for LLM prompts.
 
 Search Flow:
     1. Embed query using SentenceTransformersTextEmbedder
-    2. Query Qdrant for top child matches (top_k * 3 for oversampling)
+    2. Search Qdrant for top child matches (top_k * 3 for oversampling)
     3. Use AutoMergingRetriever to resolve children to parents
     4. Return parent documents and metadata
 
@@ -213,9 +213,9 @@ class QdrantParentDocSearchPipeline:
 
         # Search for matching child chunks in Qdrant
         # Oversample (top_k * 3) to ensure good recall before merging
-        leaves = self.vector_db.query(
-            vector=query_embedding,
-            top_k=top_k * 3,  # Oversample leaves for better recall before merging
+        leaves = self.vector_db.search(
+            query_vector=query_embedding,
+            top_k=top_k * 3,
         )
 
         # Resolve child matches to their parent documents

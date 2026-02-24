@@ -230,7 +230,7 @@ class QdrantMetadataFilteringIndexingPipeline:
             logger.info("Recreated Qdrant collection: %s", self.collection_name)
 
         dimension = len(embeddings[0]) if embeddings else 0
-        self.db.create_collection(dimension=dimension)
+        self.db.create_collection(dimension)
 
         points = [
             PointStruct(

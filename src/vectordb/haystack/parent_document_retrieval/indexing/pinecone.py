@@ -193,8 +193,8 @@ class PineconeParentDocIndexingPipeline:
             "index_name", "parent-doc-leaves"
         )
         embedding_dim = 1024  # Qwen3-Embedding-0.6B dimension
-        self.vector_db.create_collection(
-            collection_name=index_name,
+        self.vector_db.create_index(
+            index_name=index_name,
             dimension=embedding_dim,
         )
         self.index_name = index_name

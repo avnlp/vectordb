@@ -112,7 +112,7 @@ class TestQdrantAgenticRAGIndexing:
         mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.client.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -129,6 +129,8 @@ class TestQdrantAgenticRAGIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
+        mock_db_inst.create_collection.assert_called_once()
+        mock_db_inst.client.upsert.assert_called()
 
     @patch("vectordb.langchain.agentic_rag.indexing.qdrant.QdrantVectorDB")
     @patch(

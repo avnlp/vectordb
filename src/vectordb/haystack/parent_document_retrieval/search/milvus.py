@@ -213,8 +213,8 @@ class MilvusParentDocSearchPipeline:
 
         # Search for matching child chunks in Milvus
         # Oversample (top_k * 3) to ensure good recall before merging
-        leaves = self.vector_db.query(
-            vector=query_embedding,
+        leaves = self.vector_db.search(
+            query_embedding=query_embedding,
             top_k=top_k * 3,  # Oversample leaves for better recall before merging
         )
 

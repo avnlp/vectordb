@@ -46,7 +46,18 @@ class QdrantJSONIndexer:
 
     def _connect(self) -> None:
         """Connect to Qdrant using VectorDB wrapper."""
-        self.vector_db = QdrantVectorDB(config=self.config)
+        collection_config = self.config.get("collection", {})
+        collection_name = collection_config.get("name", "json_indexed")
+        self.vector_db = QdrantVectorDB(
+            config={
+                **self.config,
+                "qdrant": {
+                    **self.config.get("qdrant", {}),
+                    "collection_name": collection_name,
+                },
+            }
+        )
+        self.collection_name = collection_name
         self.logger.info("Connected to Qdrant")
 
     def _init_embedder(self) -> None:
@@ -78,19 +89,14 @@ class QdrantJSONIndexer:
 
         self.logger.info("Loaded %d documents", len(documents))
 
-        collection_config = self.config.get("collection", {})
-        collection_name = collection_config.get("name", "json_indexed")
         dimension = get_embedding_dimension(self.embedder)
 
-        self.vector_db.create_collection(
-            collection_name=collection_name,
-            dimension=dimension,
-        )
-        self.logger.info("Created collection: %s", collection_name)
+        self.vector_db.create_collection(dimension)
+        self.logger.info("Created collection: %s", self.collection_name)
 
         # Embed and index
         embedded_docs = embed_documents(documents, self.embedder)
-        self.vector_db.upsert_documents(embedded_docs, collection_name)
+        self.vector_db.index_documents(documents=embedded_docs)
         self.logger.info("Indexed %d documents", len(embedded_docs))
 
         return {"documents_indexed": len(documents)}

@@ -172,17 +172,13 @@ class ChromaParentDocIndexingPipeline:
         """Initialize the Chroma vector database connection.
 
         Creates a ChromaVectorDB instance and ensures the collection exists
-        for storing child document embeddings. The collection is created with
-        the appropriate dimension for the embedding model.
+        for storing child document embeddings. Chroma automatically determines
+        the embedding dimension from the embedding function.
 
         Configuration:
             database.chroma: Chroma connection settings
             database.chroma.collection_name: Collection name
                 (default: "parent_doc_leaves")
-
-        Note:
-            Uses 1024 dimensions, which is the output size of the default
-            Qwen/Qwen3-Embedding-0.6B model.
         """
         db_config = self.config.get("database", {})
         self.vector_db = ChromaVectorDB(config={"chroma": db_config.get("chroma", {})})
@@ -190,11 +186,7 @@ class ChromaParentDocIndexingPipeline:
         index_name = db_config.get("chroma", {}).get(
             "collection_name", "parent_doc_leaves"
         )
-        embedding_dim = 1024  # Qwen3-Embedding-0.6B dimension
-        self.vector_db.create_collection(
-            collection_name=index_name,
-            dimension=embedding_dim,
-        )
+        self.vector_db.create_collection(name=index_name)
         self.index_name = index_name
 
     def run(self, limit: int | None = None) -> dict:

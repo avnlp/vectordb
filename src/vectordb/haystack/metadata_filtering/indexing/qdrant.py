@@ -57,10 +57,11 @@ class QdrantMetadataFilteringIndexingPipeline:
             Initialized QdrantVectorDB instance.
         """
         qdrant_config = self.config["qdrant"]
+        collection_name = qdrant_config.get("collection_name")
         return QdrantVectorDB(
             url=qdrant_config.get("url", "http://localhost:6333"),
             api_key=qdrant_config.get("api_key", ""),
-            collection_name=qdrant_config.get("collection_name"),
+            collection_name=collection_name,
         )
 
     def run(self) -> dict[str, int]:
@@ -102,11 +103,11 @@ class QdrantMetadataFilteringIndexingPipeline:
         # 4. Create collection
         qdrant_config = self.config["qdrant"]
         dimension = self.config["embeddings"].get("dimension", 384)
-        collection_name = qdrant_config.get("collection_name")
 
-        logger.info("Creating Qdrant collection: %s", collection_name)
+        logger.info(
+            "Creating Qdrant collection: %s", qdrant_config.get("collection_name")
+        )
         self.db.create_collection(
-            collection_name=collection_name,
             dimension=dimension,
             recreate=qdrant_config.get("recreate", False),
         )

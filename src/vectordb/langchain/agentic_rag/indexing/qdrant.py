@@ -24,7 +24,10 @@ Architecture Notes:
 """
 
 import logging
+import uuid
 from typing import Any
+
+from qdrant_client.http.models import PointStruct
 
 from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.dataloaders import DataloaderCatalog
@@ -81,12 +84,13 @@ class QdrantAgenticRAGIndexingPipeline:
 
         # Configure Qdrant connection
         qdrant_config = self.config["qdrant"]
+        self.collection_name = qdrant_config.get("collection_name")
+
         self.db = QdrantVectorDB(
             url=qdrant_config.get("url"),
             api_key=qdrant_config.get("api_key"),
+            collection_name=self.collection_name,
         )
-
-        self.collection_name = qdrant_config.get("collection_name")
 
         logger.info("Initialized Qdrant agentic RAG indexing pipeline (LangChain)")
 
@@ -129,17 +133,29 @@ class QdrantAgenticRAGIndexingPipeline:
         # Create collection with payload indexing support
         # Payload indices enable efficient filtered search during agent queries
         recreate = self.config.get("qdrant", {}).get("recreate", False)
-        self.db.create_collection(
-            collection_name=self.collection_name,
-            recreate=recreate,
-        )
+        dimension = len(embeddings[0]) if embeddings else 0
+        self.db.create_collection(dimension=dimension, recreate=recreate)
 
         # Upsert documents with embeddings and metadata payloads
-        num_indexed = self.db.upsert(
-            documents=docs,
-            embeddings=embeddings,
-            collection_name=self.collection_name,
-        )
-        logger.info("Indexed %d documents to Qdrant", num_indexed)
+        points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=embedding,
+                payload={
+                    "page_content": doc.page_content,
+                    **doc.metadata,
+                },
+            )
+            for doc, embedding in zip(docs, embeddings)
+        ]
 
-        return {"documents_indexed": num_indexed}
+        batch_size = 100
+        for i in range(0, len(points), batch_size):
+            self.db.client.upsert(
+                collection_name=self.collection_name,
+                points=points[i : i + batch_size],
+                wait=False,
+            )
+        logger.info("Indexed %d documents to Qdrant", len(docs))
+
+        return {"documents_indexed": len(docs)}

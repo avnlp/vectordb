@@ -124,7 +124,6 @@ class TestQdrantMetadataFilteringIndexing:
         pipeline.run()
 
         mock_db.create_collection.assert_called_once_with(
-            collection_name="test_metadata",
             dimension=384,
             recreate=False,
         )

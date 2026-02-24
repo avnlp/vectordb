@@ -244,7 +244,7 @@ class MilvusParentDocIndexingPipeline:
 
         # Embed leaves and index in Milvus for similarity search
         embedded_leaves = self.doc_embedder.run(documents=leaves)["documents"]
-        self.vector_db.upsert(data=embedded_leaves)
+        self.vector_db.insert_documents(documents=embedded_leaves)
 
         return {
             "num_documents": len(documents),
