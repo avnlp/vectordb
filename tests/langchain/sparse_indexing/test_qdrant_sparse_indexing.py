@@ -13,11 +13,9 @@ from vectordb.langchain.sparse_indexing.search.qdrant import (
 class TestQdrantSparseIndexing:
     """Unit tests for Qdrant sparse indexing pipeline."""
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.qdrant.QdrantVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.qdrant.DataloaderCatalog.create"
-    )
-    def test_indexing_initialization(self, mock_get_docs, mock_db):
+    def test_indexing_initialization(self, mock_db, mock_get_docs):
         """Test pipeline initialization."""
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -30,14 +28,12 @@ class TestQdrantSparseIndexing:
         assert pipeline.config == config
         assert pipeline.collection_name == "test"
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.qdrant.QdrantVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.qdrant.DataloaderCatalog.create"
-    )
     def test_indexing_run_with_documents(
         self,
-        mock_get_docs,
         mock_db,
+        mock_get_docs,
         sample_documents,
     ):
         """Test indexing with documents."""
@@ -48,7 +44,6 @@ class TestQdrantSparseIndexing:
         mock_get_docs.return_value = mock_loader
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -62,12 +57,10 @@ class TestQdrantSparseIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.upsert.assert_called_once()
+        mock_db_inst.index_documents.assert_called_once()
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.qdrant.QdrantVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.qdrant.DataloaderCatalog.create"
-    )
     def test_indexing_run_no_documents(self, mock_get_docs, mock_db):
         """Test indexing with no documents."""
         mock_dataset = MagicMock()
@@ -120,7 +113,7 @@ class TestQdrantSparseSearch:
     ):
         """Test search execution."""
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm.return_value = None
 
@@ -151,7 +144,7 @@ class TestQdrantSparseSearch:
     ):
         """Test search with RAG generation."""
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()

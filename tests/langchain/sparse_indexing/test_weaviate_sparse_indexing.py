@@ -13,11 +13,9 @@ from vectordb.langchain.sparse_indexing.search.weaviate import (
 class TestWeaviateSparseIndexing:
     """Unit tests for Weaviate sparse indexing pipeline."""
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.weaviate.WeaviateVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.weaviate.DataloaderCatalog.create"
-    )
-    def test_indexing_initialization(self, mock_get_docs, mock_db):
+    def test_indexing_initialization(self, mock_db, mock_get_docs):
         """Test pipeline initialization."""
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -30,14 +28,12 @@ class TestWeaviateSparseIndexing:
         assert pipeline.config == config
         assert pipeline.collection_name == "test"
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.weaviate.WeaviateVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.weaviate.DataloaderCatalog.create"
-    )
     def test_indexing_run_with_documents(
         self,
-        mock_get_docs,
         mock_db,
+        mock_get_docs,
         sample_documents,
     ):
         """Test indexing with documents."""
@@ -64,10 +60,8 @@ class TestWeaviateSparseIndexing:
         assert result["documents_indexed"] == len(sample_documents)
         mock_db_inst.upsert.assert_called_once()
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.weaviate.WeaviateVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.weaviate.DataloaderCatalog.create"
-    )
     def test_indexing_run_no_documents(self, mock_get_docs, mock_db):
         """Test indexing with no documents."""
         mock_dataset = MagicMock()
@@ -120,7 +114,7 @@ class TestWeaviateSparseSearch:
     ):
         """Test search execution."""
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.hybrid_search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm.return_value = None
 
@@ -151,7 +145,7 @@ class TestWeaviateSparseSearch:
     ):
         """Test search with RAG generation."""
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.hybrid_search.return_value = sample_documents
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()

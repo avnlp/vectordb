@@ -3,27 +3,36 @@
 import logging
 from typing import Any
 
+from langchain_core.documents import Document
+
 from vectordb.databases.milvus import MilvusVectorDB
-from vectordb.dataloaders import DataloaderCatalog
-from vectordb.langchain.utils import (
-    ConfigLoader,
-    SparseEmbedder,
-)
+
+from .base import BaseSparseIndexingPipeline
 
 
 logger = logging.getLogger(__name__)
 
 
-class MilvusSparseIndexingPipeline:
-    """Milvus indexing pipeline for sparse search (LangChain)."""
+class MilvusSparseIndexingPipeline(BaseSparseIndexingPipeline):
+    """Milvus indexing pipeline for sparse search (LangChain).
+
+    Inherits common document loading and embedding logic from
+    BaseSparseIndexingPipeline. Only implements Milvus-specific
+    database initialization and indexing.
+    """
 
     def __init__(self, config_or_path: dict[str, Any] | str) -> None:
-        """Initialize indexing pipeline from configuration."""
-        self.config = ConfigLoader.load(config_or_path)
-        ConfigLoader.validate(self.config, "milvus")
+        """Initialize indexing pipeline from configuration.
 
-        self.embedder = SparseEmbedder()
+        Args:
+            config_or_path: Configuration dictionary or path to YAML file.
+        """
+        super().__init__(config_or_path, db_config_key="milvus")
 
+        logger.info("Initialized Milvus sparse indexing pipeline (LangChain)")
+
+    def _initialize_db(self) -> None:
+        """Initialize Milvus database client."""
         milvus_config = self.config["milvus"]
         self.db = MilvusVectorDB(
             host=milvus_config.get("host", "localhost"),
@@ -33,48 +42,52 @@ class MilvusSparseIndexingPipeline:
         self.collection_name = milvus_config.get("collection_name", "sparse_search")
         self.dimension = milvus_config.get("dimension", 384)
 
-        logger.info("Initialized Milvus sparse indexing pipeline (LangChain)")
+    def _index_documents(
+        self,
+        documents: list[Document],
+        sparse_embeddings: list[dict[str, float]],
+    ) -> int:
+        """Index documents with sparse embeddings to Milvus.
 
-    def run(self) -> dict[str, Any]:
-        """Execute indexing pipeline."""
-        limit = self.config.get("dataloader", {}).get("limit")
-        dl_config = self.config.get("dataloader", {})
-        loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
-            split=dl_config.get("split", "test"),
-            limit=limit,
-        )
-        dataset = loader.load()
-        documents = dataset.to_langchain()
-        logger.info("Loaded %d documents", len(documents))
+        Args:
+            documents: List of LangChain documents to index.
+            sparse_embeddings: List of sparse embeddings (one per document).
 
-        if not documents:
-            logger.warning("No documents to index")
-            return {"documents_indexed": 0}
-
-        texts = [doc.page_content for doc in documents]
-        sparse_embeddings = self.embedder.embed_documents(texts)
-        logger.info("Generated sparse embeddings for %d documents", len(documents))
-
-        # Prepare data for Milvus with sparse embeddings
+        Returns:
+            Number of documents successfully indexed.
+        """
+        # Prepare data for Milvus with sparse embeddings in metadata
+        # Milvus insert_documents expects Haystack-style documents
+        # For LangChain documents, we store sparse embeddings in metadata
         upsert_data = []
-        for i, (doc, sparse_emb) in enumerate(zip(documents, sparse_embeddings)):
+        for _i, (doc, sparse_emb) in enumerate(zip(documents, sparse_embeddings)):
             upsert_data.append(
                 {
-                    "text": doc.page_content,
-                    "sparse_vector": sparse_emb,
-                    "metadata": doc.metadata or {},
-                    "doc_id": f"milvus_{i}",
+                    "content": doc.page_content,
+                    "meta": {
+                        **doc.metadata,
+                        "sparse_embedding": sparse_emb,
+                    },
                 }
             )
 
-        num_indexed = self.db.upsert(
-            documents=upsert_data,
-            embeddings=None,  # No dense embeddings for sparse search
+        # Convert to Haystack documents for Milvus
+        from haystack.dataclasses import Document as HaystackDocument
+
+        haystack_docs = [
+            HaystackDocument(
+                content=item["content"],
+                meta=item["meta"],
+            )
+            for item in upsert_data
+        ]
+
+        self.db.insert_documents(
+            documents=haystack_docs,
             collection_name=self.collection_name,
         )
-        logger.info(
-            "Indexed %d documents with sparse embeddings to Milvus", num_indexed
-        )
 
-        return {"documents_indexed": num_indexed}
+        logger.info(
+            "Indexed %d documents with sparse embeddings to Milvus", len(documents)
+        )
+        return len(documents)

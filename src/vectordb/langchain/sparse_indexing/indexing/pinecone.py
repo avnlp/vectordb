@@ -3,19 +3,22 @@
 import logging
 from typing import Any
 
+from langchain_core.documents import Document
+
 from vectordb.databases.pinecone import PineconeVectorDB
-from vectordb.dataloaders import DataloaderCatalog
-from vectordb.langchain.utils import (
-    ConfigLoader,
-    SparseEmbedder,
-)
+
+from .base import BaseSparseIndexingPipeline
 
 
 logger = logging.getLogger(__name__)
 
 
-class PineconeSparseIndexingPipeline:
+class PineconeSparseIndexingPipeline(BaseSparseIndexingPipeline):
     """Pinecone indexing pipeline for sparse search (LangChain).
+
+    Inherits common document loading and embedding logic from
+    BaseSparseIndexingPipeline. Only implements Pinecone-specific
+    database initialization and indexing.
 
     Loads documents, generates sparse embeddings, creates index, and indexes.
     """
@@ -29,11 +32,12 @@ class PineconeSparseIndexingPipeline:
         Raises:
             ValueError: If required config missing.
         """
-        self.config = ConfigLoader.load(config_or_path)
-        ConfigLoader.validate(self.config, "pinecone")
+        super().__init__(config_or_path, db_config_key="pinecone")
 
-        self.embedder = SparseEmbedder()
+        logger.info("Initialized Pinecone sparse indexing pipeline (LangChain)")
 
+    def _initialize_db(self) -> None:
+        """Initialize Pinecone database client."""
         pinecone_config = self.config["pinecone"]
         self.db = PineconeVectorDB(
             api_key=pinecone_config["api_key"],
@@ -44,33 +48,20 @@ class PineconeSparseIndexingPipeline:
         self.namespace = pinecone_config.get("namespace", "")
         self.dimension = pinecone_config.get("dimension", 384)
 
-        logger.info("Initialized Pinecone sparse indexing pipeline (LangChain)")
+    def _index_documents(
+        self,
+        documents: list[Document],
+        sparse_embeddings: list[dict[str, float]],
+    ) -> int:
+        """Index documents with sparse embeddings to Pinecone.
 
-    def run(self) -> dict[str, Any]:
-        """Execute indexing pipeline.
+        Args:
+            documents: List of LangChain documents to index.
+            sparse_embeddings: List of sparse embeddings (one per document).
 
         Returns:
-            Dict with 'documents_indexed' count.
+            Number of documents successfully indexed.
         """
-        limit = self.config.get("dataloader", {}).get("limit")
-        dl_config = self.config.get("dataloader", {})
-        loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
-            split=dl_config.get("split", "test"),
-            limit=limit,
-        )
-        dataset = loader.load()
-        documents = dataset.to_langchain()
-        logger.info("Loaded %d documents", len(documents))
-
-        if not documents:
-            logger.warning("No documents to index")
-            return {"documents_indexed": 0}
-
-        texts = [doc.page_content for doc in documents]
-        sparse_embeddings = self.embedder.embed_documents(texts)
-        logger.info("Generated sparse embeddings for %d documents", len(documents))
-
         recreate = self.config.get("pinecone", {}).get("recreate", False)
         self.db.create_index(
             index_name=self.index_name,
@@ -98,8 +89,8 @@ class PineconeSparseIndexingPipeline:
             data=upsert_data,
             namespace=self.namespace,
         )
+
         logger.info(
             "Indexed %d documents with sparse embeddings to Pinecone", num_indexed
         )
-
-        return {"documents_indexed": num_indexed}
+        return num_indexed

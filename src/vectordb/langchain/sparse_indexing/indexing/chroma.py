@@ -1,78 +1,71 @@
-"""Chroma sparse indexing pipeline (LangChain)."""
+"""Chroma sparse indexing pipeline stub (LangChain)."""
 
 import logging
 from typing import Any
 
-from vectordb.databases.chroma import ChromaVectorDB
-from vectordb.dataloaders import DataloaderCatalog
-from vectordb.langchain.utils import (
-    ConfigLoader,
-    SparseEmbedder,
-)
+from langchain_core.documents import Document
+
+from .base import BaseSparseIndexingPipeline
 
 
 logger = logging.getLogger(__name__)
 
 
-class ChromaSparseIndexingPipeline:
-    """Chroma indexing pipeline for sparse search (LangChain)."""
+class ChromaSparseIndexingPipeline(BaseSparseIndexingPipeline):
+    """Stub pipeline for Chroma sparse indexing (LangChain).
+
+    Chroma sparse vector indexing is not supported. This class inherits
+    from BaseSparseIndexingPipeline but overrides run() to return early.
+    """
 
     def __init__(self, config_or_path: dict[str, Any] | str) -> None:
-        """Initialize indexing pipeline from configuration."""
+        """Initialize sparse indexing stub from configuration.
+
+        Args:
+            config_or_path: Configuration dictionary or path to YAML file.
+        """
+        # Skip base class initialization since we don't need embeddings
         self.config = ConfigLoader.load(config_or_path)
         ConfigLoader.validate(self.config, "chroma")
+        self.db_config_key = "chroma"
 
-        self.embedder = SparseEmbedder()
-
-        chroma_config = self.config["chroma"]
-        self.db = ChromaVectorDB(
-            path=chroma_config.get("path", "./chroma_data"),
+        logger.warning(
+            "Initialized Chroma sparse indexing stub. "
+            "Chroma sparse vector indexing is not supported."
         )
 
-        self.collection_name = chroma_config.get("collection_name", "sparse_search")
+    def _initialize_db(self) -> None:
+        """No-op for Chroma (sparse not supported)."""
+        pass
 
-        logger.info("Initialized Chroma sparse indexing pipeline (LangChain)")
+    def _index_documents(
+        self,
+        documents: list[Document],
+        sparse_embeddings: list[dict[str, float]],
+    ) -> int:
+        """No-op for Chroma (sparse not supported).
+
+        Returns:
+            0 (no documents indexed).
+        """
+        return 0
 
     def run(self) -> dict[str, Any]:
-        """Execute indexing pipeline."""
-        limit = self.config.get("dataloader", {}).get("limit")
-        dl_config = self.config.get("dataloader", {})
-        loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
-            split=dl_config.get("split", "test"),
-            limit=limit,
+        """Return without indexing because sparse vectors are unsupported.
+
+        Returns:
+            Dict indicating stub status and reason for no indexing.
+        """
+        logger.warning(
+            "Skipping Chroma sparse indexing. "
+            "Chroma sparse vector indexing is not supported."
         )
-        dataset = loader.load()
-        documents = dataset.to_langchain()
-        logger.info("Loaded %d documents", len(documents))
+        return {
+            "documents_indexed": 0,
+            "status": "stub",
+            "reason": "Chroma sparse vector indexing is not supported",
+        }
 
-        if not documents:
-            logger.warning("No documents to index")
-            return {"documents_indexed": 0}
 
-        texts = [doc.page_content for doc in documents]
-        sparse_embeddings = self.embedder.embed_documents(texts)
-        logger.info("Generated sparse embeddings for %d documents", len(documents))
-
-        # Prepare data for Chroma with sparse embeddings
-        upsert_data = []
-        for i, (doc, sparse_emb) in enumerate(zip(documents, sparse_embeddings)):
-            upsert_data.append(
-                {
-                    "text": doc.page_content,
-                    "sparse_vector": sparse_emb,
-                    "metadata": doc.metadata or {},
-                    "doc_id": f"chroma_{i}",
-                }
-            )
-
-        num_indexed = self.db.upsert(
-            documents=upsert_data,
-            embeddings=None,  # No dense embeddings for sparse search
-            collection_name=self.collection_name,
-        )
-        logger.info(
-            "Indexed %d documents with sparse embeddings to Chroma", num_indexed
-        )
-
-        return {"documents_indexed": num_indexed}
+# Import here to avoid circular dependency
+from vectordb.langchain.utils import ConfigLoader  # noqa: E402

@@ -67,7 +67,7 @@ All tests mock vector database and sparse embedding operations to ensure
 fast, deterministic unit tests without corpus-dependent BM25 fitting.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from vectordb.langchain.sparse_indexing.indexing.chroma import (
     ChromaSparseIndexingPipeline,
@@ -101,22 +101,16 @@ class TestChromaSparseIndexing:
         - b: Controls length normalization (default 0.75)
     """
 
-    @patch("vectordb.langchain.sparse_indexing.indexing.chroma.ChromaVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.chroma.DataloaderCatalog.create"
-    )
-    def test_indexing_initialization(self, mock_get_docs, mock_db):
+    @patch("vectordb.langchain.sparse_indexing.indexing.chroma.ConfigLoader")
+    def test_indexing_initialization(self, mock_config_loader):
         """Test pipeline initialization with sparse embedding configuration.
 
         Args:
-            mock_get_docs: Mock for DataloaderCatalog.create
-            mock_db: Mock for ChromaVectorDB class
+            mock_config_loader: Mock for ConfigLoader
 
         Verifies:
             - Configuration is stored correctly including sparse_embeddings
             - Collection name is extracted from config
-            - Database connection is established
-            - Sparse embedder is initialized
         """
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -125,85 +119,60 @@ class TestChromaSparseIndexing:
             "chroma": {"collection_name": "test", "path": "./test_data"},
         }
 
+        mock_config_loader.load.return_value = config
+
         pipeline = ChromaSparseIndexingPipeline(config)
         assert pipeline.config == config
-        assert pipeline.collection_name == "test"
 
-    @patch("vectordb.langchain.sparse_indexing.indexing.chroma.ChromaVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.chroma.DataloaderCatalog.create"
-    )
+    @patch("vectordb.langchain.sparse_indexing.indexing.chroma.ConfigLoader")
     def test_indexing_run_with_documents(
         self,
-        mock_get_docs,
-        mock_db,
+        mock_config_loader,
         sample_documents,
     ):
         """Test indexing pipeline with documents using BM25 sparse vectors.
 
         Args:
-            mock_get_docs: Mock for DataloaderCatalog.create
-            mock_db: Mock for ChromaVectorDB class
+            mock_config_loader: Mock for ConfigLoader
             sample_documents: Fixture providing test documents
 
         Verifies:
-            - Documents are loaded from data source
-            - BM25 sparse vectors are computed for documents
-            - Documents are upserted to Chroma with sparse metadata
-            - Returns count of indexed documents
-            - Database upsert is called once
+            - Chroma is a stub that returns 0 documents indexed
         """
-        mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
-        mock_loader = MagicMock()
-        mock_loader.load.return_value = mock_dataset
-        mock_get_docs.return_value = mock_loader
-
-        mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
-        mock_db.return_value = mock_db_inst
-
         config = {
             "dataloader": {"type": "arc", "limit": 10},
             "embeddings": {"model": "test-model", "device": "cpu"},
             "sparse_embeddings": {"model": "bm25", "device": "cpu"},
             "chroma": {"collection_name": "test", "path": "./test_data"},
         }
+
+        mock_config_loader.load.return_value = config
 
         pipeline = ChromaSparseIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.upsert.assert_called_once()
+        # Chroma is a stub - it returns 0 documents indexed
+        assert result["documents_indexed"] == 0
+        assert result["status"] == "stub"
 
-    @patch("vectordb.langchain.sparse_indexing.indexing.chroma.ChromaVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.chroma.DataloaderCatalog.create"
-    )
-    def test_indexing_run_no_documents(self, mock_get_docs, mock_db):
+    @patch("vectordb.langchain.sparse_indexing.indexing.chroma.ConfigLoader")
+    def test_indexing_run_no_documents(self, mock_config_loader):
         """Test indexing pipeline with no documents.
 
         Args:
-            mock_get_docs: Mock for DataloaderCatalog.create
-            mock_db: Mock for ChromaVectorDB class
+            mock_config_loader: Mock for ConfigLoader
 
         Verifies:
-            - Pipeline handles empty document list gracefully
-            - Returns 0 documents indexed
-            - No database operations performed for empty input
+            - Chroma is a stub that returns 0 documents indexed
         """
-        mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = []
-        mock_loader = MagicMock()
-        mock_loader.load.return_value = mock_dataset
-        mock_get_docs.return_value = mock_loader
-
         config = {
             "dataloader": {"type": "arc", "limit": 10},
             "embeddings": {"model": "test-model", "device": "cpu"},
             "sparse_embeddings": {"model": "bm25", "device": "cpu"},
             "chroma": {"collection_name": "test", "path": "./test_data"},
         }
+
+        mock_config_loader.load.return_value = config
 
         pipeline = ChromaSparseIndexingPipeline(config)
         result = pipeline.run()
@@ -236,23 +205,13 @@ class TestChromaSparseSearch:
         4. Return top-k documents
     """
 
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.ChromaVectorDB")
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.RAGHelper.create_llm")
-    def test_search_initialization(self, mock_llm, mock_db):
+    def test_search_initialization(self):
         """Test search pipeline initialization.
-
-        Args:
-            mock_llm: Mock for RAGHelper.create_llm
-            mock_db: Mock for ChromaVectorDB class
 
         Verifies:
             - Configuration is stored correctly
-            - Database connection is established
-            - LLM is initialized if RAG is enabled
-            - Sparse embedder is ready for query processing
+            - Chroma is a stub that doesn't initialize LLM
         """
-        mock_llm.return_value = None
-
         config = {
             "dataloader": {"type": "arc", "limit": 10},
             "embeddings": {"model": "test-model", "device": "cpu"},
@@ -263,35 +222,20 @@ class TestChromaSparseSearch:
 
         pipeline = ChromaSparseSearchPipeline(config)
         assert pipeline.config == config
-        assert pipeline.llm is None
 
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.ChromaVectorDB")
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.RAGHelper.create_llm")
     def test_search_execution(
         self,
-        mock_llm,
-        mock_db,
         sample_documents,
     ):
-        """Test search execution with BM25 sparse retrieval.
+        """Test search execution - Chroma is a stub.
 
         Args:
-            mock_llm: Mock for RAGHelper.create_llm
-            mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
 
         Verifies:
-            - Query is tokenized for BM25 scoring
-            - Chroma database is queried with sparse vectors
-            - Documents are ranked by BM25 relevance score
-            - Returns query and matching documents
-            - No answer is generated when RAG is disabled
+            - Chroma is a stub that returns empty documents
+            - Returns stub status and reason
         """
-        mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
-        mock_db.return_value = mock_db_inst
-        mock_llm.return_value = None
-
         config = {
             "dataloader": {"type": "arc", "limit": 10},
             "embeddings": {"model": "test-model", "device": "cpu"},
@@ -304,41 +248,23 @@ class TestChromaSparseSearch:
         result = pipeline.search("test query", top_k=5)
 
         assert result["query"] == "test query"
-        assert len(result["documents"]) > 0
-        assert "answer" not in result
+        assert result["documents"] == []
+        assert result["status"] == "stub"
+        assert "Chroma sparse vector search is not supported" in result["reason"]
 
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.ChromaVectorDB")
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.RAGHelper.create_llm")
-    @patch("vectordb.langchain.sparse_indexing.search.chroma.RAGHelper.generate")
     def test_search_with_rag(
         self,
-        mock_rag_generate,
-        mock_llm,
-        mock_db,
         sample_documents,
     ):
-        """Test search with RAG generation from sparse retrieval results.
+        """Test search with RAG - Chroma is a stub.
 
         Args:
-            mock_rag_generate: Mock for RAGHelper.generate
-            mock_llm: Mock for RAGHelper.create_llm
-            mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
 
         Verifies:
-            - Sparse retrieval returns relevant documents
-            - LLM is initialized when RAG is enabled
-            - RAG answer is generated from retrieved documents
-            - Answer is included in search results
+            - Chroma is a stub that returns empty documents regardless of RAG setting
+            - Returns stub status and reason
         """
-        mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
-        mock_db.return_value = mock_db_inst
-
-        mock_llm_inst = MagicMock()
-        mock_llm.return_value = mock_llm_inst
-        mock_rag_generate.return_value = "Test answer"
-
         config = {
             "dataloader": {"type": "arc", "limit": 10},
             "embeddings": {"model": "test-model", "device": "cpu"},
@@ -351,4 +277,6 @@ class TestChromaSparseSearch:
         result = pipeline.search("test query", top_k=5)
 
         assert result["query"] == "test query"
-        assert result["answer"] == "Test answer"
+        assert result["documents"] == []
+        assert result["status"] == "stub"
+        assert "Chroma sparse vector search is not supported" in result["reason"]

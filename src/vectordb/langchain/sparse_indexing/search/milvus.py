@@ -45,12 +45,11 @@ class MilvusSparseSearchPipeline:
         query_embedding = self.embedder.embed_query(query)
         logger.info("Embedded query with sparse embeddings: %s", query[:50])
 
-        documents = self.db.query(
-            query_embedding=None,  # No dense embeddings for sparse search
+        documents = self.db.search(
+            query_sparse_embedding=query_embedding,
             top_k=top_k,
             filters=filters,
             collection_name=self.collection_name,
-            sparse_embedding=query_embedding,
         )
         logger.info("Retrieved %d documents from Milvus", len(documents))
 

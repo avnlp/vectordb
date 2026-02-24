@@ -112,11 +112,9 @@ class TestPineconeSparseIndexing:
         - namespace: Optional data isolation segment
     """
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.pinecone.PineconeVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.pinecone.DataloaderCatalog.create"
-    )
-    def test_indexing_initialization(self, mock_get_docs, mock_db):
+    def test_indexing_initialization(self, mock_db, mock_get_docs):
         """Test pipeline initialization with Pinecone configuration.
 
         Args:
@@ -141,14 +139,12 @@ class TestPineconeSparseIndexing:
         assert pipeline.index_name == "test-index"
         assert pipeline.namespace == ""
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.pinecone.PineconeVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.pinecone.DataloaderCatalog.create"
-    )
     def test_indexing_run_with_documents(
         self,
-        mock_get_docs,
         mock_db,
+        mock_get_docs,
         sample_documents,
     ):
         """Test indexing pipeline with documents using hybrid vectors.
@@ -189,16 +185,14 @@ class TestPineconeSparseIndexing:
         mock_db_inst.create_index.assert_called_once()
         mock_db_inst.upsert.assert_called_once()
 
+    @patch("vectordb.langchain.sparse_indexing.indexing.base.DataloaderCatalog.create")
     @patch("vectordb.langchain.sparse_indexing.indexing.pinecone.PineconeVectorDB")
-    @patch(
-        "vectordb.langchain.sparse_indexing.indexing.pinecone.DataloaderCatalog.create"
-    )
-    def test_indexing_run_no_documents(self, mock_get_docs, mock_db):
+    def test_indexing_run_no_documents(self, mock_db, mock_get_docs):
         """Test indexing pipeline with no documents.
 
         Args:
-            mock_get_docs: Mock for DataloaderCatalog.create
             mock_db: Mock for PineconeVectorDB class
+            mock_get_docs: Mock for DataloaderCatalog.create
 
         Verifies:
             - Pipeline handles empty document list gracefully
@@ -210,6 +204,9 @@ class TestPineconeSparseIndexing:
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
+
+        mock_db_inst = MagicMock()
+        mock_db.return_value = mock_db_inst
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},

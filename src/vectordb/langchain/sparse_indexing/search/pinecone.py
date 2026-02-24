@@ -36,6 +36,7 @@ class PineconeSparseSearchPipeline:
 
         self.index_name = pinecone_config.get("index_name")
         self.namespace = pinecone_config.get("namespace", "")
+        self.dimension = pinecone_config.get("dimension", 384)
 
         # Optional RAG
         self.llm = RAGHelper.create_llm(self.config)
@@ -64,7 +65,7 @@ class PineconeSparseSearchPipeline:
 
         # Search Pinecone with sparse embedding only
         documents = self.db.query_with_sparse(
-            vector=[0.0] * 384,  # Placeholder dense vector
+            vector=[0.0] * self.dimension,  # Placeholder dense vector
             sparse_vector=query_embedding,
             top_k=top_k,
             filter=filters,

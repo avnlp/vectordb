@@ -3,6 +3,9 @@
 This module provides sparse indexing pipelines for keyword-based retrieval.
 """
 
+from vectordb.langchain.sparse_indexing.indexing.base import (
+    BaseSparseIndexingPipeline,
+)
 from vectordb.langchain.sparse_indexing.indexing.chroma import (
     ChromaSparseIndexingPipeline,
 )
@@ -21,6 +24,7 @@ from vectordb.langchain.sparse_indexing.indexing.weaviate import (
 
 
 __all__ = [
+    "BaseSparseIndexingPipeline",
     "ChromaSparseIndexingPipeline",
     "MilvusSparseIndexingPipeline",
     "PineconeSparseIndexingPipeline",

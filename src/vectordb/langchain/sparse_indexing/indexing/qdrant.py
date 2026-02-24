@@ -3,27 +3,36 @@
 import logging
 from typing import Any
 
+from langchain_core.documents import Document
+
 from vectordb.databases.qdrant import QdrantVectorDB
-from vectordb.dataloaders import DataloaderCatalog
-from vectordb.langchain.utils import (
-    ConfigLoader,
-    SparseEmbedder,
-)
+
+from .base import BaseSparseIndexingPipeline
 
 
 logger = logging.getLogger(__name__)
 
 
-class QdrantSparseIndexingPipeline:
-    """Qdrant indexing pipeline for sparse search (LangChain)."""
+class QdrantSparseIndexingPipeline(BaseSparseIndexingPipeline):
+    """Qdrant indexing pipeline for sparse search (LangChain).
+
+    Inherits common document loading and embedding logic from
+    BaseSparseIndexingPipeline. Only implements Qdrant-specific
+    database initialization and indexing.
+    """
 
     def __init__(self, config_or_path: dict[str, Any] | str) -> None:
-        """Initialize indexing pipeline from configuration."""
-        self.config = ConfigLoader.load(config_or_path)
-        ConfigLoader.validate(self.config, "qdrant")
+        """Initialize indexing pipeline from configuration.
 
-        self.embedder = SparseEmbedder()
+        Args:
+            config_or_path: Configuration dictionary or path to YAML file.
+        """
+        super().__init__(config_or_path, db_config_key="qdrant")
 
+        logger.info("Initialized Qdrant sparse indexing pipeline (LangChain)")
+
+    def _initialize_db(self) -> None:
+        """Initialize Qdrant database client."""
         qdrant_config = self.config["qdrant"]
         self.db = QdrantVectorDB(
             url=qdrant_config.get("url", "http://localhost:6333"),
@@ -32,48 +41,39 @@ class QdrantSparseIndexingPipeline:
 
         self.collection_name = qdrant_config.get("collection_name", "sparse_search")
 
-        logger.info("Initialized Qdrant sparse indexing pipeline (LangChain)")
+    def _index_documents(
+        self,
+        documents: list[Document],
+        sparse_embeddings: list[dict[str, float]],
+    ) -> int:
+        """Index documents with sparse embeddings to Qdrant.
 
-    def run(self) -> dict[str, Any]:
-        """Execute indexing pipeline."""
-        limit = self.config.get("dataloader", {}).get("limit")
-        dl_config = self.config.get("dataloader", {})
-        loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
-            split=dl_config.get("split", "test"),
-            limit=limit,
-        )
-        dataset = loader.load()
-        documents = dataset.to_langchain()
-        logger.info("Loaded %d documents", len(documents))
+        Args:
+            documents: List of LangChain documents to index.
+            sparse_embeddings: List of sparse embeddings (one per document).
 
-        if not documents:
-            logger.warning("No documents to index")
-            return {"documents_indexed": 0}
+        Returns:
+            Number of documents successfully indexed.
+        """
+        # Convert to Haystack documents for Qdrant
+        from haystack.dataclasses import Document as HaystackDocument
 
-        texts = [doc.page_content for doc in documents]
-        sparse_embeddings = self.embedder.embed_documents(texts)
-        logger.info("Generated sparse embeddings for %d documents", len(documents))
-
-        # Prepare data for Qdrant with sparse embeddings
-        upsert_data = []
-        for i, (doc, sparse_emb) in enumerate(zip(documents, sparse_embeddings)):
-            upsert_data.append(
-                {
-                    "text": doc.page_content,
-                    "sparse_vector": sparse_emb,
-                    "metadata": doc.metadata or {},
-                    "doc_id": f"qdrant_{i}",
-                }
+        haystack_docs = [
+            HaystackDocument(
+                content=doc.page_content,
+                meta={
+                    **doc.metadata,
+                    "sparse_embedding": sparse_emb,
+                },
             )
+            for doc, sparse_emb in zip(documents, sparse_embeddings)
+        ]
 
-        num_indexed = self.db.upsert(
-            documents=upsert_data,
-            embeddings=None,  # No dense embeddings for sparse search
-            collection_name=self.collection_name,
+        self.db.index_documents(
+            documents=haystack_docs,
         )
+
         logger.info(
-            "Indexed %d documents with sparse embeddings to Qdrant", num_indexed
+            "Indexed %d documents with sparse embeddings to Qdrant", len(documents)
         )
-
-        return {"documents_indexed": num_indexed}
+        return len(documents)

@@ -42,15 +42,15 @@ class WeaviateSparseSearchPipeline:
         filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute sparse search."""
-        query_embedding = self.embedder.embed_query(query)
-        logger.info("Embedded query with sparse embeddings: %s", query[:50])
+        # Weaviate performs BM25 search natively on the text content.
+        # No query-side sparse embedding is needed.
+        logger.info("Performing BM25 search for: %s", query[:50])
 
-        documents = self.db.query(
-            query_embedding=None,  # No dense embeddings for sparse search
+        documents = self.db.hybrid_search(
+            query=query,
             top_k=top_k,
+            alpha=0.0,  # alpha=0.0 for sparse-only (BM25) search
             filters=filters,
-            collection_name=self.collection_name,
-            sparse_embedding=query_embedding,
         )
         logger.info("Retrieved %d documents from Weaviate", len(documents))
 

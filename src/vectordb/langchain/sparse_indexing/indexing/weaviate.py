@@ -3,27 +3,39 @@
 import logging
 from typing import Any
 
+from langchain_core.documents import Document
+
 from vectordb.databases.weaviate import WeaviateVectorDB
-from vectordb.dataloaders import DataloaderCatalog
-from vectordb.langchain.utils import (
-    ConfigLoader,
-    SparseEmbedder,
-)
+
+from .base import BaseSparseIndexingPipeline
 
 
 logger = logging.getLogger(__name__)
 
 
-class WeaviateSparseIndexingPipeline:
-    """Weaviate indexing pipeline for sparse search (LangChain)."""
+class WeaviateSparseIndexingPipeline(BaseSparseIndexingPipeline):
+    """Weaviate indexing pipeline for sparse search (LangChain).
+
+    Inherits common document loading and embedding logic from
+    BaseSparseIndexingPipeline. Only implements Weaviate-specific
+    database initialization and indexing.
+
+    Note: Weaviate computes BM25 natively, so no sparse embeddings
+    are generated at indexing time.
+    """
 
     def __init__(self, config_or_path: dict[str, Any] | str) -> None:
-        """Initialize indexing pipeline from configuration."""
-        self.config = ConfigLoader.load(config_or_path)
-        ConfigLoader.validate(self.config, "weaviate")
+        """Initialize indexing pipeline from configuration.
 
-        self.embedder = SparseEmbedder()
+        Args:
+            config_or_path: Configuration dictionary or path to YAML file.
+        """
+        super().__init__(config_or_path, db_config_key="weaviate")
 
+        logger.info("Initialized Weaviate sparse indexing pipeline (LangChain)")
+
+    def _initialize_db(self) -> None:
+        """Initialize Weaviate database client."""
         weaviate_config = self.config["weaviate"]
         self.db = WeaviateVectorDB(
             url=weaviate_config["url"],
@@ -32,48 +44,34 @@ class WeaviateSparseIndexingPipeline:
 
         self.collection_name = weaviate_config.get("collection_name", "SparseSearch")
 
-        logger.info("Initialized Weaviate sparse indexing pipeline (LangChain)")
+    def _index_documents(
+        self,
+        documents: list[Document],
+        sparse_embeddings: list[dict[str, float]],
+    ) -> int:
+        """Index documents to Weaviate (BM25 computed natively).
 
-    def run(self) -> dict[str, Any]:
-        """Execute indexing pipeline."""
-        limit = self.config.get("dataloader", {}).get("limit")
-        dl_config = self.config.get("dataloader", {})
-        loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
-            split=dl_config.get("split", "test"),
-            limit=limit,
-        )
-        dataset = loader.load()
-        documents = dataset.to_langchain()
-        logger.info("Loaded %d documents", len(documents))
+        Weaviate computes BM25 natively from stored text at query time,
+        so sparse embeddings are not used at indexing time.
 
-        if not documents:
-            logger.warning("No documents to index")
-            return {"documents_indexed": 0}
+        Args:
+            documents: List of LangChain documents to index.
+            sparse_embeddings: List of sparse embeddings (not used by Weaviate).
 
-        texts = [doc.page_content for doc in documents]
-        sparse_embeddings = self.embedder.embed_documents(texts)
-        logger.info("Generated sparse embeddings for %d documents", len(documents))
-
-        # Prepare data for Weaviate with sparse embeddings
+        Returns:
+            Number of documents successfully indexed.
+        """
         upsert_data = []
-        for i, (doc, sparse_emb) in enumerate(zip(documents, sparse_embeddings)):
-            upsert_data.append(
-                {
-                    "text": doc.page_content,
-                    "sparse_vector": sparse_emb,
-                    "metadata": doc.metadata or {},
-                    "doc_id": f"weaviate_{i}",
-                }
-            )
+        for doc in documents:
+            properties = doc.metadata or {}
+            properties["text"] = doc.page_content
+            upsert_data.append(properties)
 
-        num_indexed = self.db.upsert(
-            documents=upsert_data,
-            embeddings=None,  # No dense embeddings for sparse search
-            collection_name=self.collection_name,
-        )
+        # The collection must be selected before upserting.
+        self.db._select_collection(self.collection_name)
+        self.db.upsert(data=upsert_data)
+
         logger.info(
-            "Indexed %d documents with sparse embeddings to Weaviate", num_indexed
+            "Indexed %d documents with sparse embeddings to Weaviate", len(documents)
         )
-
-        return {"documents_indexed": num_indexed}
+        return len(documents)
