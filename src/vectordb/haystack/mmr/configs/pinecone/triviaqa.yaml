@@ -1,0 +1,38 @@
+# MMR Configuration
+# Database: Pinecone
+# Dataset: TriviaQA
+
+dataloader:
+  type: "triviaqa"
+  split: "test"
+  limit: 1000
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+mmr:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  top_k: 10
+  top_k_candidates: 50
+  lambda_threshold: 0.5
+
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "mmr-triviaqa"
+  namespace: ""
+  dimension: 384
+  metric: "cosine"
+  recreate: false
+
+search:
+  top_k: 10
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  api_base_url: "https://api.groq.com/openai/v1"
+  temperature: 0.7
+  max_tokens: 2048
