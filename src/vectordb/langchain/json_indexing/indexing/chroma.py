@@ -30,6 +30,7 @@ Use Cases:
 """
 
 import logging
+import uuid
 from typing import Any
 
 from vectordb.databases.chroma import ChromaVectorDB
@@ -164,7 +165,16 @@ class ChromaJsonIndexingPipeline:
             get_or_create=True,
         )
 
-        self.db.upsert(data=docs)
+        # Build data dictionary with ids, documents, embeddings, and metadatas
+        # for upsert
+        ids = [str(uuid.uuid4()) for _ in docs]
+        upsert_data = {
+            "ids": ids,
+            "documents": [d.page_content for d in docs],
+            "embeddings": embeddings,
+            "metadatas": [d.metadata for d in docs],
+        }
+        self.db.upsert(data=upsert_data)
         num_indexed = len(docs)
         logger.info("Indexed %d JSON documents to Chroma", num_indexed)
 

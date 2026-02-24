@@ -3,7 +3,8 @@
 import logging
 from typing import Any
 
-from langchain_core.documents import Document
+from haystack.dataclasses import Document as HaystackDocument
+from langchain_core.documents import Document as LangChainDocument
 
 from vectordb.databases.weaviate import WeaviateVectorDB
 from vectordb.langchain.utils.embeddings import EmbedderHelper
@@ -98,7 +99,7 @@ class WeaviateJsonSearchPipeline:
         self.logger.info("Embedded query: %s", query[:50])
 
         # Query vector DB using hybrid search
-        results: list[Document] = self.vector_db.query(
+        raw_results = self.vector_db.query(
             query_string=query,
             vector=query_embedding,
             limit=top_k,
@@ -106,6 +107,17 @@ class WeaviateJsonSearchPipeline:
             hybrid=True,
             return_documents=True,
         )
+        # Convert Haystack documents to LangChain documents
+        # Handle Haystack (content/meta) and LangChain (page_content/metadata) types
+        results: list[LangChainDocument] = []
+        for doc in raw_results:
+            if isinstance(doc, HaystackDocument):
+                results.append(
+                    LangChainDocument(page_content=doc.content, metadata=doc.meta)
+                )
+            else:
+                # Already a LangChain document (e.g., in tests)
+                results.append(doc)
         self.logger.info("Search returned %d results", len(results))
 
         # Apply JSON metadata filters if specified in config or passed as param

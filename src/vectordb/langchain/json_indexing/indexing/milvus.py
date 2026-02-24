@@ -32,6 +32,8 @@ Use Cases:
 import logging
 from typing import Any
 
+from haystack import Document as HaystackDocument
+
 from vectordb.databases.milvus import MilvusVectorDB
 from vectordb.dataloaders import DataloaderCatalog
 from vectordb.langchain.utils import (
@@ -162,6 +164,16 @@ class MilvusJsonIndexingPipeline:
         docs, embeddings = EmbedderHelper.embed_documents(self.embedder, documents)
         logger.info("Generated embeddings for %d JSON documents", len(docs))
 
+        # Convert LangChain docs to Haystack Documents with embeddings attached
+        haystack_docs = [
+            HaystackDocument(
+                content=doc.page_content,
+                embedding=emb,
+                meta=doc.metadata or {},
+            )
+            for doc, emb in zip(docs, embeddings)
+        ]
+
         dimension = len(embeddings[0]) if embeddings else 384
         self.db.create_collection(
             collection_name=self.collection_name,
@@ -171,10 +183,10 @@ class MilvusJsonIndexingPipeline:
         logger.info("Created Milvus collection: %s", self.collection_name)
 
         self.db.insert_documents(
-            documents=docs,
+            documents=haystack_docs,
             collection_name=self.collection_name,
         )
-        num_indexed = len(docs)
+        num_indexed = len(haystack_docs)
         logger.info("Indexed %d JSON documents to Milvus", num_indexed)
 
         return {

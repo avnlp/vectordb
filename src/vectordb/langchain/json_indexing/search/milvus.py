@@ -3,7 +3,8 @@
 import logging
 from typing import Any
 
-from langchain_core.documents import Document
+from haystack.dataclasses import Document as HaystackDocument
+from langchain_core.documents import Document as LangChainDocument
 
 from vectordb.databases.milvus import MilvusVectorDB
 from vectordb.langchain.utils.embeddings import EmbedderHelper
@@ -96,13 +97,24 @@ class MilvusJsonSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         self.logger.info("Embedded query: %s", query[:50])
 
-        # Query vector DB
-        results: list[Document] = self.vector_db.search(
+        # Query vector DB - returns Haystack documents
+        haystack_results = self.vector_db.search(
             query_embedding=query_embedding,
             top_k=top_k,
             collection_name=collection_name,
             filters=filters,
         )
+        # Convert Haystack documents to LangChain documents
+        # Handle Haystack (content/meta) and LangChain (page_content/metadata) types
+        results: list[LangChainDocument] = []
+        for doc in haystack_results:
+            if isinstance(doc, HaystackDocument):
+                results.append(
+                    LangChainDocument(page_content=doc.content, metadata=doc.meta)
+                )
+            else:
+                # Already a LangChain document (e.g., in tests)
+                results.append(doc)
         self.logger.info("Search returned %d results", len(results))
 
         # Apply JSON metadata filters if specified in config or passed as param
