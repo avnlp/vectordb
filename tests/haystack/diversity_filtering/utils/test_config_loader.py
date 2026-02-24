@@ -1,4 +1,4 @@
-"""Additional tests for config loader module to improve coverage."""
+"""Tests for config loader module."""
 
 import os
 from pathlib import Path
@@ -8,6 +8,7 @@ import yaml
 from pydantic import ValidationError
 
 from vectordb.haystack.diversity_filtering.utils.config_loader import (
+    ChromaConfig,
     ConfigLoader,
     DatasetConfig,
     DiversityConfig,
@@ -17,10 +18,207 @@ from vectordb.haystack.diversity_filtering.utils.config_loader import (
     MilvusConfig,
     PineconeConfig,
     QdrantConfig,
+    RAGConfig,
     RetrievalConfig,
     VectorDBConfig,
     WeaviateConfig,
 )
+
+
+class TestConfigLoader:
+    """Test configuration loading and validation."""
+
+    @pytest.fixture
+    def sample_config_dict(self) -> dict:
+        """Sample configuration dictionary."""
+        return {
+            "dataset": {
+                "name": "triviaqa",
+                "split": "test",
+                "max_documents": 1000,
+            },
+            "embedding": {
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimension": 384,
+                "batch_size": 32,
+            },
+            "index": {"name": "triviaqa_diversity"},
+            "retrieval": {"top_k_candidates": 100},
+            "diversity": {
+                "algorithm": "maximum_margin_relevance",
+                "top_k": 10,
+                "mmr_lambda": 0.5,
+            },
+            "vectordb": {
+                "type": "qdrant",
+                "qdrant": {
+                    "url": "http://localhost:6333",
+                    "api_key": None,
+                    "timeout": 30,
+                },
+            },
+        }
+
+    def test_load_dict_valid(self, sample_config_dict):
+        """Test loading valid configuration from dict."""
+        config = ConfigLoader.load_dict(sample_config_dict)
+
+        assert isinstance(config, DiversityFilteringConfig)
+        assert config.dataset.name == "triviaqa"
+        assert config.dataset.split == "test"
+        assert config.dataset.max_documents == 1000
+        assert config.embedding.model == "sentence-transformers/all-MiniLM-L6-v2"
+        assert config.embedding.dimension == 384
+        assert config.index.name == "triviaqa_diversity"
+        assert config.retrieval.top_k_candidates == 100
+        assert config.diversity.top_k == 10
+        assert config.vectordb.type == "qdrant"
+
+    def test_load_dict_missing_required(self):
+        """Test loading with missing required fields."""
+        invalid_config = {
+            "dataset": {"name": "triviaqa"},
+            # Missing index and vectordb
+        }
+
+        with pytest.raises(ValidationError):
+            ConfigLoader.load_dict(invalid_config)
+
+    def test_load_dict_invalid_dataset(self, sample_config_dict):
+        """Test validation of invalid dataset name."""
+        sample_config_dict["dataset"]["name"] = "invalid_dataset"
+
+        with pytest.raises(ValidationError):
+            ConfigLoader.load_dict(sample_config_dict)
+
+    def test_load_dict_invalid_vectordb_type(self, sample_config_dict):
+        """Test validation of invalid vectordb type."""
+        sample_config_dict["vectordb"]["type"] = "elasticsearch"
+
+        with pytest.raises(ValidationError):
+            ConfigLoader.load_dict(sample_config_dict)
+
+    def test_load_file_valid(self, tmp_path, sample_config_dict):
+        """Test loading valid configuration from YAML file."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump(sample_config_dict))
+
+        config = ConfigLoader.load(str(config_file))
+
+        assert config.dataset.name == "triviaqa"
+        assert config.index.name == "triviaqa_diversity"
+
+    def test_load_file_not_found(self):
+        """Test loading non-existent file."""
+        with pytest.raises(FileNotFoundError):
+            ConfigLoader.load("/nonexistent/path/config.yaml")
+
+    def test_load_file_invalid_yaml(self, tmp_path):
+        """Test loading malformed YAML."""
+        config_file = tmp_path / "bad_config.yaml"
+        config_file.write_text("invalid: yaml: content: [")
+
+        with pytest.raises(yaml.YAMLError):
+            ConfigLoader.load(str(config_file))
+
+    def test_env_var_substitution(self, tmp_path):
+        """Test environment variable substitution in config."""
+        os.environ["TEST_QDRANT_URL"] = "http://custom-qdrant:6333"
+        os.environ["TEST_API_KEY"] = "test-api-key"
+
+        config_dict = {
+            "dataset": {"name": "triviaqa", "split": "test"},
+            "index": {"name": "test_index"},
+            "vectordb": {
+                "type": "qdrant",
+                "qdrant": {
+                    "url": "${TEST_QDRANT_URL}",
+                    "api_key": "${TEST_API_KEY}",
+                },
+            },
+        }
+
+        config = ConfigLoader.load_dict(config_dict)
+
+        assert config.vectordb.qdrant.url == "http://custom-qdrant:6333"
+        assert config.vectordb.qdrant.api_key == "test-api-key"
+
+    def test_default_values(self, tmp_path):
+        """Test default values for optional fields."""
+        config_dict = {
+            "dataset": {"name": "triviaqa"},
+            "index": {"name": "test"},
+            "vectordb": {
+                "type": "qdrant",
+                "qdrant": {"url": "http://localhost:6333"},
+            },
+        }
+
+        config = ConfigLoader.load_dict(config_dict)
+
+        # Check defaults
+        assert config.embedding.model == "sentence-transformers/all-MiniLM-L6-v2"
+        assert config.embedding.dimension == 384
+        assert config.embedding.batch_size == 32
+        assert config.retrieval.top_k_candidates == 100
+        assert config.diversity.algorithm == "maximum_margin_relevance"
+        assert config.diversity.top_k == 10
+        assert config.rag.enabled is False
+
+    def test_all_databases(self):
+        """Test configuration for all 5 databases."""
+        base_config = {
+            "dataset": {"name": "triviaqa"},
+            "index": {"name": "test"},
+        }
+
+        # Qdrant
+        qdrant_config = base_config.copy()
+        qdrant_config["vectordb"] = {
+            "type": "qdrant",
+            "qdrant": {"url": "http://localhost:6333"},
+        }
+        config = ConfigLoader.load_dict(qdrant_config)
+        assert config.vectordb.type == "qdrant"
+
+        # Pinecone
+        pinecone_config = base_config.copy()
+        pinecone_config["vectordb"] = {
+            "type": "pinecone",
+            "pinecone": {
+                "api_key": "pk-test",
+                "index_name": "test-index",
+            },
+        }
+        config = ConfigLoader.load_dict(pinecone_config)
+        assert config.vectordb.type == "pinecone"
+
+        # Weaviate
+        weaviate_config = base_config.copy()
+        weaviate_config["vectordb"] = {
+            "type": "weaviate",
+            "weaviate": {"url": "http://localhost:8080"},
+        }
+        config = ConfigLoader.load_dict(weaviate_config)
+        assert config.vectordb.type == "weaviate"
+
+        # Chroma
+        chroma_config = base_config.copy()
+        chroma_config["vectordb"] = {
+            "type": "chroma",
+            "chroma": {"host": "localhost", "port": 8000},
+        }
+        config = ConfigLoader.load_dict(chroma_config)
+        assert config.vectordb.type == "chroma"
+
+        # Milvus
+        milvus_config = base_config.copy()
+        milvus_config["vectordb"] = {
+            "type": "milvus",
+            "milvus": {"host": "localhost", "port": 19530},
+        }
+        config = ConfigLoader.load_dict(milvus_config)
+        assert config.vectordb.type == "milvus"
 
 
 class TestConfigModels:
@@ -191,10 +389,6 @@ class TestConfigModels:
 
     def test_vectordb_config_chroma(self) -> None:
         """Test VectorDBConfig with Chroma."""
-        from vectordb.haystack.diversity_filtering.utils.config_loader import (
-            ChromaConfig,
-        )
-
         config = VectorDBConfig(
             type="chroma",
             chroma=ChromaConfig(host="localhost", port=8000),
@@ -325,80 +519,6 @@ class TestConfigLoaderLoad:
         assert config.vectordb.qdrant.url == "http://custom:6333"
 
 
-class TestDiversityFilteringConfig:
-    """Test DiversityFilteringConfig complete configuration."""
-
-    def test_full_config_creation(self) -> None:
-        """Test creating full configuration."""
-        config = DiversityFilteringConfig(
-            dataset=DatasetConfig(name="triviaqa"),
-            embedding=EmbeddingConfig(model="custom-model", dimension=768),
-            index=IndexConfig(name="my_index"),
-            retrieval=RetrievalConfig(top_k_candidates=50),
-            diversity=DiversityConfig(algorithm="clustering", top_k=5),
-            vectordb=VectorDBConfig(
-                type="qdrant",
-                qdrant=QdrantConfig(url="http://localhost:6333"),
-            ),
-        )
-
-        assert config.dataset.name == "triviaqa"
-        assert config.embedding.dimension == 768
-        assert config.index.name == "my_index"
-        assert config.retrieval.top_k_candidates == 50
-        assert config.diversity.algorithm == "clustering"
-        assert config.diversity.top_k == 5
-        assert config.vectordb.type == "qdrant"
-
-    def test_config_with_rag(self) -> None:
-        """Test configuration with RAG enabled."""
-        from vectordb.haystack.diversity_filtering.utils.config_loader import RAGConfig
-
-        config = DiversityFilteringConfig(
-            dataset=DatasetConfig(name="triviaqa"),
-            index=IndexConfig(name="test"),
-            vectordb=VectorDBConfig(
-                type="qdrant",
-                qdrant=QdrantConfig(url="http://localhost:6333"),
-            ),
-            rag=RAGConfig(
-                enabled=True,
-                provider="openai",
-                model="gpt-4",
-                temperature=0.5,
-                max_tokens=1024,
-            ),
-        )
-
-        assert config.rag.enabled is True
-        assert config.rag.provider == "openai"
-        assert config.rag.model == "gpt-4"
-        assert config.rag.temperature == 0.5
-        assert config.rag.max_tokens == 1024
-
-    def test_rag_temperature_bounds(self) -> None:
-        """Test RAG temperature bounds."""
-        from vectordb.haystack.diversity_filtering.utils.config_loader import RAGConfig
-
-        # Valid values
-        RAGConfig(temperature=0.0)
-        RAGConfig(temperature=2.0)
-        RAGConfig(temperature=1.0)
-
-        # Invalid values
-        with pytest.raises(ValidationError):
-            RAGConfig(temperature=-0.1)
-        with pytest.raises(ValidationError):
-            RAGConfig(temperature=2.1)
-
-    def test_rag_invalid_provider(self) -> None:
-        """Test RAG with invalid provider."""
-        from vectordb.haystack.diversity_filtering.utils.config_loader import RAGConfig
-
-        with pytest.raises(ValidationError):
-            RAGConfig(provider="anthropic")
-
-
 class TestConfigLoaderDict:
     """Test ConfigLoader.load_dict method."""
 
@@ -437,15 +557,79 @@ class TestConfigLoaderDict:
         assert config.vectordb.pinecone.api_key == "secret123"
 
 
+class TestDiversityFilteringConfig:
+    """Test DiversityFilteringConfig complete configuration."""
+
+    def test_full_config_creation(self) -> None:
+        """Test creating full configuration."""
+        config = DiversityFilteringConfig(
+            dataset=DatasetConfig(name="triviaqa"),
+            embedding=EmbeddingConfig(model="custom-model", dimension=768),
+            index=IndexConfig(name="my_index"),
+            retrieval=RetrievalConfig(top_k_candidates=50),
+            diversity=DiversityConfig(algorithm="clustering", top_k=5),
+            vectordb=VectorDBConfig(
+                type="qdrant",
+                qdrant=QdrantConfig(url="http://localhost:6333"),
+            ),
+        )
+
+        assert config.dataset.name == "triviaqa"
+        assert config.embedding.dimension == 768
+        assert config.index.name == "my_index"
+        assert config.retrieval.top_k_candidates == 50
+        assert config.diversity.algorithm == "clustering"
+        assert config.diversity.top_k == 5
+        assert config.vectordb.type == "qdrant"
+
+    def test_config_with_rag(self) -> None:
+        """Test configuration with RAG enabled."""
+        config = DiversityFilteringConfig(
+            dataset=DatasetConfig(name="triviaqa"),
+            index=IndexConfig(name="test"),
+            vectordb=VectorDBConfig(
+                type="qdrant",
+                qdrant=QdrantConfig(url="http://localhost:6333"),
+            ),
+            rag=RAGConfig(
+                enabled=True,
+                provider="openai",
+                model="gpt-4",
+                temperature=0.5,
+                max_tokens=1024,
+            ),
+        )
+
+        assert config.rag.enabled is True
+        assert config.rag.provider == "openai"
+        assert config.rag.model == "gpt-4"
+        assert config.rag.temperature == 0.5
+        assert config.rag.max_tokens == 1024
+
+    def test_rag_temperature_bounds(self) -> None:
+        """Test RAG temperature bounds."""
+        # Valid values
+        RAGConfig(temperature=0.0)
+        RAGConfig(temperature=2.0)
+        RAGConfig(temperature=1.0)
+
+        # Invalid values
+        with pytest.raises(ValidationError):
+            RAGConfig(temperature=-0.1)
+        with pytest.raises(ValidationError):
+            RAGConfig(temperature=2.1)
+
+    def test_rag_invalid_provider(self) -> None:
+        """Test RAG with invalid provider."""
+        with pytest.raises(ValidationError):
+            RAGConfig(provider="anthropic")
+
+
 class TestChromaConfig:
     """Test ChromaConfig model."""
 
     def test_chroma_config_defaults(self) -> None:
         """Test ChromaConfig default values."""
-        from vectordb.haystack.diversity_filtering.utils.config_loader import (
-            ChromaConfig,
-        )
-
         config = ChromaConfig()
         assert config.host == "localhost"
         assert config.port == 8000
@@ -453,10 +637,6 @@ class TestChromaConfig:
 
     def test_chroma_config_custom(self) -> None:
         """Test ChromaConfig with custom values."""
-        from vectordb.haystack.diversity_filtering.utils.config_loader import (
-            ChromaConfig,
-        )
-
         config = ChromaConfig(host="chroma-server", port=9000, is_persistent=True)
         assert config.host == "chroma-server"
         assert config.port == 9000
