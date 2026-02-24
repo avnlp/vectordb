@@ -1,0 +1,68 @@
+# Milvus + ARC Multi-Tenancy Configuration
+# Dataset: ARC (AI2 Reasoning Challenge)
+# Strategy: Partition Key + Filter Expression
+
+pipeline:
+  name: "milvus_arc_multitenancy"
+  description: "Multi-tenant RAG for ARC using Milvus partition keys"
+
+database:
+  type: "milvus"
+  host: "${MILVUS_HOST:-localhost}"
+  port: "${MILVUS_PORT:-19530}"
+  user: "${MILVUS_USER:-}"
+  password: "${MILVUS_PASSWORD:-}"
+
+collection:
+  name: "arc_multitenancy"
+  description: "ARC documents with multi-tenancy"
+
+multitenancy:
+  strategy: "partition_key"
+  field_name: "tenant_id"
+  auto_create_tenant: true
+  partition_key_isolation: true
+  num_partitions: 64
+
+embedding:
+  model_name: "Qwen/Qwen3-Embedding-0.6B"
+  dimension: 1024
+  output_dimension: null
+  batch_size: 32
+  device: "auto"
+
+dataset:
+  name: "ai2_arc"
+  config: "ARC-Challenge"
+  split: "train"
+  max_samples: 5000
+  source: "huggingface"
+
+retrieval:
+  top_k: 5
+  metric: "cosine"
+
+rag:
+  prompt_template: |
+    Answer the multiple choice question based on retrieved context.
+
+    Context:
+    {% for doc in documents %}
+    - {{ doc.content }}
+    {% endfor %}
+
+    Question: {{ query }}
+
+    Answer:
+
+generator:
+  type: "openai"
+  model: "gpt-3.5-turbo"
+  api_key: "${OPENAI_API_KEY}"
+  kwargs:
+    temperature: 0.5
+    max_tokens: 2048
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
