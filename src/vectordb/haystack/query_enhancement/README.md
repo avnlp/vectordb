@@ -33,6 +33,43 @@ The search pipeline first generates query variations based on the configured str
 | Milvus | `indexing/milvus.py` | `search/milvus.py` | Distributed vector database |
 | Qdrant | `indexing/qdrant.py` | `search/qdrant.py` | Payload filtering support |
 
+## Architecture
+
+### Indexing Pipeline Base Class
+
+All indexing pipelines inherit from `BaseQueryEnhancementIndexingPipeline`, which encapsulates shared logic:
+
+- **Configuration Loading**: Automatically loads and validates YAML configuration
+- **Dataloader Integration**: Creates dataset loaders via `DataloaderCatalog`
+- **Embedding Generation**: Initializes document embedders from config
+- **Indexing Execution**: Provides a standard `run()` method for document ingestion
+
+Database-specific subclasses only need to implement the `_init_db()` method to configure their respective vector database connections. This design reduces code duplication and ensures consistent behavior across all database backends.
+
+```python
+from vectordb.haystack.query_enhancement.indexing import ChromaIndexer
+
+# Initialize from config - base class handles loading, dataloader, embedder
+indexer = ChromaIndexer("config.yaml")
+
+# Run indexing - base class provides standard execution flow
+result = indexer.run()
+print(f"Indexed {result['documents_indexed']} documents")
+```
+
+To add support for a new database, simply subclass `BaseQueryEnhancementIndexingPipeline` and implement `_init_db()`:
+
+```python
+from vectordb.haystack.query_enhancement.indexing.base import (
+    BaseQueryEnhancementIndexingPipeline,
+)
+
+class NewDBIndexingPipeline(BaseQueryEnhancementIndexingPipeline):
+    def _init_db(self):
+        # Database-specific initialization logic
+        return NewDBVectorDB(**config)
+```
+
 ## Configuration
 
 Each database has per-dataset YAML configuration files organized in subdirectories. The configuration specifies the enhancement strategy type, LLM model for query generation, fusion parameters, and optional RAG generation settings.
@@ -88,6 +125,7 @@ src/vectordb/haystack/query_enhancement/
 │   └── weaviate/                      # Weaviate configs (5 dataset files)
 ├── indexing/                          # Indexing pipelines
 │   ├── __init__.py
+│   ├── base.py                        # Base class for all indexing pipelines
 │   ├── pinecone.py                    # Pinecone document indexing
 │   ├── qdrant.py                      # Qdrant document indexing
 │   ├── milvus.py                      # Milvus document indexing

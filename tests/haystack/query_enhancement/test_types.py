@@ -1,12 +1,16 @@
 """Tests for query enhancement configuration TypedDicts."""
 
 from vectordb.haystack.query_enhancement.utils.types import (
+    ChromaConfig,
     DataLoaderConfig,
     EmbeddingConfig,
     LLMConfig,
+    MilvusConfig,
+    PineconeConfig,
+    QdrantConfig,
     QueryEnhancementConfig,
     QueryEnhancementPipelineConfig,
-    VectorDBConfig,
+    WeaviateConfig,
 )
 
 
@@ -127,27 +131,96 @@ class TestTypes:
         assert config["rrf_k"] == 50
         assert config["top_k"] == 15
 
-    def test_vector_db_config(self) -> None:
-        """Test VectorDBConfig TypedDict."""
-        config: VectorDBConfig = {
-            "api_key": "vector-db-key",
+    def test_pinecone_config(self) -> None:
+        """Test PineconeConfig TypedDict."""
+        config: PineconeConfig = {
+            "api_key": "pinecone-key",
             "index_name": "test-index",
             "namespace": "test-namespace",
         }
 
-        assert config["api_key"] == "vector-db-key"
+        assert config["api_key"] == "pinecone-key"
         assert config["index_name"] == "test-index"
         assert config["namespace"] == "test-namespace"
 
-        # Test with different values
-        config2: VectorDBConfig = {
-            "api_key": "another-key",
-            "index_name": "prod-index",
-            "namespace": "production",
+    def test_qdrant_config(self) -> None:
+        """Test QdrantConfig TypedDict."""
+        config: QdrantConfig = {
+            "url": "http://localhost:6333",
+            "collection_name": "test-collection",
+            "api_key": "qdrant-key",
+            "grpc": True,
         }
-        assert config2["api_key"] == "another-key"
-        assert config2["index_name"] == "prod-index"
-        assert config2["namespace"] == "production"
+
+        assert config["url"] == "http://localhost:6333"
+        assert config["collection_name"] == "test-collection"
+
+        # Test with minimal required fields
+        config2: QdrantConfig = {
+            "url": "http://localhost:6333",
+            "collection_name": "minimal-collection",
+        }
+        assert config2["url"] == "http://localhost:6333"
+        assert config2["collection_name"] == "minimal-collection"
+
+    def test_chroma_config(self) -> None:
+        """Test ChromaConfig TypedDict."""
+        config: ChromaConfig = {
+            "path": "./chroma_db",
+            "collection_name": "test-collection",
+        }
+
+        assert config["path"] == "./chroma_db"
+        assert config["collection_name"] == "test-collection"
+
+        # Test with host/port
+        config2: ChromaConfig = {
+            "host": "localhost",
+            "port": 8000,
+            "collection_name": "remote-collection",
+        }
+        assert config2["host"] == "localhost"
+        assert config2["port"] == 8000
+
+    def test_milvus_config(self) -> None:
+        """Test MilvusConfig TypedDict."""
+        config: MilvusConfig = {
+            "uri": "http://localhost:19530",
+            "token": "milvus-token",
+            "collection_name": "test-collection",
+            "database": "default",
+        }
+
+        assert config["uri"] == "http://localhost:19530"
+        assert config["collection_name"] == "test-collection"
+
+        # Test with minimal required fields
+        config2: MilvusConfig = {
+            "uri": "http://localhost:19530",
+            "collection_name": "minimal-collection",
+        }
+        assert config2["uri"] == "http://localhost:19530"
+        assert config2["collection_name"] == "minimal-collection"
+
+    def test_weaviate_config(self) -> None:
+        """Test WeaviateConfig TypedDict."""
+        config: WeaviateConfig = {
+            "url": "http://localhost:8080",
+            "api_key": "weaviate-key",
+            "collection_name": "TestCollection",
+            "grpc_port": 50051,
+        }
+
+        assert config["url"] == "http://localhost:8080"
+        assert config["collection_name"] == "TestCollection"
+
+        # Test with minimal required fields
+        config2: WeaviateConfig = {
+            "url": "http://localhost:8080",
+            "collection_name": "MinimalCollection",
+        }
+        assert config2["url"] == "http://localhost:8080"
+        assert config2["collection_name"] == "MinimalCollection"
 
     def test_query_enhancement_pipeline_config(self) -> None:
         """Test QueryEnhancementPipelineConfig TypedDict with all required configs."""
@@ -174,21 +247,41 @@ class TestTypes:
             "top_k": 10,
         }
 
-        vector_db_config: VectorDBConfig = {
-            "api_key": "db-key",
-            "index_name": "test-index",
-            "namespace": "test-ns",
+        pinecone_config: PineconeConfig = {
+            "api_key": "pinecone-key",
+            "index_name": "pinecone-index",
+            "namespace": "pinecone-ns",
+        }
+
+        qdrant_config: QdrantConfig = {
+            "url": "http://localhost:6333",
+            "collection_name": "qdrant-collection",
+        }
+
+        milvus_config: MilvusConfig = {
+            "uri": "http://localhost:19530",
+            "collection_name": "milvus-collection",
+        }
+
+        chroma_config: ChromaConfig = {
+            "path": "./chroma_db",
+            "collection_name": "chroma-collection",
+        }
+
+        weaviate_config: WeaviateConfig = {
+            "url": "http://localhost:8080",
+            "collection_name": "WeaviateCollection",
         }
 
         pipeline_config: QueryEnhancementPipelineConfig = {
             "dataloader": dataloader_config,
             "embeddings": embedding_config,
             "query_enhancement": query_enhancement_config,
-            "pinecone": vector_db_config,
-            "qdrant": vector_db_config,
-            "milvus": vector_db_config,
-            "chroma": vector_db_config,
-            "weaviate": vector_db_config,
+            "pinecone": pinecone_config,
+            "qdrant": qdrant_config,
+            "milvus": milvus_config,
+            "chroma": chroma_config,
+            "weaviate": weaviate_config,
             "logging": {"level": "INFO", "format": "json"},
             "rag": {"chunk_size": 512, "overlap": 128},
         }
@@ -197,11 +290,11 @@ class TestTypes:
         assert pipeline_config["dataloader"] == dataloader_config
         assert pipeline_config["embeddings"] == embedding_config
         assert pipeline_config["query_enhancement"] == query_enhancement_config
-        assert pipeline_config["pinecone"] == vector_db_config
-        assert pipeline_config["qdrant"] == vector_db_config
-        assert pipeline_config["milvus"] == vector_db_config
-        assert pipeline_config["chroma"] == vector_db_config
-        assert pipeline_config["weaviate"] == vector_db_config
+        assert pipeline_config["pinecone"] == pinecone_config
+        assert pipeline_config["qdrant"] == qdrant_config
+        assert pipeline_config["milvus"] == milvus_config
+        assert pipeline_config["chroma"] == chroma_config
+        assert pipeline_config["weaviate"] == weaviate_config
         assert pipeline_config["logging"] == {"level": "INFO", "format": "json"}
         assert pipeline_config["rag"] == {"chunk_size": 512, "overlap": 128}
 
@@ -230,21 +323,17 @@ class TestTypes:
             "top_k": 5,
         }
 
-        vector_db_config: VectorDBConfig = {
-            "api_key": "different-db-key",
-            "index_name": "different-index",
-            "namespace": "different-namespace",
+        pinecone_config: PineconeConfig = {
+            "api_key": "pinecone-key-2",
+            "index_name": "pinecone-index-2",
+            "namespace": "pinecone-ns-2",
         }
 
         pipeline_config: QueryEnhancementPipelineConfig = {
             "dataloader": dataloader_config,
             "embeddings": embedding_config,
             "query_enhancement": query_enhancement_config,
-            "pinecone": vector_db_config,
-            "qdrant": vector_db_config,
-            "milvus": vector_db_config,
-            "chroma": vector_db_config,
-            "weaviate": vector_db_config,
+            "pinecone": pinecone_config,
             "logging": {"level": "DEBUG"},
             "rag": {"strategy": "adaptive", "max_chunks": 10},
         }
@@ -380,7 +469,7 @@ class TestTypes:
     def test_empty_and_none_values(self) -> None:
         """Test handling of empty and None values in TypedDicts."""
         # Test with empty strings and empty dicts
-        empty_config: VectorDBConfig = {
+        empty_config: PineconeConfig = {
             "api_key": "",  # Empty string
             "index_name": "",
             "namespace": "",
@@ -410,10 +499,10 @@ class TestTypes:
                 "top_k": 10,
             },
             "pinecone": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
-            "qdrant": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
-            "milvus": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
-            "chroma": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
-            "weaviate": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
+            "qdrant": {"url": "http://localhost:6333", "collection_name": "coll"},
+            "milvus": {"uri": "http://localhost:19530", "collection_name": "coll"},
+            "chroma": {"collection_name": "coll"},
+            "weaviate": {"url": "http://localhost:8080", "collection_name": "Coll"},
             "logging": {},  # Empty logging dict
             "rag": {},  # Empty rag dict
         }
@@ -422,7 +511,7 @@ class TestTypes:
 
     def test_special_character_values(self) -> None:
         """Test TypedDicts with special characters and unicode values."""
-        special_config: VectorDBConfig = {
+        special_config: PineconeConfig = {
             "api_key": "key_with_underscores-and.dashes@123!",
             "index_name": "index-with.special.chars_123",
             "namespace": "namespace with spaces and ünïcödë",
@@ -465,3 +554,93 @@ class TestTypes:
         assert numeric_config["num_queries"] == 5
         assert numeric_config["rrf_k"] == 50
         assert numeric_config["top_k"] == 25
+
+    def test_optional_database_configs(self) -> None:
+        """Test DB configs are optional in QueryEnhancementPipelineConfig."""
+        # Test with only Pinecone configured
+        pinecone_only_config: QueryEnhancementPipelineConfig = {
+            "dataloader": {"type": "test", "params": {}},
+            "embeddings": {"model": "test", "params": {}},
+            "query_enhancement": {
+                "type": "multi_query",
+                "num_queries": 1,
+                "num_hyde_docs": 1,
+                "llm": {"model": "test", "api_key": "key"},
+                "fusion_method": "rrf",
+                "rrf_k": 20,
+                "top_k": 10,
+            },
+            "pinecone": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
+            "logging": {},
+            "rag": {},
+        }
+        assert "pinecone" in pinecone_only_config
+        assert "qdrant" not in pinecone_only_config
+        assert "milvus" not in pinecone_only_config
+        assert "chroma" not in pinecone_only_config
+        assert "weaviate" not in pinecone_only_config
+
+        # Test with only Qdrant configured
+        qdrant_only_config: QueryEnhancementPipelineConfig = {
+            "dataloader": {"type": "test", "params": {}},
+            "embeddings": {"model": "test", "params": {}},
+            "query_enhancement": {
+                "type": "hyde",
+                "num_queries": 1,
+                "num_hyde_docs": 1,
+                "llm": {"model": "test", "api_key": "key"},
+                "fusion_method": "rrf",
+                "rrf_k": 20,
+                "top_k": 10,
+            },
+            "qdrant": {"url": "http://localhost:6333", "collection_name": "coll"},
+            "logging": {},
+            "rag": {},
+        }
+        assert "qdrant" in qdrant_only_config
+        assert "pinecone" not in qdrant_only_config
+
+        # Test with only Chroma configured
+        chroma_only_config: QueryEnhancementPipelineConfig = {
+            "dataloader": {"type": "test", "params": {}},
+            "embeddings": {"model": "test", "params": {}},
+            "query_enhancement": {
+                "type": "multi_query",
+                "num_queries": 1,
+                "num_hyde_docs": 1,
+                "llm": {"model": "test", "api_key": "key"},
+                "fusion_method": "rrf",
+                "rrf_k": 20,
+                "top_k": 10,
+            },
+            "chroma": {"path": "./chroma_db", "collection_name": "coll"},
+            "logging": {},
+            "rag": {},
+        }
+        assert "chroma" in chroma_only_config
+        assert "pinecone" not in chroma_only_config
+        assert "qdrant" not in chroma_only_config
+
+        # Test with multiple databases configured
+        multi_db_config: QueryEnhancementPipelineConfig = {
+            "dataloader": {"type": "test", "params": {}},
+            "embeddings": {"model": "test", "params": {}},
+            "query_enhancement": {
+                "type": "multi_query",
+                "num_queries": 1,
+                "num_hyde_docs": 1,
+                "llm": {"model": "test", "api_key": "key"},
+                "fusion_method": "rrf",
+                "rrf_k": 20,
+                "top_k": 10,
+            },
+            "pinecone": {"api_key": "key", "index_name": "idx", "namespace": "ns"},
+            "chroma": {"collection_name": "coll"},
+            "logging": {},
+            "rag": {},
+        }
+        assert "pinecone" in multi_db_config
+        assert "chroma" in multi_db_config
+        assert "qdrant" not in multi_db_config
+        assert "milvus" not in multi_db_config
+        assert "weaviate" not in multi_db_config

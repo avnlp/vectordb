@@ -80,7 +80,8 @@ def __getattr__(name: str) -> object:
         AttributeError: If the requested name is not a valid export.
     """
     if name not in _IMPORT_MAP:
-        raise AttributeError(f"module {name!r} not found")
+        msg = f"module '{__name__}' has no attribute {name!r}"
+        raise AttributeError(msg)
 
     module_path, attr_name = _IMPORT_MAP[name]
     module = __import__(module_path, fromlist=[attr_name])

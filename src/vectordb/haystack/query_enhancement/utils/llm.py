@@ -27,7 +27,7 @@ def create_groq_generator(config: dict[str, Any]) -> OpenAIChatGenerator:
     api_key = llm_config.get("api_key") or os.environ.get("GROQ_API_KEY")
 
     if not api_key:
-        msg = "GROQ_API_KEY required. Set it as environment variable."
+        msg = "GROQ_API_KEY required. Set it in your config file or as an environment variable."
         raise ValueError(msg)
 
     generation_kwargs = llm_config.get("kwargs", {})

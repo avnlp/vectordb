@@ -36,6 +36,12 @@ Performance Notes:
 
 def __getattr__(name: str) -> object:
     """Lazy load indexers to avoid import errors for optional dependencies."""
+    if name == "BaseQueryEnhancementIndexingPipeline":
+        from vectordb.haystack.query_enhancement.indexing.base import (
+            BaseQueryEnhancementIndexingPipeline,
+        )
+
+        return BaseQueryEnhancementIndexingPipeline
     if name == "QdrantIndexer":
         from vectordb.haystack.query_enhancement.indexing.qdrant import (
             QdrantQueryEnhancementIndexingPipeline as QdrantIndexer,
@@ -66,11 +72,12 @@ def __getattr__(name: str) -> object:
         )
 
         return ChromaIndexer
-    msg = f"module {name!r} not found"
+    msg = f"module '{__name__}' has no attribute {name!r}"
     raise AttributeError(msg)
 
 
 __all__ = [
+    "BaseQueryEnhancementIndexingPipeline",
     "ChromaIndexer",
     "MilvusIndexer",
     "PineconeIndexer",

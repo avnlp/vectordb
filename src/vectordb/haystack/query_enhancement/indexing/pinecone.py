@@ -4,18 +4,12 @@ from pathlib import Path
 from typing import Any
 
 from vectordb.databases.pinecone import PineconeVectorDB
-from vectordb.dataloaders import DataloaderCatalog
-from vectordb.haystack.query_enhancement.utils.config import (
-    load_config,
-    validate_config,
+from vectordb.haystack.query_enhancement.indexing.base import (
+    BaseQueryEnhancementIndexingPipeline,
 )
-from vectordb.haystack.query_enhancement.utils.embeddings import (
-    create_document_embedder,
-)
-from vectordb.utils.logging import LoggerFactory
 
 
-class PineconeQueryEnhancementIndexingPipeline:
+class PineconeQueryEnhancementIndexingPipeline(BaseQueryEnhancementIndexingPipeline):
     """Index documents into Pinecone for query enhancement retrieval.
 
     Loads documents from configured dataloader, embeds them,
@@ -28,24 +22,7 @@ class PineconeQueryEnhancementIndexingPipeline:
         Args:
             config_path: Path to YAML configuration file.
         """
-        self.config = load_config(config_path)
-        validate_config(self.config)
-
-        logger_factory = LoggerFactory("pinecone_query_enhancement_indexing")
-        self.logger = logger_factory.get_logger()
-
-        dataloader_config = self.config.get("dataloader", {})
-        loader = DataloaderCatalog.create(
-            dataloader_config.get("type", "triviaqa"),
-            split=dataloader_config.get("split", "test"),
-            limit=dataloader_config.get("limit"),
-            dataset_id=dataloader_config.get("dataset_name"),
-        )
-        self._dataset = loader.load()
-        self.embedder = create_document_embedder(self.config)
-        self.db = self._init_db()
-
-        self.logger.info("Pinecone indexing pipeline initialized")
+        super().__init__(config_path, "pinecone_query_enhancement_indexing")
 
     def _init_db(self) -> PineconeVectorDB:
         """Initialize Pinecone VectorDB from config."""
@@ -76,7 +53,7 @@ class PineconeQueryEnhancementIndexingPipeline:
             dimension = len(docs_with_embeddings[0].embedding)
             self.db.create_index(dimension=dimension)
 
-        # Upsert to Pinecone
+        # Upsert to Pinecone with namespace support
         namespace = self.config.get("pinecone", {}).get("namespace", "default")
         count = self.db.upsert(docs_with_embeddings, namespace=namespace)
 

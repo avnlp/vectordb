@@ -76,7 +76,7 @@ def __getattr__(name: str) -> object:
         )
 
         return ChromaSearcher
-    msg = f"module {name!r} not found"
+    msg = f"module '{__name__}' has no attribute {name!r}"
     raise AttributeError(msg)
 
 

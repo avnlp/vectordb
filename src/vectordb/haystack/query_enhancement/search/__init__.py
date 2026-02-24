@@ -36,6 +36,12 @@ Performance Notes:
 
 def __getattr__(name: str) -> object:
     """Lazy load searchers to avoid import errors for optional dependencies."""
+    if name == "BaseQueryEnhancementSearchPipeline":
+        from vectordb.haystack.query_enhancement.search.base import (
+            BaseQueryEnhancementSearchPipeline,
+        )
+
+        return BaseQueryEnhancementSearchPipeline
     if name == "QdrantSearcher":
         from vectordb.haystack.query_enhancement.search.qdrant import (
             QdrantQueryEnhancementSearchPipeline as QdrantSearcher,
@@ -66,11 +72,12 @@ def __getattr__(name: str) -> object:
         )
 
         return ChromaSearcher
-    msg = f"module {name!r} not found"
+    msg = f"module '{__name__}' has no attribute {name!r}"
     raise AttributeError(msg)
 
 
 __all__ = [
+    "BaseQueryEnhancementSearchPipeline",
     "ChromaSearcher",
     "MilvusSearcher",
     "PineconeSearcher",
