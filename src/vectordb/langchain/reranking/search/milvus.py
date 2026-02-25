@@ -27,6 +27,7 @@ from vectordb.databases.milvus import MilvusVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     RerankerHelper,
 )
@@ -145,12 +146,13 @@ class MilvusRerankingSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        candidates = self.db.query(
+        candidates = self.db.search(
             query_embedding=query_embedding,
             top_k=top_k,
             filters=filters,
             collection_name=self.collection_name,
         )
+        candidates = HaystackToLangchainConverter.convert(candidates)
         logger.info("Retrieved %d candidate documents from Milvus", len(candidates))
 
         reranked_docs = RerankerHelper.rerank(

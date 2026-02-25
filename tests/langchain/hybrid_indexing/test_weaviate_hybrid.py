@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
@@ -285,9 +286,10 @@ class TestWeaviateHybridSearch:
         )
 
         sample_documents = [
-            Document(
-                page_content="Python is a high-level programming language",
-                metadata={"source": "wiki", "id": "1"},
+            HaystackDocument(
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+                id="1",
             ),
         ]
 
@@ -321,8 +323,8 @@ class TestWeaviateHybridSearch:
         # Verify hybrid_search was called with query and embedding
         mock_db_inst.hybrid_search.assert_called_once()
         call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
-        assert "query_embedding" in call_kwargs
-        assert "query_text" in call_kwargs
+        assert "vector" in call_kwargs
+        assert "query" in call_kwargs
         assert call_kwargs["alpha"] == 0.5
 
     @patch("vectordb.langchain.hybrid_indexing.search.weaviate.WeaviateVectorDB")
@@ -350,9 +352,10 @@ class TestWeaviateHybridSearch:
         )
 
         sample_documents = [
-            Document(
-                page_content="Python is a high-level programming language",
-                metadata={"source": "wiki", "id": "1"},
+            HaystackDocument(
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+                id="1",
             ),
         ]
 
@@ -407,9 +410,10 @@ class TestWeaviateHybridSearch:
         )
 
         sample_documents = [
-            Document(
-                page_content="Python is a high-level programming language",
-                metadata={"source": "wiki", "id": "1"},
+            HaystackDocument(
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+                id="1",
             ),
         ]
 
@@ -530,7 +534,7 @@ class TestWeaviateHybridSearch:
         pipeline = WeaviateHybridSearchPipeline(config)
         pipeline.search("machine learning algorithms", top_k=10)
 
-        # Verify hybrid_search was called with query_text for BM25
+        # Verify hybrid_search was called with query for BM25
         call_kwargs = mock_db_inst.hybrid_search.call_args.kwargs
-        assert "query_text" in call_kwargs
-        assert call_kwargs["query_text"] == "machine learning algorithms"
+        assert "query" in call_kwargs
+        assert call_kwargs["query"] == "machine learning algorithms"

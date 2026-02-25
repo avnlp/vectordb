@@ -150,6 +150,7 @@ class MMRHelper:
         embeddings: list[list[float]],
         query_embedding: list[float],
         k: int = 10,
+        lambda_param: float = 0.5,
     ) -> list[Document]:
         """Simple MMR reranking returning only documents.
 
@@ -158,9 +159,18 @@ class MMRHelper:
             embeddings: Embeddings for each document.
             query_embedding: Embedding of the query.
             k: Number of documents to return.
+            lambda_param: Trade-off parameter between relevance and diversity
+                (0-1). Higher values prioritize relevance, lower values
+                prioritize diversity.
 
         Returns:
             List of reranked documents.
         """
-        mmr_results = MMRHelper.mmr_rerank(documents, embeddings, query_embedding, k=k)
+        mmr_results = MMRHelper.mmr_rerank(
+            documents,
+            embeddings,
+            query_embedding,
+            lambda_param=lambda_param,
+            k=k,
+        )
         return [doc for doc, _ in mmr_results]

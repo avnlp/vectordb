@@ -37,6 +37,7 @@ from vectordb.langchain.components import (
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     RerankerHelper,
 )
@@ -190,12 +191,12 @@ class QdrantAgenticRAGPipeline(AgenticRAGPipeline):
                 logger.info("Executing SEARCH action")
 
                 # Retrieve from Qdrant collection
-                documents = self.db.query(
-                    query_embedding=query_embedding,
+                documents = self.db.search(
+                    query_vector=query_embedding,
                     top_k=top_k,
                     filters=filters,
-                    collection_name=self.collection_name,
                 )
+                documents = HaystackToLangchainConverter.convert(documents)
                 logger.info("Retrieved %d documents from Qdrant", len(documents))
 
                 # Compress documents

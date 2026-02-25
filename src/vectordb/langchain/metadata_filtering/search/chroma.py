@@ -221,6 +221,7 @@ class ChromaMetadataFilteringSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
+        self.db._get_collection(self.collection_name)
         raw_results = self.db.query(
             query_embedding=query_embedding,
             n_results=top_k,

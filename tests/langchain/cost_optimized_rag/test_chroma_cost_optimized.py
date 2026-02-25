@@ -489,7 +489,7 @@ class TestChromaCostOptimizedSearch:
             ChromaCostOptimizedRAGSearchPipeline,
         )
 
-        sample_documents = [
+        [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
@@ -502,7 +502,17 @@ class TestChromaCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2"]],
+            "documents": [
+                [
+                    "Python is a high-level programming language",
+                    "Machine learning uses algorithms to learn from data",
+                ]
+            ],
+            "metadatas": [[{"source": "wiki"}, {"source": "wiki"}]],
+            "distances": [[0.1, 0.2]],
+        }
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -550,7 +560,7 @@ class TestChromaCostOptimizedSearch:
             ChromaCostOptimizedRAGSearchPipeline,
         )
 
-        sample_documents = [
+        [
             Document(
                 page_content="Python is a programming language",
                 metadata={"source": "wiki"},
@@ -559,7 +569,12 @@ class TestChromaCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1"]],
+            "documents": [["Python is a programming language"]],
+            "metadatas": [[{"source": "wiki"}]],
+            "distances": [[0.1]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_llm = MagicMock()
@@ -608,7 +623,7 @@ class TestChromaCostOptimizedSearch:
             ChromaCostOptimizedRAGSearchPipeline,
         )
 
-        sample_documents = [
+        [
             Document(
                 page_content="Python programming",
                 metadata={"source": "wiki", "category": "programming"},
@@ -617,7 +632,12 @@ class TestChromaCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1"]],
+            "documents": [["Python programming"]],
+            "metadatas": [[{"source": "wiki", "category": "programming"}]],
+            "distances": [[0.1]],
+        }
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 

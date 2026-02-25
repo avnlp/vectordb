@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
@@ -214,7 +215,7 @@ class TestWeaviateRerankingSearch:
             WeaviateRerankingSearchPipeline,
         )
 
-        sample_documents = [
+        langchain_sample = [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
@@ -224,16 +225,29 @@ class TestWeaviateRerankingSearch:
                 metadata={"source": "wiki", "id": "2"},
             ),
         ]
+        haystack_sample = [
+            HaystackDocument(
+                id="1",
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+            ),
+            HaystackDocument(
+                id="2",
+                content="Machine learning uses algorithms to learn from data",
+                meta={"source": "wiki"},
+            ),
+        ]
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst._select_collection.return_value = True
+        mock_db_inst.query.return_value = haystack_sample
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
         mock_reranker = MagicMock()
         mock_reranker_helper.return_value = mock_reranker
-        mock_rerank.return_value = sample_documents[:1]
+        mock_rerank.return_value = langchain_sample[:1]
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -279,16 +293,24 @@ class TestWeaviateRerankingSearch:
             WeaviateRerankingSearchPipeline,
         )
 
-        sample_documents = [
+        langchain_sample = [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
             ),
         ]
+        haystack_sample = [
+            HaystackDocument(
+                id="1",
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+            ),
+        ]
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst._select_collection.return_value = True
+        mock_db_inst.query.return_value = haystack_sample
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()
@@ -297,7 +319,7 @@ class TestWeaviateRerankingSearch:
 
         mock_reranker = MagicMock()
         mock_reranker_helper.return_value = mock_reranker
-        mock_rerank.return_value = sample_documents
+        mock_rerank.return_value = langchain_sample
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -340,22 +362,30 @@ class TestWeaviateRerankingSearch:
             WeaviateRerankingSearchPipeline,
         )
 
-        sample_documents = [
+        langchain_sample = [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
             ),
         ]
+        haystack_sample = [
+            HaystackDocument(
+                id="1",
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+            ),
+        ]
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst._select_collection.return_value = True
+        mock_db_inst.query.return_value = haystack_sample
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
         mock_reranker = MagicMock()
         mock_reranker_helper.return_value = mock_reranker
-        mock_rerank.return_value = sample_documents
+        mock_rerank.return_value = langchain_sample
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -403,6 +433,7 @@ class TestWeaviateRerankingSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
+        mock_db_inst._select_collection.return_value = True
         mock_db_inst.query.return_value = []
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None

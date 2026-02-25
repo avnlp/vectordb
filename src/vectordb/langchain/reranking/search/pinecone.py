@@ -25,6 +25,7 @@ from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     RerankerHelper,
 )
@@ -152,11 +153,12 @@ class PineconeRerankingSearchPipeline:
         logger.info("Embedded query: %s", query[:50])
 
         candidates = self.db.query(
-            query_embedding=query_embedding,
+            vector=query_embedding,
             top_k=top_k,
-            filters=filters,
+            filter=filters,
             namespace=self.namespace,
         )
+        candidates = HaystackToLangchainConverter.convert(candidates)
         logger.info("Retrieved %d candidate documents from Pinecone", len(candidates))
 
         reranked_docs = RerankerHelper.rerank(

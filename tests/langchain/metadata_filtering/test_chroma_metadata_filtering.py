@@ -114,7 +114,7 @@ class TestChromaMetadataFilteringIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test successful document indexing with metadata preservation.
 
@@ -134,17 +134,20 @@ class TestChromaMetadataFilteringIndexing:
             mock_embed_docs: Mock returning (docs, embeddings) tuple.
             mock_embedder_helper: Mock for embedder factory.
             mock_db: Mock for ChromaVectorDB, tracks upsert calls.
-            sample_documents: Fixture with 5 sample documents with metadata.
+            sample_langchain_documents: Fixture with 5 sample documents with metadata.
         """
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
-        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+        mock_embed_docs.return_value = (
+            sample_langchain_documents,
+            [[0.1] * 384] * 5,
+        )
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = len(sample_langchain_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -159,7 +162,7 @@ class TestChromaMetadataFilteringIndexing:
         pipeline = ChromaMetadataFilteringIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
 
     @patch("vectordb.langchain.metadata_filtering.indexing.chroma.ChromaVectorDB")
     @patch(

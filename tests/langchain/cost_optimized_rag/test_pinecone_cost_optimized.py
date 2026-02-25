@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
@@ -344,11 +345,11 @@ class TestPineconeCostOptimizedSearch:
         )
 
         dense_docs = [
-            Document(page_content="Dense result 1", metadata={"id": "1"}),
-            Document(page_content="Dense result 2", metadata={"id": "2"}),
+            HaystackDocument(content="Dense result 1", meta={}, id="1"),
+            HaystackDocument(content="Dense result 2", meta={}, id="2"),
         ]
         sparse_docs = [
-            Document(page_content="Sparse result 1", metadata={"id": "3"}),
+            HaystackDocument(content="Sparse result 1", meta={}, id="3"),
         ]
         merged_docs = [
             Document(page_content="Merged result 1", metadata={"id": "1"}),
@@ -426,7 +427,11 @@ class TestPineconeCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
+        mock_db_inst.query.return_value = [
+            HaystackDocument(
+                content="Python is a programming language", meta={}, id="1"
+            )
+        ]
         mock_db_inst.query_with_sparse.return_value = []
         mock_db.return_value = mock_db_inst
 
@@ -494,7 +499,11 @@ class TestPineconeCostOptimizedSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = merged_docs
+        mock_db_inst.query.return_value = [
+            HaystackDocument(
+                content="Python programming", meta={"category": "programming"}, id="1"
+            )
+        ]
         mock_db_inst.query_with_sparse.return_value = []
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None

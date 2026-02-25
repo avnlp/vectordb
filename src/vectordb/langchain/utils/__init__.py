@@ -46,6 +46,7 @@ Usage:
 
 from vectordb.langchain.utils.config import ConfigLoader
 from vectordb.langchain.utils.diversification import DiversificationHelper
+from vectordb.langchain.utils.document_converter import HaystackToLangchainConverter
 from vectordb.langchain.utils.embeddings import EmbedderHelper
 from vectordb.langchain.utils.filters import DocumentFilter
 from vectordb.langchain.utils.fusion import ResultMerger
@@ -58,6 +59,7 @@ from vectordb.langchain.utils.sparse_embeddings import SparseEmbedder
 __all__ = [
     "ConfigLoader",
     "DiversificationHelper",
+    "HaystackToLangchainConverter",
     "EmbedderHelper",
     "DocumentFilter",
     "ResultMerger",

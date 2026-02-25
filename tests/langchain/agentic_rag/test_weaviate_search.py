@@ -192,13 +192,12 @@ class TestWeaviateAgenticRAGSearch:
                 return_value=MagicMock(),
             ),
         ]
-        if mock_rag_generate:
-            patches.append(
-                patch(
-                    "vectordb.langchain.agentic_rag.search.weaviate.RAGHelper.generate",
-                    mock_rag_generate,
-                )
+        patches.append(
+            patch(
+                "vectordb.langchain.agentic_rag.search.weaviate.RAGHelper.generate",
+                mock_rag_generate or MagicMock(return_value="Generated answer"),
             )
+        )
         return patches
 
     def test_run_with_search_action(
@@ -277,7 +276,7 @@ class TestWeaviateAgenticRAGSearch:
                 p.stop()
 
     def test_run_with_reflect_action(
-        self, weaviate_search_config, sample_search_documents
+        self, weaviate_search_config, sample_search_documents, sample_documents
     ):
         """Test run method with reflect action."""
         from vectordb.langchain.agentic_rag.search.weaviate import (
@@ -293,7 +292,7 @@ class TestWeaviateAgenticRAGSearch:
             {"action": "generate", "reasoning": "Generate answer"},
         ]
         mock_compressor = MagicMock()
-        mock_compressor.compress.return_value = sample_search_documents[:3]
+        mock_compressor.compress.return_value = sample_documents[:3]
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="Reflection feedback")
 
@@ -337,6 +336,10 @@ class TestWeaviateAgenticRAGSearch:
                 "vectordb.langchain.agentic_rag.search.weaviate.ChatGroq",
                 return_value=MagicMock(),
             ),
+            patch(
+                "vectordb.langchain.agentic_rag.search.weaviate.RAGHelper.generate",
+                MagicMock(return_value="Generated answer"),
+            ),
         ]
 
         for p in patches:
@@ -379,7 +382,7 @@ class TestWeaviateAgenticRAGSearch:
             pipeline.run("What is semantic search?", top_k=20)
 
             call_kwargs = mock_db.query.call_args
-            assert call_kwargs[1]["top_k"] == 20
+            assert call_kwargs[1]["limit"] == 20
         finally:
             for p in patches:
                 p.stop()

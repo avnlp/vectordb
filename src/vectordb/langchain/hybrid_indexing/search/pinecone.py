@@ -29,6 +29,7 @@ from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     SparseEmbedder,
 )
@@ -136,10 +137,11 @@ class PineconeHybridSearchPipeline:
             query_embedding=dense_embedding,
             query_sparse_embedding=sparse_embedding,
             top_k=top_k,
-            filters=filters,
+            filter=filters,
             namespace=self.namespace,
             alpha=self.alpha,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info("Retrieved %d documents from Pinecone", len(documents))
 
         result = {

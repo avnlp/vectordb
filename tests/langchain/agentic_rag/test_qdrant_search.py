@@ -186,13 +186,12 @@ class TestQdrantAgenticRAGSearch:
                 return_value=MagicMock(),
             ),
         ]
-        if mock_rag_generate:
-            patches.append(
-                patch(
-                    "vectordb.langchain.agentic_rag.search.qdrant.RAGHelper.generate",
-                    mock_rag_generate,
-                )
+        patches.append(
+            patch(
+                "vectordb.langchain.agentic_rag.search.qdrant.RAGHelper.generate",
+                mock_rag_generate or MagicMock(return_value="Generated answer"),
             )
+        )
         return patches
 
     def test_run_with_search_action(
@@ -204,7 +203,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_search_documents
+        mock_db.search.return_value = sample_search_documents
         mock_router = MagicMock()
         mock_router.route.return_value = {
             "action": "search",
@@ -226,7 +225,7 @@ class TestQdrantAgenticRAGSearch:
             assert "final_answer" in result
             assert "documents" in result
             assert "intermediate_steps" in result
-            mock_db.query.assert_called()
+            mock_db.search.assert_called()
         finally:
             for p in patches:
                 p.stop()
@@ -240,7 +239,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_search_documents
+        mock_db.search.return_value = sample_search_documents
         mock_router = MagicMock()
         mock_router.route.side_effect = [
             {"action": "search", "reasoning": "Search for docs"},
@@ -271,7 +270,7 @@ class TestQdrantAgenticRAGSearch:
                 p.stop()
 
     def test_run_with_reflect_action(
-        self, qdrant_search_config, sample_search_documents
+        self, qdrant_search_config, sample_search_documents, sample_documents
     ):
         """Test run method with reflect action."""
         from vectordb.langchain.agentic_rag.search.qdrant import (
@@ -279,7 +278,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_search_documents
+        mock_db.search.return_value = sample_search_documents
         mock_router = MagicMock()
         mock_router.route.side_effect = [
             {"action": "search", "reasoning": "Search for docs"},
@@ -287,7 +286,7 @@ class TestQdrantAgenticRAGSearch:
             {"action": "generate", "reasoning": "Generate answer"},
         ]
         mock_compressor = MagicMock()
-        mock_compressor.compress.return_value = sample_search_documents[:3]
+        mock_compressor.compress.return_value = sample_documents[:3]
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="Reflection feedback")
 
@@ -329,6 +328,10 @@ class TestQdrantAgenticRAGSearch:
                 "vectordb.langchain.agentic_rag.search.qdrant.ChatGroq",
                 return_value=MagicMock(),
             ),
+            patch(
+                "vectordb.langchain.agentic_rag.search.qdrant.RAGHelper.generate",
+                MagicMock(return_value="Generated answer"),
+            ),
         ]
 
         for p in patches:
@@ -349,7 +352,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_search_documents
+        mock_db.search.return_value = sample_search_documents
         mock_router = MagicMock()
         mock_router.route.return_value = {
             "action": "search",
@@ -368,7 +371,7 @@ class TestQdrantAgenticRAGSearch:
             pipeline = QdrantAgenticRAGPipeline(qdrant_search_config)
             pipeline.run("What are vector databases?", top_k=20)
 
-            call_kwargs = mock_db.query.call_args
+            call_kwargs = mock_db.search.call_args
             assert call_kwargs[1]["top_k"] == 20
         finally:
             for p in patches:
@@ -381,7 +384,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_search_documents
+        mock_db.search.return_value = sample_search_documents
         mock_router = MagicMock()
         mock_router.route.return_value = {
             "action": "search",
@@ -401,7 +404,7 @@ class TestQdrantAgenticRAGSearch:
             filters = {"source": "docs"}
             pipeline.run("What are vector databases?", filters=filters)
 
-            call_kwargs = mock_db.query.call_args
+            call_kwargs = mock_db.search.call_args
             assert call_kwargs[1]["filters"] == filters
         finally:
             for p in patches:
@@ -414,7 +417,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = []
+        mock_db.search.return_value = []
         mock_router = MagicMock()
         mock_router.route.return_value = {
             "action": "search",
@@ -478,7 +481,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = []
+        mock_db.search.return_value = []
         mock_router = MagicMock()
         mock_router.route.return_value = {
             "action": "search",
@@ -546,7 +549,7 @@ class TestQdrantAgenticRAGSearch:
         )
 
         mock_db = MagicMock()
-        mock_db.query.return_value = sample_search_documents
+        mock_db.search.return_value = sample_search_documents
         mock_router = MagicMock()
         mock_router.route.side_effect = [
             {"action": "search", "reasoning": "Search for docs"},

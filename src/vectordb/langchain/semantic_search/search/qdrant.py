@@ -80,6 +80,7 @@ from vectordb.databases.qdrant import QdrantVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
 )
 
@@ -190,11 +191,11 @@ class QdrantSemanticSearchPipeline:
         logger.info("Embedded query: %s", query[:50])
 
         documents = self.db.search(
-            query_embedding=query_embedding,
+            query_vector=query_embedding,
             top_k=top_k,
             filters=filters,
-            collection_name=self.collection_name,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info("Retrieved %d documents from Qdrant", len(documents))
 
         result = {

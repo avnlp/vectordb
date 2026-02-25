@@ -20,6 +20,38 @@ Search configuration fixtures:
 """
 
 import pytest
+from langchain_core.documents import Document
+
+
+@pytest.fixture
+def sample_documents() -> list[Document]:
+    """Create sample LangChain documents for JSON indexing tests.
+
+    Returns LangChain Documents with page_content and metadata attributes
+    to match the expected document structure in langchain json_indexing pipelines.
+    """
+    return [
+        Document(
+            page_content="Python is a high-level programming language",
+            metadata={"source": "wiki", "title": "Python"},
+        ),
+        Document(
+            page_content="Machine learning uses algorithms to learn from data",
+            metadata={"source": "wiki", "title": "ML"},
+        ),
+        Document(
+            page_content="Vector databases store embeddings efficiently",
+            metadata={"source": "blog", "title": "VectorDB"},
+        ),
+        Document(
+            page_content="LangChain is a framework for building LLM applications",
+            metadata={"source": "docs", "title": "LangChain"},
+        ),
+        Document(
+            page_content="Semantic search uses embeddings to find similar documents",
+            metadata={"source": "blog", "title": "SemanticSearch"},
+        ),
+    ]
 
 
 @pytest.fixture

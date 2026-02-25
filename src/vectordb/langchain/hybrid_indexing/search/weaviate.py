@@ -34,6 +34,7 @@ from vectordb.databases.weaviate import WeaviateVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     SparseEmbedder,
 )
@@ -136,13 +137,13 @@ class WeaviateHybridSearchPipeline:
         logger.info("Generated dense embedding for query: %s...", query[:50])
 
         documents = self.db.hybrid_search(
-            query_embedding=dense_embedding,
-            query_text=query,
+            query=query,
+            vector=dense_embedding,
             top_k=top_k,
             filters=filters,
-            collection_name=self.collection_name,
             alpha=self.alpha,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info("Retrieved %d documents from Weaviate", len(documents))
 
         result = {

@@ -43,6 +43,7 @@ from vectordb.langchain.utils import (
     RAGHelper,
     SparseEmbedder,
 )
+from vectordb.utils.chroma_document_converter import ChromaDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -155,12 +156,16 @@ class ChromaCostOptimizedRAGSearchPipeline:
         dense_query_embedding = EmbedderHelper.embed_query(self.dense_embedder, query)
         logger.info("Embedded query with dense embedding: %s", query[:50])
 
-        # Execute dense semantic search
-        dense_documents = self.db.query(
+        self.db._get_collection(self.collection_name)
+        results_dict = self.db.query(
             query_embedding=dense_query_embedding,
-            top_k=top_k,
-            collection_name=self.collection_name,
+            n_results=top_k,
             where=filters,
+        )
+        dense_documents = (
+            ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+                results_dict
+            )
         )
         logger.info("Retrieved %d documents from dense search", len(dense_documents))
 

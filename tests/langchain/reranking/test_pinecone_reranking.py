@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
@@ -259,13 +260,15 @@ class TestPineconeRerankingSearch:
         )
 
         sample_documents = [
-            Document(
-                page_content="Python is a high-level programming language",
-                metadata={"source": "wiki", "id": "1"},
+            HaystackDocument(
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+                id="1",
             ),
-            Document(
-                page_content="Machine learning uses algorithms to learn from data",
-                metadata={"source": "wiki", "id": "2"},
+            HaystackDocument(
+                content="Machine learning uses algorithms to learn from data",
+                meta={"source": "wiki"},
+                id="2",
             ),
         ]
 
@@ -324,9 +327,10 @@ class TestPineconeRerankingSearch:
         )
 
         sample_documents = [
-            Document(
-                page_content="Python is a high-level programming language",
-                metadata={"source": "wiki", "id": "1"},
+            HaystackDocument(
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+                id="1",
             ),
         ]
 
@@ -385,9 +389,10 @@ class TestPineconeRerankingSearch:
         )
 
         sample_documents = [
-            Document(
-                page_content="Python is a high-level programming language",
-                metadata={"source": "wiki", "id": "1"},
+            HaystackDocument(
+                content="Python is a high-level programming language",
+                meta={"source": "wiki"},
+                id="1",
             ),
         ]
 
@@ -419,7 +424,7 @@ class TestPineconeRerankingSearch:
         assert result["query"] == "test query"
         mock_db_inst.query.assert_called_once()
         call_kwargs = mock_db_inst.query.call_args.kwargs
-        assert call_kwargs["filters"] == filters
+        assert call_kwargs["filter"] == filters
 
     @patch("vectordb.langchain.reranking.search.pinecone.PineconeVectorDB")
     @patch(

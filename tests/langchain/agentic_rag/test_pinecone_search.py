@@ -193,13 +193,12 @@ class TestPineconeAgenticRAGSearch:
                 return_value=MagicMock(),
             ),
         ]
-        if mock_rag_generate:
-            patches.append(
-                patch(
-                    "vectordb.langchain.agentic_rag.search.pinecone.RAGHelper.generate",
-                    mock_rag_generate,
-                )
+        patches.append(
+            patch(
+                "vectordb.langchain.agentic_rag.search.pinecone.RAGHelper.generate",
+                mock_rag_generate or MagicMock(return_value="Generated answer"),
             )
+        )
         return patches
 
     def test_run_with_search_action(
@@ -278,7 +277,7 @@ class TestPineconeAgenticRAGSearch:
                 p.stop()
 
     def test_run_with_reflect_action(
-        self, pinecone_search_config, sample_search_documents
+        self, pinecone_search_config, sample_search_documents, sample_documents
     ):
         """Test run method with reflect action."""
         from vectordb.langchain.agentic_rag.search.pinecone import (
@@ -294,7 +293,7 @@ class TestPineconeAgenticRAGSearch:
             {"action": "generate", "reasoning": "Generate answer"},
         ]
         mock_compressor = MagicMock()
-        mock_compressor.compress.return_value = sample_search_documents[:3]
+        mock_compressor.compress.return_value = sample_documents[:3]
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="Reflection feedback")
 
@@ -337,6 +336,10 @@ class TestPineconeAgenticRAGSearch:
             patch(
                 "vectordb.langchain.agentic_rag.search.pinecone.ChatGroq",
                 return_value=MagicMock(),
+            ),
+            patch(
+                "vectordb.langchain.agentic_rag.search.pinecone.RAGHelper.generate",
+                MagicMock(return_value="Generated answer"),
             ),
         ]
 
@@ -413,7 +416,7 @@ class TestPineconeAgenticRAGSearch:
             pipeline.run("What is machine learning?", filters=filters)
 
             call_kwargs = mock_db.query.call_args
-            assert call_kwargs[1]["filters"] == filters
+            assert call_kwargs[1]["filter"] == filters
         finally:
             for p in patches:
                 p.stop()

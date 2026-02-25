@@ -280,7 +280,12 @@ class TestChromaSemanticSearch:
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [[doc.id or str(i + 1) for i, doc in enumerate(sample_documents)]],
+            "documents": [[doc.content for doc in sample_documents]],
+            "metadatas": [[doc.meta or {} for doc in sample_documents]],
+            "distances": [[0.1 * (i + 1) for i in range(len(sample_documents))]],
+        }
         mock_db.return_value = mock_db_inst
         mock_llm.return_value = None
 
@@ -343,7 +348,12 @@ class TestChromaSemanticSearch:
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [[doc.id or str(i + 1) for i, doc in enumerate(sample_documents)]],
+            "documents": [[doc.content for doc in sample_documents]],
+            "metadatas": [[doc.meta or {} for doc in sample_documents]],
+            "distances": [[0.1 * (i + 1) for i in range(len(sample_documents))]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()

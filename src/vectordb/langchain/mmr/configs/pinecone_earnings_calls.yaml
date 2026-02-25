@@ -1,0 +1,34 @@
+dataloader:
+  type: "earnings_calls"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "lc-mmr-earnings-calls"
+  namespace: ""
+  dimension: 384
+  metric: "cosine"
+  recreate: false
+
+search:
+  top_k: 20
+  mmr_k: 5
+  lambda_param: 0.5
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+logging:
+  name: "lc_mmr_pinecone"
+  level: "INFO"

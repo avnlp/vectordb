@@ -31,6 +31,7 @@ Sample data fixtures:
 from unittest.mock import MagicMock
 
 import pytest
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
@@ -284,6 +285,32 @@ def sample_query_result() -> dict:
 
 
 @pytest.fixture
-def sample_search_documents(sample_documents) -> list[Document]:
-    """Create sample documents for search results."""
-    return sample_documents
+def sample_search_documents() -> list[HaystackDocument]:
+    """Create sample Haystack documents for search results (mock DB output)."""
+    return [
+        HaystackDocument(
+            content="Python is a high-level programming language",
+            meta={"source": "wiki", "title": "Python"},
+            id="1",
+        ),
+        HaystackDocument(
+            content="Machine learning uses algorithms to learn from data",
+            meta={"source": "wiki", "title": "ML"},
+            id="2",
+        ),
+        HaystackDocument(
+            content="Vector databases store embeddings efficiently",
+            meta={"source": "blog", "title": "VectorDB"},
+            id="3",
+        ),
+        HaystackDocument(
+            content="LangChain is a framework for building LLM applications",
+            meta={"source": "docs", "title": "LangChain"},
+            id="4",
+        ),
+        HaystackDocument(
+            content="Semantic search uses embeddings to find similar documents",
+            meta={"source": "blog", "title": "SemanticSearch"},
+            id="5",
+        ),
+    ]

@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from haystack.dataclasses import Document as HaystackDocument
 
 
 class TestMilvusNamespaceSearchPipeline:
@@ -59,8 +60,12 @@ class TestMilvusNamespaceSearchPipeline:
         mock_llm.return_value = None
         mock_embed_query.return_value = [0.1] * 384
 
+        haystack_docs = [
+            HaystackDocument(content="doc1", meta={}, id="1"),
+            HaystackDocument(content="doc2", meta={}, id="2"),
+        ]
         mock_db_instance = MagicMock()
-        mock_db_instance.query.return_value = ["doc1", "doc2"]
+        mock_db_instance.search.return_value = haystack_docs
         mock_db_cls.return_value = mock_db_instance
 
         from vectordb.langchain.namespaces.search.milvus import (
@@ -73,7 +78,7 @@ class TestMilvusNamespaceSearchPipeline:
         assert "documents" in result
         assert result["namespace"] == "ns_123"
         assert result["query"] == "test query"
-        mock_db_instance.query.assert_called_once()
+        mock_db_instance.search.assert_called_once()
 
     @patch("vectordb.langchain.namespaces.milvus.MilvusVectorDB")
     @patch("vectordb.langchain.utils.EmbedderHelper.create_embedder")
@@ -93,8 +98,11 @@ class TestMilvusNamespaceSearchPipeline:
         mock_llm.return_value = None
         mock_embed_query.return_value = [0.1] * 384
 
+        haystack_docs = [
+            HaystackDocument(content="doc1", meta={}, id="1"),
+        ]
         mock_db_instance = MagicMock()
-        mock_db_instance.query.return_value = ["doc1"]
+        mock_db_instance.search.return_value = haystack_docs
         mock_db_cls.return_value = mock_db_instance
 
         from vectordb.langchain.namespaces.search.milvus import (
@@ -104,8 +112,8 @@ class TestMilvusNamespaceSearchPipeline:
         pipeline = MilvusNamespaceSearchPipeline(milvus_namespace_config, "ns_abc")
         pipeline.search("test query")
 
-        call_kwargs = mock_db_instance.query.call_args.kwargs
-        assert call_kwargs["partition_name"] == "ns_abc"
+        call_kwargs = mock_db_instance.search.call_args.kwargs
+        assert call_kwargs["scope"] == "ns_abc"
 
     @patch("vectordb.langchain.namespaces.milvus.MilvusVectorDB")
     @patch("vectordb.langchain.utils.EmbedderHelper.create_embedder")
@@ -127,9 +135,12 @@ class TestMilvusNamespaceSearchPipeline:
         mock_llm.return_value = llm
         mock_embed_query.return_value = [0.1] * 384
 
-        documents = ["doc1", "doc2"]
+        haystack_docs = [
+            HaystackDocument(content="doc1", meta={}, id="1"),
+            HaystackDocument(content="doc2", meta={}, id="2"),
+        ]
         mock_db_instance = MagicMock()
-        mock_db_instance.query.return_value = documents
+        mock_db_instance.search.return_value = haystack_docs
         mock_db_cls.return_value = mock_db_instance
         mock_generate.return_value = "generated answer"
 
@@ -142,4 +153,6 @@ class TestMilvusNamespaceSearchPipeline:
 
         assert "answer" in result
         assert result["answer"] == "generated answer"
-        mock_generate.assert_called_once_with(llm, "test query", documents)
+        mock_generate.assert_called_once()
+        assert mock_generate.call_args[0][0] == llm
+        assert mock_generate.call_args[0][1] == "test query"

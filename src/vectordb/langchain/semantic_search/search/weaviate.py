@@ -79,6 +79,7 @@ from vectordb.databases.weaviate import WeaviateVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
 )
 
@@ -192,12 +193,14 @@ class WeaviateSemanticSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
+        self.db._select_collection(self.collection_name)
         documents = self.db.query(
-            query_embedding=query_embedding,
-            top_k=top_k,
+            vector=query_embedding,
+            limit=top_k,
             filters=filters,
-            collection_name=self.collection_name,
+            return_documents=True,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info("Retrieved %d documents from Weaviate", len(documents))
 
         result = {
