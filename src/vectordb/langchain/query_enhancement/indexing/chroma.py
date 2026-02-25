@@ -71,7 +71,7 @@ class ChromaQueryEnhancementIndexingPipeline:
 
     Prepares document collections for query-enhanced search by indexing
     documents with their dense vector embeddings. The resulting collection
-    can be queried with multiDE, or step-query, Hy-back enhancement strategies.
+    can be queried with multi-query, or step-query, HyDE enhancement strategies.
 
     This pipeline is functionally identical to standard semantic search indexing.
     Query enhancement is applied at search time using the same embedded documents.

@@ -121,10 +121,10 @@ class TestQdrantQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.qdrant.QdrantVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.qdrant.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
-    @patch("vectordb.langchain.query_enhancement.search.qdrant.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.qdrant.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_initialization(
         self, mock_enhancer, mock_llm_helper, mock_embedder_helper, mock_db, mock_llm
     ):
@@ -149,13 +149,13 @@ class TestQdrantQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.qdrant.QdrantVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.qdrant.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.qdrant.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.qdrant.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.qdrant.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_execution(
         self,
         mock_enhancer,
@@ -198,13 +198,13 @@ class TestQdrantQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.qdrant.QdrantVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.qdrant.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.qdrant.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.qdrant.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.qdrant.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_with_different_modes(
         self,
         mock_enhancer,

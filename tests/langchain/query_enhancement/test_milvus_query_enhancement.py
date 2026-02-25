@@ -121,10 +121,10 @@ class TestMilvusQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.milvus.MilvusVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.milvus.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
-    @patch("vectordb.langchain.query_enhancement.search.milvus.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.milvus.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_initialization(
         self, mock_enhancer, mock_llm_helper, mock_embedder_helper, mock_db, mock_llm
     ):
@@ -149,13 +149,13 @@ class TestMilvusQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.milvus.MilvusVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.milvus.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.milvus.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.milvus.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.milvus.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_execution(
         self,
         mock_enhancer,
@@ -198,13 +198,13 @@ class TestMilvusQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.milvus.MilvusVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.milvus.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.milvus.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.milvus.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.milvus.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_with_different_modes(
         self,
         mock_enhancer,

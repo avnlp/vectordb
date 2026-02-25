@@ -249,10 +249,10 @@ class TestChromaQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.chroma.ChromaVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.chroma.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
-    @patch("vectordb.langchain.query_enhancement.search.chroma.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.chroma.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_initialization(
         self, mock_enhancer, mock_llm_helper, mock_embedder_helper, mock_db, mock_llm
     ):
@@ -288,13 +288,13 @@ class TestChromaQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.chroma.ChromaVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.chroma.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.chroma.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.chroma.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.chroma.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_execution(
         self,
         mock_enhancer,
@@ -347,3 +347,59 @@ class TestChromaQueryEnhancementSearch:
 
         assert result["query"] == "test query"
         assert len(result["documents"]) > 0
+
+    @patch("langchain_groq.ChatGroq")
+    @patch("vectordb.langchain.query_enhancement.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
+    )
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
+    def test_search_with_different_modes(
+        self,
+        mock_enhancer,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        mock_llm,
+        sample_documents,
+    ):
+        """Test search with different query enhancement modes."""
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+
+        mock_enhancer_inst = MagicMock()
+        mock_enhancer_inst.generate_queries.return_value = ["query 1", "query 2"]
+        mock_enhancer.return_value = mock_enhancer_inst
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "path": "./test_chroma_data",
+                "collection_name": "test_query_enhancement",
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = ChromaQueryEnhancementSearchPipeline(config)
+
+        # Test multi_query mode
+        result = pipeline.search("test query", top_k=5, mode="multi_query")
+        assert "documents" in result
+        assert "enhanced_queries" in result
+
+        # Test hyde mode
+        result = pipeline.search("test query", top_k=5, mode="hyde")
+        assert "documents" in result
+
+        # Test step_back mode
+        result = pipeline.search("test query", top_k=5, mode="step_back")
+        assert "documents" in result

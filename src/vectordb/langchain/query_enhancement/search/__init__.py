@@ -33,6 +33,9 @@ Example:
     >>> results = searcher.run("What are transformer architectures?")
 """
 
+from vectordb.langchain.query_enhancement.search.base import (
+    BaseQueryEnhancementSearchPipeline,
+)
 from vectordb.langchain.query_enhancement.search.chroma import (
     ChromaQueryEnhancementSearchPipeline,
 )
@@ -51,6 +54,7 @@ from vectordb.langchain.query_enhancement.search.weaviate import (
 
 
 __all__ = [
+    "BaseQueryEnhancementSearchPipeline",
     "ChromaQueryEnhancementSearchPipeline",
     "MilvusQueryEnhancementSearchPipeline",
     "PineconeQueryEnhancementSearchPipeline",

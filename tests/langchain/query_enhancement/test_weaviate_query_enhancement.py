@@ -119,10 +119,10 @@ class TestWeaviateQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.weaviate.WeaviateVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.weaviate.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
-    @patch("vectordb.langchain.query_enhancement.search.weaviate.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.weaviate.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_initialization(
         self, mock_enhancer, mock_llm_helper, mock_embedder_helper, mock_db, mock_llm
     ):
@@ -146,13 +146,13 @@ class TestWeaviateQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.weaviate.WeaviateVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.weaviate.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.weaviate.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.weaviate.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.weaviate.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_execution(
         self,
         mock_enhancer,
@@ -194,13 +194,13 @@ class TestWeaviateQueryEnhancementSearch:
     @patch("langchain_groq.ChatGroq")
     @patch("vectordb.langchain.query_enhancement.search.weaviate.WeaviateVectorDB")
     @patch(
-        "vectordb.langchain.query_enhancement.search.weaviate.EmbedderHelper.create_embedder"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.create_embedder"
     )
     @patch(
-        "vectordb.langchain.query_enhancement.search.weaviate.EmbedderHelper.embed_query"
+        "vectordb.langchain.query_enhancement.search.base.EmbedderHelper.embed_query"
     )
-    @patch("vectordb.langchain.query_enhancement.search.weaviate.RAGHelper.create_llm")
-    @patch("vectordb.langchain.query_enhancement.search.weaviate.QueryEnhancer")
+    @patch("vectordb.langchain.query_enhancement.search.base.RAGHelper.create_llm")
+    @patch("vectordb.langchain.query_enhancement.search.base.QueryEnhancer")
     def test_search_with_different_modes(
         self,
         mock_enhancer,
