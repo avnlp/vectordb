@@ -92,7 +92,7 @@ class ChromaContextualCompressionIndexingPipeline:
         chroma_config = self.config["chroma"]
 
         self.db = ChromaVectorDB(
-            persist_dir=chroma_config.get("persist_dir"),
+            path=chroma_config.get("persist_dir"),
         )
 
         self.collection_name = chroma_config.get("collection_name")
@@ -121,8 +121,11 @@ class ChromaContextualCompressionIndexingPipeline:
         """
         limit = self.config.get("dataloader", {}).get("limit")
         dl_config = self.config.get("dataloader", {})
+        dl_type = dl_config.get("type")
+        if not dl_type:
+            raise ValueError("dataloader.type must be specified in the configuration.")
         loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
+            dl_type,
             split=dl_config.get("split", "test"),
             limit=limit,
         )

@@ -129,7 +129,7 @@ class TestChromaContextualCompressionIndexing:
             sample_documents: Fixture with 5 sample documents.
         """
         mock_dataset = MagicMock()
-        mock_dataset.to_haystack.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
@@ -229,7 +229,7 @@ class TestChromaContextualCompressionIndexing:
             sample_documents: Fixture with 5 sample documents.
         """
         mock_dataset = MagicMock()
-        mock_dataset.to_haystack.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader

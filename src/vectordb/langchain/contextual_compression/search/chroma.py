@@ -98,7 +98,7 @@ class ChromaContextualCompressionSearchPipeline:
 
         chroma_config = self.config["chroma"]
         self.db = ChromaVectorDB(
-            persist_dir=chroma_config.get("persist_dir"),
+            path=chroma_config.get("persist_dir"),
         )
 
         self.collection_name = chroma_config.get("collection_name")
@@ -110,11 +110,18 @@ class ChromaContextualCompressionSearchPipeline:
             reranker = RerankerHelper.create_reranker(self.config)
             self.compressor = ContextCompressor(mode="reranking", reranker=reranker)
         else:  # llm_extraction
-            llm = RAGHelper.create_llm(self.config)
-            if llm is None:
-                from langchain_groq import ChatGroq
+            llm_extraction_config = compression_config.get("llm_extraction", {})
+            if not llm_extraction_config:
+                raise ValueError(
+                    "llm_extraction config section is required for 'llm_extraction' mode."
+                )
 
-                llm = ChatGroq(model="llama-3.3-70b-versatile")
+            from langchain_groq import ChatGroq
+
+            llm = ChatGroq(
+                model=llm_extraction_config.get("model"),
+                api_key=llm_extraction_config.get("api_key"),
+            )
             self.compressor = ContextCompressor(mode="llm_extraction", llm=llm)
 
         self.llm = RAGHelper.create_llm(self.config)

@@ -1,7 +1,7 @@
 # CHROMA Reranking Pipeline - PopQA Dataset
 
 chroma:
-  persist_dir: "${CHROMA_PERSIST_DIR:-./chroma_data}"
+  path: "${CHROMA_PERSIST_DIR:-./chroma_data}"
 
 collection:
   name: "popqa_reranking"

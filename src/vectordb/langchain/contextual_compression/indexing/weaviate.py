@@ -121,8 +121,11 @@ class WeaviateContextualCompressionIndexingPipeline:
         """
         limit = self.config.get("dataloader", {}).get("limit")
         dl_config = self.config.get("dataloader", {})
+        dl_type = dl_config.get("type")
+        if not dl_type:
+            raise ValueError("dataloader.type must be specified in the configuration.")
         loader = DataloaderCatalog.create(
-            dl_config.get("type", "triviaqa"),
+            dl_type,
             split=dl_config.get("split", "test"),
             limit=limit,
         )

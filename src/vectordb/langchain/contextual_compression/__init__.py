@@ -46,7 +46,8 @@ Example:
     >>> pipeline = PineconeContextualCompressionSearchPipeline("config.yaml")
     >>> result = pipeline.search("What is machine learning?", top_k=5)
     >>> for doc in result["documents"]:
-    ...     print(f"Relevance: {doc.metadata['rerank_score']:.2f}")
+    ...     if "rerank_score" in doc.metadata:
+    ...         print(f"Relevance: {doc.metadata['rerank_score']:.2f}")
     ...     print(f"Content: {doc.page_content[:200]}...")
 """
 

@@ -96,11 +96,13 @@ contextual_compression/
 │   ├── milvus.py                      # Milvus compression search
 │   └── qdrant.py                      # Qdrant compression search
 └── configs/                           # YAML configs organized by database
-    ├── pinecone_triviaqa_reranking.yaml
-    ├── pinecone_triviaqa_llm.yaml
-    ├── weaviate_arc_reranking.yaml
-    └── ...                            # (25+ config files total)
+    ├── pinecone_arc.yaml
+    ├── pinecone_triviaqa.yaml
+    ├── weaviate_arc.yaml
+    └── ...                            # (25 config files: 5 databases × 5 datasets)
 ```
+
+Config files are named as `{database}_{dataset}.yaml`. The compression strategy (reranking or LLM extraction) is specified within each config file under the `compression.mode` field.
 
 ## Related Modules
 

@@ -10,7 +10,7 @@ embeddings:
   batch_size: 32
 
 chroma:
-  persist_dir: "./chroma_db"
+  path: "./chroma_db"
   collection_name: "contextual_compression_arc"
 
 search:
