@@ -1,0 +1,25 @@
+# Weaviate JSON Indexing Configuration - ARC Dataset
+
+dataloader:
+  type: "arc"
+  dataset_name: "allenai/ai2_arc"
+  config: "ARC-Easy"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+weaviate:
+  cluster_url: "${WEAVIATE_CLUSTER_URL:-http://localhost:8080}"
+  api_key: "${WEAVIATE_API_KEY:-}"
+  collection_name: "ArcJsonIndexed"
+
+search:
+  top_k: 10
+
+logging:
+  level: "INFO"
+  name: "weaviate_arc_json_indexing"
