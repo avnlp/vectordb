@@ -41,6 +41,7 @@ from vectordb.databases.chroma import ChromaVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     MMRHelper,
     RAGHelper,
 )
@@ -157,26 +158,28 @@ class ChromaMMRSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query: %s", query[:50])
 
-        candidates = self.db.query(
+        self.db._get_collection(self.collection_name)
+        results_dict = self.db.query(
             query_embedding=query_embedding,
-            top_k=top_k,
-            filters=filters,
-            collection_name=self.collection_name,
+            n_results=top_k,
+            where=filters,
+            include_vectors=True,
         )
-        logger.info("Retrieved %d candidate documents from Chroma", len(candidates))
+        haystack_candidates = self.db.query_to_documents(results_dict)
+        logger.info(
+            "Retrieved %d candidate documents from Chroma", len(haystack_candidates)
+        )
 
-        candidate_embeddings = []
-        for doc in candidates:
-            embedding = doc.metadata.get("embedding")
-            if embedding is None:
-                embedding = query_embedding
-            candidate_embeddings.append(embedding)
+        candidates, candidate_embeddings = (
+            HaystackToLangchainConverter.convert_with_embeddings(haystack_candidates)
+        )
 
         mmr_docs = MMRHelper.mmr_rerank_simple(
             candidates,
             candidate_embeddings,
             query_embedding,
             k=mmr_k,
+            lambda_param=lambda_param,
         )
         logger.info("Applied MMR to %d documents", len(mmr_docs))
 

@@ -27,6 +27,7 @@ from vectordb.langchain.utils import (
     EmbedderHelper,
     RAGHelper,
 )
+from vectordb.utils.chroma_document_converter import ChromaDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -106,11 +107,16 @@ class ChromaNamespaceSearchPipeline:
         logger.info("Embedded query for namespace %s: %s", self.namespace, query[:50])
 
         collection_name = self.pipeline._get_collection_name(self.namespace)
-        documents = self.pipeline.db.query(
+        self.pipeline.db._get_collection(collection_name)
+        results_dict = self.pipeline.db.query(
             query_embedding=query_embedding,
-            top_k=top_k,
-            filters=filters,
-            collection_name=collection_name,
+            n_results=top_k,
+            where=filters,
+        )
+        documents = (
+            ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+                results_dict
+            )
         )
         logger.info(
             "Retrieved %d documents for namespace %s from Chroma",

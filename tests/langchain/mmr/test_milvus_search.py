@@ -174,7 +174,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = sample_mmr_candidates
+            mock_db_instance.search.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
             mock_mmr.return_value = sample_mmr_candidates[:3]
@@ -223,7 +223,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = sample_mmr_candidates
+            mock_db_instance.search.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
             mock_mmr.return_value = sample_mmr_candidates[:5]
@@ -272,7 +272,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = sample_mmr_candidates
+            mock_db_instance.search.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
             mock_mmr.return_value = sample_mmr_candidates[:3]
@@ -281,8 +281,8 @@ mmr:
             filters = {"metadata.source": "wiki"}
             pipeline.search("test query", filters=filters)
 
-            mock_db_instance.query.assert_called_once()
-            call_args = mock_db_instance.query.call_args
+            mock_db_instance.search.assert_called_once()
+            call_args = mock_db_instance.search.call_args
             assert call_args.kwargs.get("filters") == filters
 
         @patch("vectordb.langchain.mmr.search.milvus.MilvusVectorDB")
@@ -322,7 +322,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = sample_mmr_candidates
+            mock_db_instance.search.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
             mock_mmr.return_value = sample_mmr_candidates[:3]
@@ -330,8 +330,8 @@ mmr:
             pipeline = MilvusMMRSearchPipeline(milvus_config)
             pipeline.search("test query", top_k=10)
 
-            mock_db_instance.query.assert_called_once()
-            call_args = mock_db_instance.query.call_args
+            mock_db_instance.search.assert_called_once()
+            call_args = mock_db_instance.search.call_args
             assert call_args.kwargs.get("top_k") == 10
 
         @patch("vectordb.langchain.mmr.search.milvus.MilvusVectorDB")
@@ -372,7 +372,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = sample_mmr_candidates
+            mock_db_instance.search.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
             mmr_result = [sample_mmr_candidates[0], sample_mmr_candidates[2]]
@@ -429,7 +429,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
-            mock_db_instance.query.return_value = sample_mmr_candidates
+            mock_db_instance.search.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
             mock_mmr.return_value = sample_mmr_candidates[:3]

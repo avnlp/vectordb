@@ -25,6 +25,7 @@ from vectordb.langchain.namespaces.weaviate import WeaviateNamespacePipeline
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
 )
 
@@ -107,11 +108,12 @@ class WeaviateNamespaceSearchPipeline:
         logger.info("Embedded query for namespace %s: %s", self.namespace, query[:50])
 
         documents = self.pipeline.db.query(
-            query_embedding=query_embedding,
-            top_k=top_k,
+            vector=query_embedding,
+            limit=top_k,
             filters=filters,
-            tenant=self.namespace,
+            return_documents=True,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info(
             "Retrieved %d documents for namespace %s from Weaviate",
             len(documents),

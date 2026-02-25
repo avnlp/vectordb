@@ -48,6 +48,7 @@ from vectordb.langchain.utils import (
     RAGHelper,
     RerankerHelper,
 )
+from vectordb.utils.chroma_document_converter import ChromaDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -216,12 +217,14 @@ class ChromaAgenticRAGPipeline(AgenticRAGPipeline):
             if action == "search":
                 logger.info("Executing SEARCH action")
 
-                # Retrieve documents from Chroma using pre-computed embedding
-                documents = self.db.query(
+                self.db._get_collection(self.collection_name)
+                results_dict = self.db.query(
                     query_embedding=query_embedding,
-                    top_k=top_k,
-                    filters=filters,
-                    collection_name=self.collection_name,
+                    n_results=top_k,
+                    where=filters,
+                )
+                documents = ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+                    results_dict
                 )
                 logger.info("Retrieved %d documents from Chroma", len(documents))
 

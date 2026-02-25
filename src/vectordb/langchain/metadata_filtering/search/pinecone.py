@@ -236,9 +236,9 @@ class PineconeMetadataFilteringSearchPipeline:
 
         # Search Pinecone (returns Haystack Documents internally)
         haystack_docs = self.db.query(
-            query_embedding=query_embedding,
+            vector=query_embedding,
             top_k=top_k,
-            filters=filters,
+            filter=filters,
             namespace=self.namespace,
         )
 

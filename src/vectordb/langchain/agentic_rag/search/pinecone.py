@@ -39,6 +39,7 @@ from vectordb.langchain.components import (
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     RerankerHelper,
 )
@@ -204,11 +205,12 @@ class PineconeAgenticRAGPipeline(AgenticRAGPipeline):
 
                 # Retrieve documents from Pinecone namespace
                 documents = self.db.query(
-                    query_embedding=query_embedding,
+                    vector=query_embedding,
                     top_k=top_k,
-                    filters=filters,
+                    filter=filters,
                     namespace=self.namespace,
                 )
+                documents = HaystackToLangchainConverter.convert(documents)
                 logger.info("Retrieved %d documents from Pinecone", len(documents))
 
                 # Compress documents to most relevant subset

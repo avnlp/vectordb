@@ -69,6 +69,7 @@ from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
 )
 
@@ -199,11 +200,12 @@ class PineconeSemanticSearchPipeline:
         # Query Pinecone for nearest neighbors in vector space.
         # Returns documents sorted by similarity (highest first).
         documents = self.db.query(
-            query_embedding=query_embedding,
+            vector=query_embedding,
             top_k=top_k,
-            filters=filters,
+            filter=filters,
             namespace=self.namespace,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info("Retrieved %d documents from Pinecone", len(documents))
 
         result = {

@@ -38,6 +38,7 @@ from vectordb.langchain.components import (
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     RerankerHelper,
 )
@@ -191,12 +192,14 @@ class WeaviateAgenticRAGPipeline(AgenticRAGPipeline):
                 logger.info("Executing SEARCH action")
 
                 # Retrieve from Weaviate class
+                self.db._select_collection(self.collection_name)
                 documents = self.db.query(
-                    query_embedding=query_embedding,
-                    top_k=top_k,
+                    vector=query_embedding,
+                    limit=top_k,
                     filters=filters,
-                    collection_name=self.collection_name,
+                    return_documents=True,
                 )
+                documents = HaystackToLangchainConverter.convert(documents)
                 logger.info("Retrieved %d documents from Weaviate", len(documents))
 
                 # Compress documents

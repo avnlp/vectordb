@@ -174,6 +174,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
+            mock_db_instance._select_collection.return_value = True
             mock_db_instance.query.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
@@ -223,6 +224,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
+            mock_db_instance._select_collection.return_value = True
             mock_db_instance.query.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
@@ -272,6 +274,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
+            mock_db_instance._select_collection.return_value = True
             mock_db_instance.query.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
@@ -322,6 +325,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
+            mock_db_instance._select_collection.return_value = True
             mock_db_instance.query.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
@@ -332,7 +336,7 @@ mmr:
 
             mock_db_instance.query.assert_called_once()
             call_args = mock_db_instance.query.call_args
-            assert call_args.kwargs.get("top_k") == 10
+            assert call_args.kwargs.get("limit") == 10
 
         @patch("vectordb.langchain.mmr.search.weaviate.WeaviateVectorDB")
         @patch("vectordb.langchain.mmr.search.weaviate.EmbedderHelper.create_embedder")
@@ -372,6 +376,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
+            mock_db_instance._select_collection.return_value = True
             mock_db_instance.query.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 
@@ -429,6 +434,7 @@ mmr:
             mock_embed_query.return_value = [0.1] * 384
 
             mock_db_instance = MagicMock()
+            mock_db_instance._select_collection.return_value = True
             mock_db_instance.query.return_value = sample_mmr_candidates
             mock_db_cls.return_value = mock_db_instance
 

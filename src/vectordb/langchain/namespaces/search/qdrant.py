@@ -25,6 +25,7 @@ from vectordb.langchain.namespaces.qdrant import QdrantNamespacePipeline
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
 )
 
@@ -106,12 +107,13 @@ class QdrantNamespaceSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query for namespace %s: %s", self.namespace, query[:50])
 
-        documents = self.pipeline.db.query(
-            query_embedding=query_embedding,
+        documents = self.pipeline.db.search(
+            query_vector=query_embedding,
             top_k=top_k,
             filters=filters,
-            namespace=self.namespace,
+            scope=self.namespace,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info(
             "Retrieved %d documents for namespace %s from Qdrant",
             len(documents),

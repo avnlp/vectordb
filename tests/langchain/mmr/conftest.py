@@ -25,6 +25,7 @@ Configuration fixtures:
 from unittest.mock import MagicMock, patch
 
 import pytest
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
@@ -179,11 +180,13 @@ def sample_mmr_candidates() -> list:
             ),
         ]
     ):
-        doc = MagicMock()
-        doc.id = str(i + 1)
-        doc.text = text
-        doc.score = score
-        doc.metadata = {"embedding": embedding}
+        doc = HaystackDocument(
+            id=str(i + 1),
+            content=text,
+            score=score,
+            embedding=embedding,
+            meta={},
+        )
         candidates.append(doc)
     return candidates
 

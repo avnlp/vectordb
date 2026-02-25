@@ -25,6 +25,7 @@ from vectordb.langchain.namespaces.milvus import MilvusNamespacePipeline
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
 )
 
@@ -107,13 +108,14 @@ class MilvusNamespaceSearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query for namespace %s: %s", self.namespace, query[:50])
 
-        documents = self.pipeline.db.query(
+        documents = self.pipeline.db.search(
             query_embedding=query_embedding,
             top_k=top_k,
             filters=filters,
             collection_name=self.pipeline.collection_name,
-            partition_name=self.namespace,
+            scope=self.namespace,
         )
+        documents = HaystackToLangchainConverter.convert(documents)
         logger.info(
             "Retrieved %d documents for namespace %s from Milvus",
             len(documents),

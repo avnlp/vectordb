@@ -285,7 +285,7 @@ mmr:
 
             mock_db_instance.query.assert_called_once()
             call_args = mock_db_instance.query.call_args
-            assert call_args.kwargs.get("filters") == filters
+            assert call_args.kwargs.get("filter") == filters
             assert call_args.kwargs.get("namespace") == "test"
 
         @patch("vectordb.langchain.mmr.search.pinecone.PineconeVectorDB")

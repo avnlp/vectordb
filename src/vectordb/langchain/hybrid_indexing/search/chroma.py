@@ -32,6 +32,7 @@ from vectordb.langchain.utils import (
     RAGHelper,
     SparseEmbedder,
 )
+from vectordb.utils.chroma_document_converter import ChromaDocumentConverter
 
 
 logger = logging.getLogger(__name__)
@@ -131,13 +132,17 @@ class ChromaHybridSearchPipeline:
         dense_embedding = EmbedderHelper.embed_query(self.dense_embedder, query)
         logger.info("Generated dense embedding for query: %s...", query[:50])
 
+        self.db._get_collection(self.collection_name)
         raw_results = self.db.query(
             query_embedding=dense_embedding,
-            top_k=top_k,
-            filters=filters,
-            collection_name=self.collection_name,
+            n_results=top_k,
+            where=filters,
         )
-        documents = self.db.query_to_documents(raw_results)
+        documents = (
+            ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+                raw_results
+            )
+        )
         logger.info("Retrieved %d documents from Chroma", len(documents))
 
         result = {

@@ -223,7 +223,7 @@ class TestChromaMMRSearch:
         mock_embed_query: Any,
         mock_embedder_helper: Any,
         mock_db: Any,
-        sample_documents: Any,
+        sample_mmr_candidates: Any,
     ) -> None:
         """Test end-to-end search execution with mocked dependencies.
 
@@ -237,15 +237,20 @@ class TestChromaMMRSearch:
             mock_llm_helper: Mock for LLM factory.
             mock_embed_query: Mock returning 384-dimensional query vector.
             mock_embedder_helper: Mock for embedder factory.
-            mock_db: Mock returning sample_documents from query.
-            sample_documents: Fixture with sample documents to return.
+            mock_db: Mock returning sample_mmr_candidates from query_to_documents.
+            sample_mmr_candidates: Fixture with Haystack documents (with embeddings).
 
         Returns:
             None
         """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst._get_collection.return_value = None
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2"]],
+            "documents": [["doc1", "doc2"]],
+        }
+        mock_db_inst.query_to_documents.return_value = sample_mmr_candidates
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 

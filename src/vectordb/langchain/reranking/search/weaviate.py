@@ -26,6 +26,7 @@ from vectordb.databases.weaviate import WeaviateVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     RerankerHelper,
 )
@@ -151,6 +152,7 @@ class WeaviateRerankingSearchPipeline:
             filters=filters,
             return_documents=True,
         )
+        candidates = HaystackToLangchainConverter.convert(candidates)
         logger.info("Retrieved %d candidate documents from Weaviate", len(candidates))
 
         reranked_docs = RerankerHelper.rerank(

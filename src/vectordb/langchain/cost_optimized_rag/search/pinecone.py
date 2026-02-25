@@ -31,6 +31,7 @@ from vectordb.databases.pinecone import PineconeVectorDB
 from vectordb.langchain.utils import (
     ConfigLoader,
     EmbedderHelper,
+    HaystackToLangchainConverter,
     RAGHelper,
     ResultMerger,
     SparseEmbedder,
@@ -165,11 +166,12 @@ class PineconeCostOptimizedRAGSearchPipeline:
 
         # Execute dense semantic search
         dense_documents = self.db.query(
-            query_embedding=dense_query_embedding,
+            vector=dense_query_embedding,
             top_k=top_k,
-            filters=filters,
+            filter=filters,
             namespace=self.namespace,
         )
+        dense_documents = HaystackToLangchainConverter.convert(dense_documents)
         logger.info("Retrieved %d documents from dense search", len(dense_documents))
 
         # Execute sparse lexical search
@@ -182,6 +184,7 @@ class PineconeCostOptimizedRAGSearchPipeline:
             filter=filters,
             namespace=self.namespace,
         )
+        sparse_documents = HaystackToLangchainConverter.convert(sparse_documents)
         logger.info("Retrieved %d documents from sparse search", len(sparse_documents))
 
         # Fuse results using Reciprocal Rank Fusion (RRF)
