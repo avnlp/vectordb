@@ -325,8 +325,10 @@ class TestChromaParentDocumentRetrievalSearch:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_chunk_1 = MagicMock()
+        mock_chunk_1.id = None
         mock_chunk_1.metadata = {"id": "chunk_1"}
         mock_chunk_2 = MagicMock()
+        mock_chunk_2.id = None
         mock_chunk_2.metadata = {"id": "chunk_2"}
 
         mock_db_inst = MagicMock()
@@ -408,6 +410,7 @@ class TestChromaParentDocumentRetrievalSearch:
         mock_generate.return_value = "Generated answer based on documents"
 
         mock_chunk = MagicMock()
+        mock_chunk.id = None
         mock_chunk.metadata = {"id": "chunk_1"}
 
         mock_db_inst = MagicMock()
@@ -531,6 +534,7 @@ class TestChromaParentDocumentRetrievalSearch:
         mock_chunks = []
         for i in range(10):
             chunk = MagicMock()
+            chunk.id = None
             chunk.metadata = {"id": f"chunk_{i}"}
             mock_chunks.append(chunk)
 
@@ -597,8 +601,10 @@ class TestChromaParentDocumentRetrievalSearch:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_chunk_with_id = MagicMock()
+        mock_chunk_with_id.id = None
         mock_chunk_with_id.metadata = {"id": "chunk_1"}
         mock_chunk_without_id = MagicMock()
+        mock_chunk_without_id.id = None
         mock_chunk_without_id.metadata = {"source": "wiki"}
 
         mock_db_inst = MagicMock()
@@ -827,6 +833,7 @@ class TestChromaParentDocumentRetrievalSearch:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_chunk = MagicMock()
+        mock_chunk.id = None
         mock_chunk.metadata = {"id": "chunk_1"}
 
         mock_db_inst = MagicMock()

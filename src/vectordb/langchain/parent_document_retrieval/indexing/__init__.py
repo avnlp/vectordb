@@ -22,7 +22,7 @@ Supported Vector Databases:
     - Chroma: Lightweight, embeddable vector database
     - Weaviate: Cloud-native, GraphQL-based vector search
     - Milvus: High-performance, distributed vector database
-       - Qdrant: Open-source, filterable vector search
+    - Qdrant: Open-source, filterable vector search
 
 Example Usage:
     >>> from vectordb.langchain.parent_document_retrieval.indexing import (

@@ -226,8 +226,6 @@ class WeaviateParentDocumentRetrievalIndexingPipeline:
 
             # Create chunk documents with parent_id metadata
             for chunk_idx, chunk_text in enumerate(chunks):
-                chunk_id = str(uuid.uuid4())
-
                 chunk_doc = {
                     "text": chunk_text,
                     "parent_id": parent_id,
@@ -235,9 +233,6 @@ class WeaviateParentDocumentRetrievalIndexingPipeline:
                     "metadata": doc.metadata or {},
                 }
                 all_chunks.append(chunk_doc)
-
-                # Map chunk_id to parent_id in store
-                self.parent_store.add_chunk_mapping(chunk_id, parent_id)
 
         logger.info("Created %d chunks from documents", len(all_chunks))
 
@@ -275,6 +270,8 @@ class WeaviateParentDocumentRetrievalIndexingPipeline:
             # Build document with parent reference and vector
             upsert_data.append(
                 {
+                    "uuid": chunk_id,
+                    "id": chunk_id,
                     "text": chunk["text"],
                     "vector": embedding,
                     "parent_id": chunk["parent_id"],

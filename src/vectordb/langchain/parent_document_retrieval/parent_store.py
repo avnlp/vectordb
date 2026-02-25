@@ -240,11 +240,10 @@ class ParentDocumentStore:
         parents: list[dict[str, Any]] = []
 
         for chunk_id in chunk_ids:
-            parent = self.get_parent(chunk_id)
-            if parent is not None:
-                # Get the parent_id to check for duplicates
-                parent_id = self.chunk_to_parent.get(chunk_id)
-                if parent_id and parent_id not in seen_parents:
+            parent_id = self.chunk_to_parent.get(chunk_id)
+            if parent_id and parent_id not in seen_parents:
+                parent = self.parent_map.get(parent_id)
+                if parent is not None:
                     seen_parents.add(parent_id)
                     parents.append(parent)
 

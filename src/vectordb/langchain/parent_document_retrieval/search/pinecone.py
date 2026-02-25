@@ -226,8 +226,14 @@ class PineconeParentDocumentRetrievalSearchPipeline:
         # Chunk IDs were stored as metadata during indexing
         chunk_ids = []
         for doc in chunk_documents:
-            if hasattr(doc, "metadata") and "id" in doc.metadata:
-                chunk_ids.append(doc.metadata["id"])
+            chunk_id = None
+            # Prefer doc.id for LangChain Document objects, fallback to metadata
+            if hasattr(doc, "id") and doc.id is not None:
+                chunk_id = doc.id
+            elif hasattr(doc, "metadata") and "id" in doc.metadata:
+                chunk_id = doc.metadata["id"]
+            if chunk_id is not None:
+                chunk_ids.append(chunk_id)
 
         # Map chunk IDs to parent documents
         # ParentDocumentStore handles deduplication internally

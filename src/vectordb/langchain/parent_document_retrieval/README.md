@@ -80,7 +80,7 @@ chunking:
   parent_size: 2048  # Size of parent documents
 
 parent_store:
-  store_path: "./parent_store.json"  # Optional persistence
+  store_path: "./parent_store.pkl"  # Optional persistence
   auto_save: true
 
 retrieval:
