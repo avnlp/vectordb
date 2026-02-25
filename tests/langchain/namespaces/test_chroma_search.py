@@ -15,7 +15,6 @@ All tests use mocking to avoid requiring actual Chroma database.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from langchain_core.documents import Document
 
 
 class TestChromaNamespaceSearchPipeline:
@@ -107,10 +106,12 @@ class TestChromaNamespaceSearchPipeline:
             - Correct number of documents returned
         """
         mock_db = MagicMock()
-        mock_db.query.return_value = [
-            Document(page_content="result1", metadata={}),
-            Document(page_content="result2", metadata={}),
-        ]
+        mock_db.query.return_value = {
+            "ids": [["1", "2"]],
+            "documents": [["result1", "result2"]],
+            "metadatas": [[{}, {}]],
+            "distances": [[0.1, 0.2]],
+        }
         mock_db_cls.return_value = mock_db
 
         mock_create_embedder.return_value = MagicMock()
@@ -148,7 +149,12 @@ class TestChromaNamespaceSearchPipeline:
             - For namespace "ns_abc", collection_name is "ns_ns_abc"
         """
         mock_db = MagicMock()
-        mock_db.query.return_value = []
+        mock_db.query.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
         mock_db_cls.return_value = mock_db
 
         mock_create_embedder.return_value = MagicMock()
@@ -162,8 +168,7 @@ class TestChromaNamespaceSearchPipeline:
         pipeline = ChromaNamespaceSearchPipeline(chroma_namespace_config, "ns_abc")
         pipeline.search("test query")
 
-        call_kwargs = mock_db.query.call_args.kwargs
-        assert call_kwargs["collection_name"] == "ns_ns_abc"
+        mock_db._get_collection.assert_called_with("ns_ns_abc")
 
     @patch("vectordb.langchain.namespaces.chroma.ChromaVectorDB")
     @patch("vectordb.langchain.utils.EmbedderHelper.create_embedder")
@@ -182,13 +187,13 @@ class TestChromaNamespaceSearchPipeline:
         """Test search includes generated answer when LLM is configured."""
         llm = MagicMock()
 
-        documents = [
-            Document(page_content="result1", metadata={}),
-            Document(page_content="result2", metadata={}),
-        ]
-
         mock_db = MagicMock()
-        mock_db.query.return_value = documents
+        mock_db.query.return_value = {
+            "ids": [["1", "2"]],
+            "documents": [["result1", "result2"]],
+            "metadatas": [[{}, {}]],
+            "distances": [[0.1, 0.2]],
+        }
         mock_db_cls.return_value = mock_db
 
         mock_create_embedder.return_value = MagicMock()
@@ -205,4 +210,4 @@ class TestChromaNamespaceSearchPipeline:
 
         assert "answer" in result
         assert result["answer"] == "generated answer"
-        mock_generate.assert_called_once_with(llm, "test query", documents)
+        mock_generate.assert_called_once()

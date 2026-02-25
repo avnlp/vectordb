@@ -21,32 +21,37 @@ All configurations include:
 """
 
 import pytest
-from langchain_core.documents import Document
+from haystack.dataclasses import Document as HaystackDocument
 
 
 @pytest.fixture
-def sample_documents() -> list[Document]:
-    """Create sample LangChain documents for testing."""
+def sample_documents() -> list[HaystackDocument]:
+    """Create sample Haystack documents for testing."""
     return [
-        Document(
-            page_content="Python is a high-level programming language",
-            metadata={"source": "wiki", "id": "1", "title": "Python"},
+        HaystackDocument(
+            content="Python is a high-level programming language",
+            meta={"source": "wiki", "title": "Python"},
+            id="1",
         ),
-        Document(
-            page_content="Machine learning uses algorithms to learn from data",
-            metadata={"source": "wiki", "id": "2", "title": "ML"},
+        HaystackDocument(
+            content="Machine learning uses algorithms to learn from data",
+            meta={"source": "wiki", "title": "ML"},
+            id="2",
         ),
-        Document(
-            page_content="Vector databases store embeddings efficiently",
-            metadata={"source": "blog", "id": "3", "title": "VectorDB"},
+        HaystackDocument(
+            content="Vector databases store embeddings efficiently",
+            meta={"source": "blog", "title": "VectorDB"},
+            id="3",
         ),
-        Document(
-            page_content="LangChain is a framework for building LLM applications",
-            metadata={"source": "docs", "id": "4", "title": "LangChain"},
+        HaystackDocument(
+            content="LangChain is a framework for building LLM applications",
+            meta={"source": "docs", "title": "LangChain"},
+            id="4",
         ),
-        Document(
-            page_content="Semantic search uses embeddings to find similar documents",
-            metadata={"source": "blog", "id": "5", "title": "SemanticSearch"},
+        HaystackDocument(
+            content="Semantic search uses embeddings to find similar documents",
+            meta={"source": "blog", "title": "SemanticSearch"},
+            id="5",
         ),
     ]
 

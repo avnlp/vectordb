@@ -50,15 +50,18 @@ class TestQdrantMetadataFilteringIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test indexing with documents."""
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
-        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+        mock_embed_docs.return_value = (
+            sample_langchain_documents,
+            [[0.1] * 384] * 5,
+        )
 
         mock_db_inst = MagicMock()
         mock_db.return_value = mock_db_inst
@@ -77,7 +80,7 @@ class TestQdrantMetadataFilteringIndexing:
         pipeline = QdrantMetadataFilteringIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
         mock_db_inst.client.upsert.assert_called()
 
     @patch("vectordb.langchain.metadata_filtering.indexing.qdrant.QdrantVectorDB")
@@ -129,15 +132,18 @@ class TestQdrantMetadataFilteringIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test indexing with collection recreation."""
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
-        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+        mock_embed_docs.return_value = (
+            sample_langchain_documents,
+            [[0.1] * 384] * 5,
+        )
 
         mock_db_inst = MagicMock()
         mock_db.return_value = mock_db_inst
@@ -157,7 +163,7 @@ class TestQdrantMetadataFilteringIndexing:
         pipeline = QdrantMetadataFilteringIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
         mock_db_inst.client.delete_collection.assert_called_once_with(
             "test_metadata_filtering"
         )

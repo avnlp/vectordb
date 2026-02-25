@@ -57,15 +57,15 @@ class TestChromaCostOptimizedRAGIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test indexing with documents."""
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
-        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+        mock_embed_docs.return_value = (sample_langchain_documents, [[0.1] * 384] * 5)
 
         mock_sparse_embedder = MagicMock()
         mock_sparse_embedder.embed_documents.return_value = [
@@ -74,7 +74,7 @@ class TestChromaCostOptimizedRAGIndexing:
         mock_sparse_embedder_cls.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = len(sample_langchain_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -93,7 +93,7 @@ class TestChromaCostOptimizedRAGIndexing:
         pipeline = ChromaCostOptimizedRAGIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
         assert "chunks_created" in result
 
     @patch("vectordb.langchain.cost_optimized_rag.indexing.chroma.ChromaVectorDB")
@@ -147,15 +147,15 @@ class TestChromaCostOptimizedRAGIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test indexing with custom chunking configuration."""
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
-        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+        mock_embed_docs.return_value = (sample_langchain_documents, [[0.1] * 384] * 5)
 
         mock_sparse_embedder = MagicMock()
         mock_sparse_embedder.embed_documents.return_value = [
@@ -164,7 +164,7 @@ class TestChromaCostOptimizedRAGIndexing:
         mock_sparse_embedder_cls.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = len(sample_langchain_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -184,7 +184,7 @@ class TestChromaCostOptimizedRAGIndexing:
         pipeline = ChromaCostOptimizedRAGIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
 
     @patch("vectordb.langchain.cost_optimized_rag.indexing.chroma.ChromaVectorDB")
     @patch(
@@ -230,27 +230,27 @@ class TestChromaCostOptimizedRAGIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test run() with use_text_splitter=False (no splitting)."""
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
         mock_embed_docs.return_value = (
-            sample_documents,
-            [[0.1] * 384 for _ in range(len(sample_documents))],
+            sample_langchain_documents,
+            [[0.1] * 384 for _ in range(len(sample_langchain_documents))],
         )
 
         mock_sparse_embedder = MagicMock()
         mock_sparse_embedder.embed_documents.return_value = [
-            [0.5, 0.3, 0.2] for _ in range(len(sample_documents))
+            [0.5, 0.3, 0.2] for _ in range(len(sample_langchain_documents))
         ]
         mock_sparse_cls.return_value = mock_sparse_embedder
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = len(sample_langchain_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -270,8 +270,8 @@ class TestChromaCostOptimizedRAGIndexing:
         result = pipeline.run()
 
         # Documents should be used as-is without splitting
-        assert result["documents_indexed"] == len(sample_documents)
-        assert result["chunks_created"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
+        assert result["chunks_created"] == len(sample_langchain_documents)
 
     @patch("vectordb.langchain.cost_optimized_rag.indexing.chroma.ChromaVectorDB")
     @patch(

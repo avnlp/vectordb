@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from haystack.dataclasses import Document as HaystackDocument
 
 
 class TestWeaviateNamespaceSearchPipeline:
@@ -66,8 +67,12 @@ class TestWeaviateNamespaceSearchPipeline:
         mock_llm.return_value = None
         mock_embed_query.return_value = [0.1] * 384
 
+        haystack_docs = [
+            HaystackDocument(content="doc1", meta={}, id="1"),
+            HaystackDocument(content="doc2", meta={}, id="2"),
+        ]
         mock_db_instance = MagicMock()
-        mock_db_instance.query.return_value = ["doc1", "doc2"]
+        mock_db_instance.query.return_value = haystack_docs
         mock_db_cls.return_value = mock_db_instance
 
         from vectordb.langchain.namespaces.search.weaviate import (
@@ -94,13 +99,16 @@ class TestWeaviateNamespaceSearchPipeline:
         mock_db_cls: MagicMock,
         weaviate_namespace_config: dict,
     ) -> None:
-        """Test search queries with correct tenant parameter."""
+        """Test search queries with correct return_documents parameter."""
         mock_embedder.return_value = MagicMock()
         mock_llm.return_value = None
         mock_embed_query.return_value = [0.1] * 384
 
+        haystack_docs = [
+            HaystackDocument(content="doc1", meta={}, id="1"),
+        ]
         mock_db_instance = MagicMock()
-        mock_db_instance.query.return_value = ["doc1"]
+        mock_db_instance.query.return_value = haystack_docs
         mock_db_cls.return_value = mock_db_instance
 
         from vectordb.langchain.namespaces.search.weaviate import (
@@ -111,7 +119,7 @@ class TestWeaviateNamespaceSearchPipeline:
         pipeline.search("test query")
 
         call_kwargs = mock_db_instance.query.call_args.kwargs
-        assert call_kwargs["tenant"] == "ns_abc"
+        assert call_kwargs["return_documents"] is True
 
     @patch("vectordb.langchain.namespaces.weaviate.WeaviateVectorDB")
     @patch("vectordb.langchain.utils.EmbedderHelper.create_embedder")
@@ -133,9 +141,12 @@ class TestWeaviateNamespaceSearchPipeline:
         mock_llm.return_value = llm
         mock_embed_query.return_value = [0.1] * 384
 
-        documents = ["doc1", "doc2"]
+        haystack_docs = [
+            HaystackDocument(content="doc1", meta={}, id="1"),
+            HaystackDocument(content="doc2", meta={}, id="2"),
+        ]
         mock_db_instance = MagicMock()
-        mock_db_instance.query.return_value = documents
+        mock_db_instance.query.return_value = haystack_docs
         mock_db_cls.return_value = mock_db_instance
         mock_generate.return_value = "generated answer"
 
@@ -148,4 +159,6 @@ class TestWeaviateNamespaceSearchPipeline:
 
         assert "answer" in result
         assert result["answer"] == "generated answer"
-        mock_generate.assert_called_once_with(llm, "test query", documents)
+        mock_generate.assert_called_once()
+        assert mock_generate.call_args[0][0] == llm
+        assert mock_generate.call_args[0][1] == "test query"

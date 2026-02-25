@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from haystack.dataclasses import Document as HaystackDocument
+
 from vectordb.langchain.cost_optimized_rag.search.pinecone import (
     PineconeCostOptimizedRAGSearchPipeline,
 )
@@ -251,12 +253,12 @@ search:
 
             # Simulate some documents returned
             dense_docs = [
-                {"id": "1", "text": "doc1", "score": 0.9},
-                {"id": "2", "text": "doc2", "score": 0.8},
+                HaystackDocument(content="doc1", meta={}, id="1"),
+                HaystackDocument(content="doc2", meta={}, id="2"),
             ]
             sparse_docs = [
-                {"id": "2", "text": "doc2", "score": 0.85},
-                {"id": "3", "text": "doc3", "score": 0.7},
+                HaystackDocument(content="doc2", meta={}, id="2"),
+                HaystackDocument(content="doc3", meta={}, id="3"),
             ]
 
             mock_db_instance = MagicMock()
@@ -266,7 +268,13 @@ search:
 
             mock_embed_query.return_value = [0.1] * 384
 
-            mock_merger.return_value = dense_docs + sparse_docs
+            from langchain_core.documents import Document as LangchainDocument
+
+            mock_merger.return_value = [
+                LangchainDocument(page_content="doc1", metadata={"id": "1"}),
+                LangchainDocument(page_content="doc2", metadata={"id": "2"}),
+                LangchainDocument(page_content="doc3", metadata={"id": "3"}),
+            ]
 
             pipeline = PineconeCostOptimizedRAGSearchPipeline(pinecone_config)
             result = pipeline.search("test query")

@@ -497,7 +497,7 @@ class TestChromaHybridSearch:
             ChromaHybridSearchPipeline,
         )
 
-        sample_documents = [
+        [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
@@ -506,8 +506,12 @@ class TestChromaHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = MagicMock()
-        mock_db_inst.query_to_documents.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1"]],
+            "documents": [["Python is a high-level programming language"]],
+            "metadatas": [[{"source": "wiki"}]],
+            "distances": [[0.1]],
+        }
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -571,7 +575,7 @@ class TestChromaHybridSearch:
             ChromaHybridSearchPipeline,
         )
 
-        sample_documents = [
+        [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
@@ -580,8 +584,12 @@ class TestChromaHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = MagicMock()
-        mock_db_inst.query_to_documents.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1"]],
+            "documents": [["Python is a high-level programming language"]],
+            "metadatas": [[{"source": "wiki"}]],
+            "distances": [[0.1]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_llm_inst = MagicMock()
@@ -644,7 +652,7 @@ class TestChromaHybridSearch:
             ChromaHybridSearchPipeline,
         )
 
-        sample_documents = [
+        [
             Document(
                 page_content="Python is a high-level programming language",
                 metadata={"source": "wiki", "id": "1"},
@@ -653,8 +661,12 @@ class TestChromaHybridSearch:
 
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = MagicMock()
-        mock_db_inst.query_to_documents.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1"]],
+            "documents": [["Python is a high-level programming language"]],
+            "metadatas": [[{"source": "wiki"}]],
+            "distances": [[0.1]],
+        }
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
 
@@ -678,4 +690,4 @@ class TestChromaHybridSearch:
         assert result["query"] == "test query"
         mock_db_inst.query.assert_called_once()
         call_kwargs = mock_db_inst.query.call_args.kwargs
-        assert call_kwargs["filters"] == filters
+        assert call_kwargs["where"] == filters

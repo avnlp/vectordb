@@ -23,33 +23,56 @@ Note:
 """
 
 import pytest
+from haystack.dataclasses import Document as HaystackDocument
 from langchain_core.documents import Document
 
 
 @pytest.fixture
-def sample_documents() -> list[Document]:
-    """Create sample LangChain documents for testing."""
+def sample_documents() -> list[HaystackDocument]:
+    """Create sample Haystack documents for testing."""
+    return [
+        HaystackDocument(
+            content="Python is a high-level programming language",
+            meta={"source": "wiki", "title": "Python"},
+            id="1",
+        ),
+        HaystackDocument(
+            content="Machine learning uses algorithms to learn from data",
+            meta={"source": "wiki", "title": "ML"},
+            id="2",
+        ),
+        HaystackDocument(
+            content="Vector databases store embeddings efficiently",
+            meta={"source": "blog", "title": "VectorDB"},
+            id="3",
+        ),
+        HaystackDocument(
+            content="LangChain is a framework for building LLM applications",
+            meta={"source": "docs", "title": "LangChain"},
+            id="4",
+        ),
+        HaystackDocument(
+            content="Semantic search uses embeddings to find similar documents",
+            meta={"source": "blog", "title": "SemanticSearch"},
+            id="5",
+        ),
+    ]
+
+
+@pytest.fixture
+def sample_langchain_documents(
+    sample_documents: list[HaystackDocument],
+) -> list[Document]:
+    """Create sample LangChain documents for indexing tests."""
     return [
         Document(
-            page_content="Python is a high-level programming language",
-            metadata={"source": "wiki", "id": "1", "title": "Python"},
-        ),
-        Document(
-            page_content="Machine learning uses algorithms to learn from data",
-            metadata={"source": "wiki", "id": "2", "title": "ML"},
-        ),
-        Document(
-            page_content="Vector databases store embeddings efficiently",
-            metadata={"source": "blog", "id": "3", "title": "VectorDB"},
-        ),
-        Document(
-            page_content="LangChain is a framework for building LLM applications",
-            metadata={"source": "docs", "id": "4", "title": "LangChain"},
-        ),
-        Document(
-            page_content="Semantic search uses embeddings to find similar documents",
-            metadata={"source": "blog", "id": "5", "title": "SemanticSearch"},
-        ),
+            page_content=doc.content or "",
+            metadata={
+                **(doc.meta or {}),
+                **({"id": doc.id} if doc.id else {}),
+            },
+        )
+        for doc in sample_documents
     ]
 
 

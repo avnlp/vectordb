@@ -102,7 +102,7 @@ class TestPineconeSemanticIndexing:
         mock_embed_docs,
         mock_embedder_helper,
         mock_db,
-        sample_documents,
+        sample_langchain_documents,
     ):
         """Test full indexing pipeline execution with sample documents.
 
@@ -119,17 +119,20 @@ class TestPineconeSemanticIndexing:
             mock_embed_docs: Mock returning embedded documents with vectors
             mock_embedder_helper: Mock for embedder initialization
             mock_db: Mock for PineconeVectorDB with upsert tracking
-            sample_documents: Pytest fixture providing test documents
+            sample_langchain_documents: Pytest fixture providing test documents
         """
         mock_dataset = MagicMock()
-        mock_dataset.to_langchain.return_value = sample_documents
+        mock_dataset.to_langchain.return_value = sample_langchain_documents
         mock_loader = MagicMock()
         mock_loader.load.return_value = mock_dataset
         mock_get_docs.return_value = mock_loader
-        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+        mock_embed_docs.return_value = (
+            sample_langchain_documents,
+            [[0.1] * 384] * 5,
+        )
 
         mock_db_inst = MagicMock()
-        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db_inst.upsert.return_value = len(sample_langchain_documents)
         mock_db.return_value = mock_db_inst
 
         config = {
@@ -141,7 +144,7 @@ class TestPineconeSemanticIndexing:
         pipeline = PineconeSemanticIndexingPipeline(config)
         result = pipeline.run()
 
-        assert result["documents_indexed"] == len(sample_documents)
+        assert result["documents_indexed"] == len(sample_langchain_documents)
         mock_db_inst.create_index.assert_called_once()
         mock_db_inst.upsert.assert_called_once()
 

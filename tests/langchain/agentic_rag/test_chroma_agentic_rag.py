@@ -501,7 +501,17 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2", "3", "4", "5"]],
+            "documents": [[doc.page_content for doc in sample_documents]],
+            "metadatas": [
+                [
+                    {k: v for k, v in doc.metadata.items() if k != "id"}
+                    for doc in sample_documents
+                ]
+            ],
+            "distances": [[0.1, 0.2, 0.3, 0.4, 0.5]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -606,7 +616,12 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = []
+        mock_db_inst.query.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -716,7 +731,17 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2", "3", "4", "5"]],
+            "documents": [[doc.page_content for doc in sample_documents]],
+            "metadatas": [
+                [
+                    {k: v for k, v in doc.metadata.items() if k != "id"}
+                    for doc in sample_documents
+                ]
+            ],
+            "distances": [[0.1, 0.2, 0.3, 0.4, 0.5]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -819,7 +844,12 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = []
+        mock_db_inst.query.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -917,7 +947,17 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2", "3", "4", "5"]],
+            "documents": [[doc.page_content for doc in sample_documents]],
+            "metadatas": [
+                [
+                    {k: v for k, v in doc.metadata.items() if k != "id"}
+                    for doc in sample_documents
+                ]
+            ],
+            "distances": [[0.1, 0.2, 0.3, 0.4, 0.5]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -1020,7 +1060,12 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = []
+        mock_db_inst.query.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -1121,7 +1166,17 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2", "3", "4", "5"]],
+            "documents": [[doc.page_content for doc in sample_documents]],
+            "metadatas": [
+                [
+                    {k: v for k, v in doc.metadata.items() if k != "id"}
+                    for doc in sample_documents
+                ]
+            ],
+            "distances": [[0.1, 0.2, 0.3, 0.4, 0.5]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -1229,7 +1284,17 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2", "3", "4", "5"]],
+            "documents": [[doc.page_content for doc in sample_documents]],
+            "metadatas": [
+                [
+                    {k: v for k, v in doc.metadata.items() if k != "id"}
+                    for doc in sample_documents
+                ]
+            ],
+            "distances": [[0.1, 0.2, 0.3, 0.4, 0.5]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -1342,7 +1407,17 @@ class TestChromaAgenticRAGPipelineRun:
         mock_embed_query.return_value = [0.1] * 384
 
         mock_db_inst = MagicMock()
-        mock_db_inst.query.return_value = sample_documents[:2]
+        mock_db_inst.query.return_value = {
+            "ids": [["1", "2"]],
+            "documents": [[doc.page_content for doc in sample_documents[:2]]],
+            "metadatas": [
+                [
+                    {k: v for k, v in doc.metadata.items() if k != "id"}
+                    for doc in sample_documents[:2]
+                ]
+            ],
+            "distances": [[0.1, 0.2]],
+        }
         mock_db.return_value = mock_db_inst
 
         mock_compressor = MagicMock()
@@ -1382,9 +1457,8 @@ class TestChromaAgenticRAGPipelineRun:
 
             mock_db_inst.query.assert_called_once_with(
                 query_embedding=[0.1] * 384,
-                top_k=10,
-                filters=filters,
-                collection_name="test_agentic_rag",
+                n_results=10,
+                where=filters,
             )
 
             assert "final_answer" in result
