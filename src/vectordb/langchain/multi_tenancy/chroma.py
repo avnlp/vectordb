@@ -107,6 +107,7 @@ class ChromaMultiTenancyPipeline(MultiTenancyPipeline):
         query: str,
         top_k: int = 10,
         filters: dict[str, Any] | None = None,
+        query_embedding: list[float] | None = None,
     ) -> list[Document]:
         """Search within a tenant's isolated collection only.
 
@@ -115,6 +116,8 @@ class ChromaMultiTenancyPipeline(MultiTenancyPipeline):
             query: Search query text.
             top_k: Number of results to return.
             filters: Optional metadata filters.
+            query_embedding: Optional pre-computed query embedding. If provided,
+                used for similarity search instead of query text.
 
         Returns:
             List of Document objects from tenant's collection.
@@ -134,7 +137,41 @@ class ChromaMultiTenancyPipeline(MultiTenancyPipeline):
             query[:50],
         )
 
-        return []
+        # Get the tenant-specific collection and query it
+        collection = self.db._get_collection(collection_name)
+
+        # Query the tenant's collection using embedding if provided, otherwise use text
+        if query_embedding is not None:
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_k,
+                where=filters,
+                include=["metadatas", "documents", "distances"],
+            )
+        else:
+            results = collection.query(
+                query_texts=[query],
+                n_results=top_k,
+                where=filters,
+                include=["metadatas", "documents", "distances"],
+            )
+
+        # Convert Chroma query results to LangChain Documents
+        from vectordb.utils.chroma_document_converter import ChromaDocumentConverter
+
+        documents = (
+            ChromaDocumentConverter.convert_query_results_to_langchain_documents(
+                results
+            )
+        )
+
+        logger.info(
+            "Retrieved %d documents for tenant %s",
+            len(documents),
+            tenant_id,
+        )
+
+        return documents
 
     def delete_tenant(self, tenant_id: str) -> bool:
         """Delete all data for a tenant by deleting the collection.

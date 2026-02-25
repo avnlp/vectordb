@@ -99,23 +99,32 @@ class PineconeMultiTenancyPipeline(MultiTenancyPipeline):
         query: str,
         top_k: int = 10,
         filters: dict[str, Any] | None = None,
+        query_embedding: list[float] | None = None,
     ) -> list[Document]:
         """Search within a tenant's isolated namespace only.
 
         Args:
             tenant_id: Unique identifier for the tenant.
-            query: Search query text.
+            query: Search query text (used for logging if query_embedding provided).
             top_k: Number of results to return.
             filters: Optional metadata filters.
+            query_embedding: Pre-computed query embedding vector. Required for Pinecone
+                search. If not provided, a ValueError is raised.
 
         Returns:
             List of Document objects from tenant's namespace.
 
         Raises:
-            ValueError: If tenant_id is invalid.
+            ValueError: If tenant_id is invalid or query_embedding not provided.
         """
         if not tenant_id:
             raise ValueError("tenant_id cannot be empty")
+
+        if query_embedding is None:
+            raise ValueError(
+                "query_embedding is required for Pinecone search. "
+                "Generate embeddings before calling search_for_tenant."
+            )
 
         logger.info(
             "Searching for tenant %s in namespace %s with query: %s",
@@ -124,7 +133,28 @@ class PineconeMultiTenancyPipeline(MultiTenancyPipeline):
             query[:50],
         )
 
-        return []
+        # Search within tenant's namespace
+        haystack_docs = self.db.query(
+            vector=query_embedding,
+            top_k=top_k,
+            filter=filters,
+            namespace=tenant_id,
+        )
+
+        # Convert Haystack Documents to LangChain Documents
+        from vectordb.langchain.utils.document_converter import (
+            HaystackToLangchainConverter,
+        )
+
+        documents = HaystackToLangchainConverter.convert(haystack_docs)
+
+        logger.info(
+            "Retrieved %d documents for tenant %s",
+            len(documents),
+            tenant_id,
+        )
+
+        return documents
 
     def delete_tenant(self, tenant_id: str) -> bool:
         """Delete all data for a tenant by deleting the namespace.
@@ -142,10 +172,7 @@ class PineconeMultiTenancyPipeline(MultiTenancyPipeline):
             raise ValueError("tenant_id cannot be empty")
 
         try:
-            self.db.delete_by_metadata(
-                namespace=tenant_id,
-                metadata_filter={},
-            )
+            self.db.delete_namespace(namespace=tenant_id)
             logger.info("Deleted all data for tenant %s", tenant_id)
             return True
         except Exception as e:

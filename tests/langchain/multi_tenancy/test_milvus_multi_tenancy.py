@@ -213,7 +213,9 @@ class TestMilvusMultiTenancySearch:
 
         pipeline = MilvusMultiTenancyPipeline()
 
-        result = pipeline.search_for_tenant("tenant_1", "test query", top_k=5)
+        result = pipeline.search_for_tenant(
+            "tenant_1", "test query", top_k=5, query_embedding=[0.1] * 384
+        )
 
         assert isinstance(result, list)
 
@@ -257,7 +259,11 @@ class TestMilvusMultiTenancySearch:
 
         filters = {"category": "test"}
         result = pipeline.search_for_tenant(
-            "tenant_1", "test query", top_k=5, filters=filters
+            "tenant_1",
+            "test query",
+            top_k=5,
+            filters=filters,
+            query_embedding=[0.1] * 384,
         )
 
         assert isinstance(result, list)

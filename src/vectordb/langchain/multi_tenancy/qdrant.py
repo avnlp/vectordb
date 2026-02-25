@@ -112,23 +112,32 @@ class QdrantMultiTenancyPipeline(MultiTenancyPipeline):
         query: str,
         top_k: int = 10,
         filters: dict[str, Any] | None = None,
+        query_embedding: list[float] | None = None,
     ) -> list[Document]:
         """Search within a tenant's isolated collection only.
 
         Args:
             tenant_id: Unique identifier for the tenant.
-            query: Search query text.
+            query: Search query text (used for logging if query_embedding provided).
             top_k: Number of results to return.
             filters: Optional metadata filters.
+            query_embedding: Pre-computed query embedding vector. Required for Qdrant
+                search. If not provided, a ValueError is raised.
 
         Returns:
             List of Document objects from tenant's collection.
 
         Raises:
-            ValueError: If tenant_id is invalid.
+            ValueError: If tenant_id is invalid or query_embedding not provided.
         """
         if not tenant_id:
             raise ValueError("tenant_id cannot be empty")
+
+        if query_embedding is None:
+            raise ValueError(
+                "query_embedding is required for Qdrant search. "
+                "Generate embeddings before calling search_for_tenant."
+            )
 
         collection_name = self._get_tenant_collection_name(tenant_id)
 
@@ -139,7 +148,28 @@ class QdrantMultiTenancyPipeline(MultiTenancyPipeline):
             query[:50],
         )
 
-        return []
+        # Search within tenant's collection
+        haystack_docs = self.db.search(
+            query_vector=query_embedding,
+            top_k=top_k,
+            collection_name=collection_name,
+            filters=filters,
+        )
+
+        # Convert Haystack Documents to LangChain Documents
+        from vectordb.langchain.utils.document_converter import (
+            HaystackToLangchainConverter,
+        )
+
+        documents = HaystackToLangchainConverter.convert(haystack_docs)
+
+        logger.info(
+            "Retrieved %d documents for tenant %s",
+            len(documents),
+            tenant_id,
+        )
+
+        return documents
 
     def delete_tenant(self, tenant_id: str) -> bool:
         """Delete all data for a tenant by deleting the collection.

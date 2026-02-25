@@ -953,10 +953,14 @@ class TestChromaMultiTenancySearchPipeline:
             - Result structure matches expected contract
         """
         mock_db = MagicMock()
-        mock_db.query.return_value = [
-            Document(page_content="result1", metadata={}),
-            Document(page_content="result2", metadata={}),
-        ]
+        mock_collection = MagicMock()
+        mock_db._get_collection.return_value = mock_collection
+        mock_collection.query.return_value = {
+            "ids": [["doc1", "doc2"]],
+            "documents": [["result1", "result2"]],
+            "metadatas": [[{}, {}]],
+            "distances": [[0.1, 0.2]],
+        }
         mock_db_cls.return_value = mock_db
 
         mock_create_embedder.return_value = MagicMock()

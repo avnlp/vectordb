@@ -202,19 +202,18 @@ class ChromaMultiTenancySearchPipeline:
         query_embedding = EmbedderHelper.embed_query(self.embedder, query)
         logger.info("Embedded query for tenant %s: %s", self.tenant_id, query[:50])
 
-        # Get the tenant-specific collection name.
-        collection_name = self.pipeline._get_tenant_collection_name(self.tenant_id)
-
-        # Query Chroma within tenant-specific collection only.
-        # This is the key isolation mechanism - collection_name=tenant_id
-        documents = self.pipeline.db.query(
-            query_embedding=query_embedding,
+        # Search within tenant's collection using the multi-tenancy pipeline.
+        # This ensures proper tenant isolation and uses the pipeline's collection.
+        # Pass the pre-computed embedding for consistent embedding model usage.
+        documents = self.pipeline.search_for_tenant(
+            tenant_id=self.tenant_id,
+            query=query,
             top_k=top_k,
             filters=filters,
-            collection_name=collection_name,
+            query_embedding=query_embedding,
         )
         logger.info(
-            "Retrieved %d documents for tenant %s from Chroma",
+            "Retrieved %d documents for tenant %s",
             len(documents),
             self.tenant_id,
         )

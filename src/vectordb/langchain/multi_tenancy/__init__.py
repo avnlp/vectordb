@@ -64,18 +64,35 @@ Key Classes:
 
 Example:
     >>> from vectordb.langchain.multi_tenancy import PineconeMultiTenancyPipeline
-    >>> # Initialize multi-tenant pipeline
-    >>> pipeline = PineconeMultiTenancyPipeline("config.yaml")
+    >>> from langchain_core.documents import Document
+    >>>
+    >>> # Initialize multi-tenant pipeline with your credentials
+    >>> pipeline = PineconeMultiTenancyPipeline(
+    ...     api_key="YOUR_PINECONE_API_KEY",
+    ...     index_name="your-pinecone-index",
+    ...     dimension=384,
+    ... )
+    >>>
+    >>> # Prepare documents and embeddings
+    >>> docs = [Document(page_content="A document about machine learning.")]
+    >>> embeddings = [[0.1] * 384]  # Example 384-dimensional embedding
+    >>>
     >>> # Index documents for a specific tenant
-    >>> pipeline.index_documents(tenant_id="customer_123", documents=docs)
+    >>> pipeline.index_for_tenant(
+    ...     tenant_id="customer_123",
+    ...     documents=docs,
+    ...     embeddings=embeddings,
+    ... )
+    >>>
     >>> # Search within tenant's isolated data
-    >>> results = pipeline.search(
+    >>> results = pipeline.search_for_tenant(
     ...     tenant_id="customer_123",
     ...     query="machine learning",
     ...     top_k=5,
     ... )
+    >>>
     >>> # Results only contain customer_123's documents
-    >>> for doc in results["documents"]:
+    >>> for doc in results:
     ...     print(doc.page_content)
 
 Note:

@@ -220,7 +220,9 @@ class TestPineconeMultiTenancySearch:
             api_key="test-key", index_name="test-index"
         )
 
-        result = pipeline.search_for_tenant("tenant_1", "test query", top_k=5)
+        result = pipeline.search_for_tenant(
+            "tenant_1", "test query", top_k=5, query_embedding=[0.1] * 384
+        )
 
         assert isinstance(result, list)
 
@@ -268,7 +270,11 @@ class TestPineconeMultiTenancySearch:
 
         filters = {"category": "test"}
         result = pipeline.search_for_tenant(
-            "tenant_1", "test query", top_k=5, filters=filters
+            "tenant_1",
+            "test query",
+            top_k=5,
+            filters=filters,
+            query_embedding=[0.1] * 384,
         )
 
         assert isinstance(result, list)
@@ -296,10 +302,10 @@ class TestPineconeMultiTenancyManagement:
         Validates:
             - Delete operation targets the correct namespace
             - Success returns True
-            - Database delete_by_metadata is called with correct parameters
+            - Database delete_namespace is called with correct parameters
         """
         mock_db = MagicMock()
-        mock_db.delete_by_metadata.return_value = None
+        mock_db.delete_namespace.return_value = None
         mock_db_cls.return_value = mock_db
 
         from vectordb.langchain.multi_tenancy.pinecone import (
@@ -313,9 +319,7 @@ class TestPineconeMultiTenancyManagement:
         result = pipeline.delete_tenant("tenant_1")
 
         assert result is True
-        mock_db.delete_by_metadata.assert_called_once_with(
-            namespace="tenant_1", metadata_filter={}
-        )
+        mock_db.delete_namespace.assert_called_once_with(namespace="tenant_1")
 
     @patch("vectordb.langchain.multi_tenancy.pinecone.PineconeVectorDB")
     def test_delete_tenant_invalid_tenant_id(self, mock_db_cls):
@@ -349,7 +353,7 @@ class TestPineconeMultiTenancyManagement:
             - Failures are visible for monitoring and debugging
         """
         mock_db = MagicMock()
-        mock_db.delete_by_metadata.side_effect = Exception("Deletion failed")
+        mock_db.delete_namespace.side_effect = Exception("Deletion failed")
         mock_db_cls.return_value = mock_db
 
         from vectordb.langchain.multi_tenancy.pinecone import (

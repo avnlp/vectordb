@@ -101,11 +101,11 @@ multi_tenancy/
 │   ├── chroma.py                      # Chroma collection-scoped search
 │   ├── milvus.py                      # Milvus partition-scoped search
 │   └── qdrant.py                      # Qdrant collection-scoped search
-├── pinecone.py                        # Pinecone tenant management
-├── weaviate.py                        # Weaviate tenant management
-├── chroma.py                          # Chroma tenant management
-├── milvus.py                          # Milvus tenant management
-├── qdrant.py                          # Qdrant tenant management
+├── pinecone.py                        # Core Pinecone multi-tenancy pipeline
+├── weaviate.py                        # Core Weaviate multi-tenancy pipeline
+├── chroma.py                          # Core Chroma multi-tenancy pipeline
+├── milvus.py                          # Core Milvus multi-tenancy pipeline
+├── qdrant.py                          # Core Qdrant multi-tenancy pipeline
 └── configs/                           # YAML configs organized by database
     ├── pinecone_triviaqa.yaml
     ├── pinecone_arc.yaml

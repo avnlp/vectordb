@@ -164,7 +164,7 @@ def mock_pinecone_db() -> MagicMock:
     mock.index_for_tenant.return_value = 5
     mock.upsert.return_value = 5
     mock.get_index_stats.return_value = {"namespaces": {"tenant1": {}, "tenant2": {}}}
-    mock.delete_by_metadata.return_value = None
+    mock.delete_namespace.return_value = None
     mock.create_index.return_value = None
     return mock
 
