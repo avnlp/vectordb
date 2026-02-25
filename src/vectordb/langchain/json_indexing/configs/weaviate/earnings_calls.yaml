@@ -1,0 +1,24 @@
+# Weaviate JSON Indexing Configuration - Earnings Calls Dataset
+
+dataloader:
+  type: "earnings_calls"
+  dataset_name: "polyu/earnings_calls"
+  split: "test"
+  limit: null
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+weaviate:
+  cluster_url: "${WEAVIATE_CLUSTER_URL:-http://localhost:8080}"
+  api_key: "${WEAVIATE_API_KEY:-}"
+  collection_name: "EarningsCallsJsonIndexed"
+
+search:
+  top_k: 10
+
+logging:
+  level: "INFO"
+  name: "weaviate_earnings_calls_json_indexing"
