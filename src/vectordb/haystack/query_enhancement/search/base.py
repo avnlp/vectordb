@@ -176,7 +176,8 @@ class BaseQueryEnhancementSearchPipeline(ABC):
                     self.logger.error(f"Search failed for '{query_text}': {e}")
 
         # Fuse results using N-way RRF
-        fused_results = rrf_fusion_many(all_results, top_k=top_k)
+        rrf_k = self.config.get("query_enhancement", {}).get("rrf_k", 60)
+        fused_results = rrf_fusion_many(all_results, k=rrf_k, top_k=top_k)
 
         # Deduplicate results
         deduplicated_results = deduplicate_by_content(fused_results)
