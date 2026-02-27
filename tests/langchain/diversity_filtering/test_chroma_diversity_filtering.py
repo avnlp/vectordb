@@ -394,6 +394,9 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
@@ -405,6 +408,7 @@ class TestChromaDiversityFilteringSearch:
         mock_mmr_diversify,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -415,6 +419,7 @@ class TestChromaDiversityFilteringSearch:
             mock_mmr_diversify: Mock for DiversityFilteringHelper.mmr_diversify
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
@@ -427,6 +432,10 @@ class TestChromaDiversityFilteringSearch:
             - Results balance relevance and diversity
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -460,6 +469,9 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
@@ -471,6 +483,7 @@ class TestChromaDiversityFilteringSearch:
         mock_cluster_diversify,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -487,6 +500,7 @@ class TestChromaDiversityFilteringSearch:
                 DiversityFilteringHelper.clustering_diversify
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
@@ -497,6 +511,10 @@ class TestChromaDiversityFilteringSearch:
             - Number of returned documents does not exceed top_k
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -538,6 +556,9 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
@@ -545,6 +566,7 @@ class TestChromaDiversityFilteringSearch:
         self,
         mock_db,
         mock_embedder_helper,
+        mock_embed_documents,
         mock_embed_query,
         mock_llm_helper,
         mock_cluster_diversify,
@@ -558,6 +580,7 @@ class TestChromaDiversityFilteringSearch:
         Args:
             mock_db: Mock for ChromaVectorDB class
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embed_query: Mock for EmbedderHelper.embed_query
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_cluster_diversify: Mock for
@@ -569,6 +592,10 @@ class TestChromaDiversityFilteringSearch:
             - Fixed default provides predictable behavior regardless of top_k
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -604,6 +631,9 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
@@ -611,6 +641,7 @@ class TestChromaDiversityFilteringSearch:
         self,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -624,6 +655,7 @@ class TestChromaDiversityFilteringSearch:
         Args:
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
@@ -633,6 +665,10 @@ class TestChromaDiversityFilteringSearch:
             - Error message contains the phrase ``"Unknown diversity method"``
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -662,6 +698,9 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
@@ -675,6 +714,7 @@ class TestChromaDiversityFilteringSearch:
         mock_rag_generate,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -686,6 +726,7 @@ class TestChromaDiversityFilteringSearch:
             mock_rag_generate: Mock for RAGHelper.generate
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
@@ -698,6 +739,10 @@ class TestChromaDiversityFilteringSearch:
             - Query is preserved in results
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -733,6 +778,9 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
@@ -744,6 +792,7 @@ class TestChromaDiversityFilteringSearch:
         mock_diversify,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -757,6 +806,7 @@ class TestChromaDiversityFilteringSearch:
             mock_diversify: Mock for DiversityFilteringHelper.mmr_diversify
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for ChromaVectorDB class
             sample_documents: Fixture providing test documents
@@ -767,6 +817,10 @@ class TestChromaDiversityFilteringSearch:
             - Custom multiplier is applied when configured
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst

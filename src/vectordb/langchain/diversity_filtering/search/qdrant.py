@@ -220,10 +220,9 @@ class QdrantDiversityFilteringSearchPipeline:
 
         # Re-embed retrieved documents to ensure consistent embeddings.
         # Stored embeddings might use a different model or version.
-        doc_texts = [doc.page_content for doc in retrieved_documents]
-        doc_embeddings = [
-            EmbedderHelper.embed_query(self.embedder, text) for text in doc_texts
-        ]
+        _, doc_embeddings = EmbedderHelper.embed_documents(
+            self.embedder, retrieved_documents
+        )
 
         # Apply diversity filtering based on configured method.
         if self.method == "clustering":

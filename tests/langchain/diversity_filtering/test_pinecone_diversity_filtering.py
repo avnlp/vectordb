@@ -207,6 +207,9 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_query"
     )
     @patch(
@@ -220,6 +223,7 @@ class TestPineconeDiversityFilteringSearch:
         mock_diversify,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -234,6 +238,7 @@ class TestPineconeDiversityFilteringSearch:
             mock_diversify: Mock for DiversityFilteringHelper.mmr_diversify
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for PineconeVectorDB class
             sample_documents: Fixture providing test documents
@@ -244,6 +249,10 @@ class TestPineconeDiversityFilteringSearch:
             - Returned document count does not exceed top_k
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -278,6 +287,9 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_query"
     )
     @patch(
@@ -291,6 +303,7 @@ class TestPineconeDiversityFilteringSearch:
         mock_cluster_diversify,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -306,6 +319,7 @@ class TestPineconeDiversityFilteringSearch:
                 DiversityFilteringHelper.clustering_diversify
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for PineconeVectorDB class
             sample_documents: Fixture providing test documents
@@ -316,6 +330,10 @@ class TestPineconeDiversityFilteringSearch:
             - Returned document count does not exceed top_k
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -350,6 +368,9 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_query"
     )
     @patch(
@@ -359,6 +380,7 @@ class TestPineconeDiversityFilteringSearch:
         self,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -372,6 +394,7 @@ class TestPineconeDiversityFilteringSearch:
         Args:
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for PineconeVectorDB class
             sample_documents: Fixture providing test documents
@@ -381,6 +404,10 @@ class TestPineconeDiversityFilteringSearch:
             - Error message matches ``"Unknown diversity method"``
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -411,6 +438,9 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.create_embedder"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_query"
     )
     @patch(
@@ -426,6 +456,7 @@ class TestPineconeDiversityFilteringSearch:
         mock_rag_generate,
         mock_llm_helper,
         mock_embed_query,
+        mock_embed_documents,
         mock_embedder_helper,
         mock_db,
         sample_documents,
@@ -441,6 +472,7 @@ class TestPineconeDiversityFilteringSearch:
             mock_rag_generate: Mock for RAGHelper.generate
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
             mock_db: Mock for PineconeVectorDB class
             sample_documents: Fixture providing test documents
@@ -450,6 +482,10 @@ class TestPineconeDiversityFilteringSearch:
             - RAG-generated answer is included in the result under ``"answer"``
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
@@ -491,6 +527,9 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_query"
     )
     @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_documents"
+    )
+    @patch(
         "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.create_embedder"
     )
     @patch("vectordb.langchain.diversity_filtering.search.pinecone.PineconeVectorDB")
@@ -498,6 +537,7 @@ class TestPineconeDiversityFilteringSearch:
         self,
         mock_db,
         mock_embedder_helper,
+        mock_embed_documents,
         mock_embed_query,
         mock_llm_helper,
         mock_diversify,
@@ -511,6 +551,7 @@ class TestPineconeDiversityFilteringSearch:
         Args:
             mock_db: Mock for PineconeVectorDB class
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_embed_documents: Mock for EmbedderHelper.embed_documents
             mock_embed_query: Mock for EmbedderHelper.embed_query
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_diversify: Mock for DiversityFilteringHelper.mmr_diversify
@@ -522,6 +563,10 @@ class TestPineconeDiversityFilteringSearch:
             - Custom multiplier is applied when configured
         """
         mock_embed_query.return_value = [0.1] * 384
+        mock_embed_documents.return_value = (
+            sample_documents,
+            [[0.1] * 384] * len(sample_documents),
+        )
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
