@@ -1,0 +1,35 @@
+dataloader:
+  type: "arc"
+  split: "test"
+  limit: 100
+  use_text_splitter: false
+
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"
+  device: "cpu"
+  batch_size: 32
+
+qdrant:
+  url: "http://localhost:6333"
+  api_key: "${QDRANT_API_KEY}"
+  collection_name: "diversity_filtering_arc"
+  dimension: 384
+
+search:
+  top_k: 10
+
+diversity:
+  method: "threshold"
+  max_documents: 10
+  similarity_threshold: 0.7
+
+rag:
+  enabled: false
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+
+logging:
+  name: "lc_diversity_filtering_qdrant"
+  level: "INFO"

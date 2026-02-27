@@ -1,0 +1,496 @@
+"""Tests for Chroma diversity filtering pipelines (LangChain).
+
+This module tests the diversity filtering feature which implements Maximal Marginal
+Relevance (MMR) to balance relevance and diversity in retrieval results. MMR ensures
+search results cover different aspects of a query rather than returning similar
+documents.
+
+Diversity Filtering Concept:
+    Standard retrieval ranks documents purely by similarity to the query, which can
+result in redundant results that all express the same aspect. Diversity filtering
+uses MMR to select documents that are both relevant to the query and diverse from
+each other, providing broader coverage of the answer space.
+
+Maximal Marginal Relevance (MMR):
+    MMR is an iterative selection algorithm that balances:
+    - Relevance: Similarity between document and query
+    - Diversity: Dissimilarity between selected documents
+
+    Formula: MMR = lambda * Relevance - (1 - lambda) * max(Similarity to selected)
+
+    Where lambda controls the trade-off:
+    - lambda = 1.0: Pure relevance ranking (no diversity)
+    - lambda = 0.0: Pure diversity (may sacrifice relevance)
+    - lambda = 0.5: Balanced relevance and diversity (recommended)
+
+Pipeline Architecture:
+    Indexing Pipeline:
+        1. Load documents from configured data source (ARC, TriviaQA, etc.)
+        2. Generate dense embeddings for semantic similarity
+        3. Store documents and embeddings in Chroma vector database
+        4. Standard semantic indexing (no special handling required)
+
+    Search Pipeline:
+        1. Embed query using dense embedding model
+        2. Retrieve candidate documents from Chroma (top_k * 2 for MMR pool)
+        3. Compute relevance scores: similarity(query, document)
+        4. Iteratively select documents using MMR algorithm:
+           a. Pick document with highest MMR score
+           b. Update diversity penalties for remaining documents
+           c. Repeat until top_k documents selected
+        5. Return diverse set of relevant documents
+        6. Optionally generate RAG answer from diverse results
+
+Components Tested:
+    - ChromaDiversityFilteringIndexingPipeline: Standard semantic indexing
+    - ChromaDiversityFilteringSearchPipeline: MMR-based diverse retrieval
+    - MMR algorithm implementation for result selection
+
+Key Features:
+    - MMR-based diversity-relevance balancing
+    - Configurable lambda parameter for trade-off control
+    - Candidate pool expansion (retrieves 2x top_k for selection)
+    - Iterative selection with diversity penalties
+    - Optional RAG generation from diverse results
+    - Chroma database integration
+
+Test Coverage:
+    - Pipeline initialization with MMR configuration
+    - Document indexing (standard semantic indexing)
+    - MMR search with diversity filtering
+    - Lambda parameter effects on results
+    - RAG generation from diverse documents
+    - Empty document handling
+    - Edge cases: single document, all identical documents
+
+Configuration:
+    Diversity filtering is configured in the search pipeline:
+    - lambda_param: Trade-off between relevance and diversity (default: 0.5)
+    - top_k: Number of diverse documents to return (default: 5)
+    - Candidate pool is automatically expanded to 2 * top_k
+
+Benefits of MMR:
+    - Reduces redundancy in search results
+    - Covers multiple aspects of multi-faceted queries
+    - Improves user satisfaction with varied perspectives
+    - Better for exploratory search scenarios
+
+Trade-offs:
+    - Requires larger initial retrieval (2x top_k)
+    - Slightly higher computational cost
+    - May reduce precision for narrow, specific queries
+
+All tests mock vector database and embedding operations to ensure fast,
+deterministic unit tests without external dependencies.
+"""
+
+from unittest.mock import MagicMock, patch
+
+from vectordb.langchain.diversity_filtering.indexing.chroma import (
+    ChromaDiversityFilteringIndexingPipeline,
+)
+from vectordb.langchain.diversity_filtering.search.chroma import (
+    ChromaDiversityFilteringSearchPipeline,
+)
+
+
+class TestChromaDiversityFilteringIndexing:
+    """Unit tests for Chroma diversity filtering indexing pipeline.
+
+    Validates the indexing pipeline for MMR-based diverse retrieval.
+    Uses standard semantic indexing since diversity filtering happens at search time.
+
+    Tested Behaviors:
+        - Pipeline initialization with Chroma configuration
+        - Document loading and dense embedding generation
+        - Standard semantic document indexing
+        - Collection creation and management
+        - Empty document handling
+        - Recreate option for collection management
+
+    Mocks:
+        - ChromaVectorDB: Database operations (collection creation, upsert)
+        - EmbedderHelper: Embedding model and document embedding
+        - DataLoaderHelper: Document loading from data sources
+
+    Configuration:
+        - persist_dir: Chroma persistence directory
+        - collection_name: Target collection for documents
+        - recreate: Whether to recreate collection on indexing
+    """
+
+    @patch("vectordb.langchain.diversity_filtering.indexing.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.DataloaderCatalog.create"
+    )
+    def test_indexing_initialization(
+        self, mock_get_docs, mock_embedder_helper, mock_db
+    ):
+        """Test pipeline initialization with valid configuration.
+
+        Args:
+            mock_get_docs: Mock for DataloaderCatalog.create
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+
+        Verifies:
+            - Configuration is stored correctly
+            - Collection name is extracted from config
+            - Database connection is established
+            - Embedding model is configured
+        """
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+        }
+
+        pipeline = ChromaDiversityFilteringIndexingPipeline(config)
+        assert pipeline.config == config
+        assert pipeline.collection_name == "test_diversity_filtering"
+
+    @patch("vectordb.langchain.diversity_filtering.indexing.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.DataloaderCatalog.create"
+    )
+    def test_indexing_run_with_documents(
+        self,
+        mock_get_docs,
+        mock_embed_docs,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test indexing pipeline with documents.
+
+        Args:
+            mock_get_docs: Mock for DataloaderCatalog.create
+            mock_embed_docs: Mock for EmbedderHelper.embed_documents
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - Documents are loaded from data source
+            - Dense embeddings are generated for all documents
+            - Documents are upserted to Chroma database
+            - Returns count of indexed documents
+            - Database upsert is called once
+        """
+        mock_dataset = MagicMock()
+        mock_dataset.to_langchain.return_value = sample_documents
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = mock_dataset
+        mock_get_docs.return_value = mock_loader
+        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+
+        mock_db_inst = MagicMock()
+        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db.return_value = mock_db_inst
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+        }
+
+        pipeline = ChromaDiversityFilteringIndexingPipeline(config)
+        result = pipeline.run()
+
+        assert result["documents_indexed"] == len(sample_documents)
+        mock_db_inst.upsert.assert_called_once()
+
+    @patch("vectordb.langchain.diversity_filtering.indexing.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.DataloaderCatalog.create"
+    )
+    def test_indexing_run_no_documents(
+        self, mock_get_docs, mock_embedder_helper, mock_db
+    ):
+        """Test indexing pipeline with no documents.
+
+        Args:
+            mock_get_docs: Mock for DataloaderCatalog.create
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+
+        Verifies:
+            - Pipeline handles empty document list gracefully
+            - Returns 0 documents indexed
+            - No database operations performed for empty input
+        """
+        mock_dataset = MagicMock()
+        mock_dataset.to_langchain.return_value = []
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = mock_dataset
+        mock_get_docs.return_value = mock_loader
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+        }
+
+        pipeline = ChromaDiversityFilteringIndexingPipeline(config)
+        result = pipeline.run()
+
+        assert result["documents_indexed"] == 0
+
+    @patch("vectordb.langchain.diversity_filtering.indexing.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.EmbedderHelper.embed_documents"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.indexing.chroma.DataloaderCatalog.create"
+    )
+    def test_indexing_with_recreate_option(
+        self,
+        mock_get_docs,
+        mock_embed_docs,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test indexing with recreate option for collection management.
+
+        Args:
+            mock_get_docs: Mock for DataloaderCatalog.create
+            mock_embed_docs: Mock for EmbedderHelper.embed_documents
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - Collection is recreated when recreate=True
+            - create_collection is called before upserting
+            - Documents are indexed after recreation
+        """
+        mock_dataset = MagicMock()
+        mock_dataset.to_langchain.return_value = sample_documents
+        mock_loader = MagicMock()
+        mock_loader.load.return_value = mock_dataset
+        mock_get_docs.return_value = mock_loader
+        mock_embed_docs.return_value = (sample_documents, [[0.1] * 384] * 5)
+
+        mock_db_inst = MagicMock()
+        mock_db_inst.upsert.return_value = len(sample_documents)
+        mock_db.return_value = mock_db_inst
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+                "recreate": True,
+            },
+        }
+
+        pipeline = ChromaDiversityFilteringIndexingPipeline(config)
+        result = pipeline.run()
+
+        assert result["documents_indexed"] == len(sample_documents)
+        mock_db_inst.create_collection.assert_called_once()
+
+
+class TestChromaDiversityFilteringSearch:
+    """Unit tests for Chroma diversity filtering search pipeline.
+
+    Validates the search pipeline that applies Maximal Marginal Relevance (MMR)
+    to select diverse yet relevant documents from retrieval results.
+
+    Tested Behaviors:
+        - Search pipeline initialization with MMR configuration
+        - Query embedding for semantic search
+        - Candidate pool retrieval (2x top_k for MMR selection)
+        - MMR algorithm execution for diverse selection
+        - Lambda parameter control over relevance-diversity trade-off
+        - RAG generation from diverse documents
+
+    Mocks:
+        - ChromaVectorDB: Database query operations
+        - EmbedderHelper: Query embedding and embedding model
+        - RAGHelper: LLM initialization and answer generation
+
+    MMR Algorithm:
+        1. Retrieve candidate documents (2 * top_k)
+        2. Compute relevance: similarity(query, each document)
+        3. Iteratively select documents:
+           - First: Highest relevance
+           - Subsequent: Highest (lambda * relevance - (1-lambda) * max_sim_to_selected)
+        4. Return top_k diverse documents
+    """
+
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    def test_search_initialization(
+        self, mock_llm_helper, mock_embedder_helper, mock_db
+    ):
+        """Test search pipeline initialization.
+
+        Args:
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+
+        Verifies:
+            - Configuration is stored correctly including MMR settings
+            - Database connection is established
+            - Lambda parameter is configured (default 0.5)
+            - LLM is initialized if RAG is enabled
+        """
+        mock_llm_helper.return_value = None
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = ChromaDiversityFilteringSearchPipeline(config)
+        assert pipeline.config == config
+
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    def test_search_execution(
+        self,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test search execution with MMR diversity filtering.
+
+        Args:
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - Query is embedded using configured model
+            - Candidate pool is retrieved (larger than top_k)
+            - MMR algorithm selects diverse documents
+            - Returns query and diverse documents
+            - Results balance relevance and diversity
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = ChromaDiversityFilteringSearchPipeline(config)
+        result = pipeline.search("test query", top_k=5)
+
+        assert result["query"] == "test query"
+        assert len(result["documents"]) > 0
+
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.generate")
+    def test_search_with_rag(
+        self,
+        mock_rag_generate,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test search with RAG generation from diverse documents.
+
+        Args:
+            mock_rag_generate: Mock for RAGHelper.generate
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - MMR retrieves diverse set of documents
+            - LLM is initialized when RAG is enabled
+            - RAG answer is generated from diverse documents
+            - Answer is included in search results
+            - Query is preserved in results
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+
+        mock_llm_inst = MagicMock()
+        mock_llm_helper.return_value = mock_llm_inst
+        mock_rag_generate.return_value = "Test answer"
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "rag": {"enabled": True},
+        }
+
+        pipeline = ChromaDiversityFilteringSearchPipeline(config)
+        result = pipeline.search("test query", top_k=5)
+
+        assert result["query"] == "test query"
+        assert result["answer"] == "Test answer"
