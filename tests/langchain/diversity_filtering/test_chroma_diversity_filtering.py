@@ -316,7 +316,13 @@ class TestChromaDiversityFilteringIndexing:
         result = pipeline.run()
 
         assert result["documents_indexed"] == len(sample_documents)
-        mock_db_inst.create_collection.assert_called_once()
+        mock_db_inst.delete_collection.assert_called_once_with(
+            name="test_diversity_filtering"
+        )
+        mock_db_inst.create_collection.assert_called_once_with(
+            name="test_diversity_filtering",
+            get_or_create=False,
+        )
 
 
 class TestChromaDiversityFilteringSearch:
@@ -517,7 +523,81 @@ class TestChromaDiversityFilteringSearch:
 
         assert result["query"] == "test query"
         assert len(result["documents"]) <= 5
-        mock_cluster_diversify.assert_called_once()
+        mock_cluster_diversify.assert_called_once_with(
+            documents=sample_documents,
+            embeddings=[[0.1] * 384] * len(sample_documents),
+            num_clusters=3,
+            samples_per_cluster=2,
+        )
+
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.DiversityFilteringHelper.clustering_diversify"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    def test_search_clustering_samples_per_cluster_fixed_default(
+        self,
+        mock_db,
+        mock_embedder_helper,
+        mock_embed_query,
+        mock_llm_helper,
+        mock_cluster_diversify,
+        sample_documents,
+    ):
+        """Test that samples_per_cluster uses fixed default when not configured.
+
+        Validates that when samples_per_cluster is not explicitly set in the config,
+        it defaults to 2, providing a predictable default value.
+
+        Args:
+            mock_db: Mock for ChromaVectorDB class
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_cluster_diversify: Mock for
+                DiversityFilteringHelper.clustering_diversify
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - samples_per_cluster defaults to 2 when not specified
+            - Fixed default provides predictable behavior regardless of top_k
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+        mock_cluster_diversify.return_value = sample_documents[:3]
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "clustering",
+                "num_clusters": 3,
+                # samples_per_cluster not specified, should default to 2
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = ChromaDiversityFilteringSearchPipeline(config)
+        pipeline.search("test query", top_k=9)
+
+        # Fixed default: 2
+        # Verify the call was made with correct parameters
+        call_args = mock_cluster_diversify.call_args
+        assert call_args.kwargs["num_clusters"] == 3
+        assert call_args.kwargs["samples_per_cluster"] == 2
 
     @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
     @patch(
@@ -647,3 +727,101 @@ class TestChromaDiversityFilteringSearch:
 
         assert result["query"] == "test query"
         assert result["answer"] == "Test answer"
+
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.DiversityFilteringHelper.mmr_diversify"
+    )
+    def test_search_candidate_multiplier_config(
+        self,
+        mock_diversify,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test that candidate_multiplier configuration is respected.
+
+        Validates that the candidate_multiplier parameter from the diversity config
+        is used to scale the top_k value when fetching candidates from Chroma.
+
+        Args:
+            mock_diversify: Mock for DiversityFilteringHelper.mmr_diversify
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - Chroma query is called with top_k * candidate_multiplier
+            - Default multiplier of 3 is used when not specified
+            - Custom multiplier is applied when configured
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+        mock_diversify.return_value = sample_documents[:3]
+
+        # Test with default multiplier (3)
+        config_default = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "mmr",
+                "max_documents": 5,
+                "lambda_param": 0.5,
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline_default = ChromaDiversityFilteringSearchPipeline(config_default)
+        pipeline_default.search("test query", top_k=5)
+        # Default multiplier is 3, so top_k=5 should fetch 15 documents
+        mock_db_inst.query.assert_called_with(
+            query_embedding=[0.1] * 384,
+            top_k=15,
+            filters=None,
+            collection_name="test_diversity_filtering",
+        )
+
+        # Test with custom multiplier (5)
+        config_custom = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "mmr",
+                "max_documents": 5,
+                "lambda_param": 0.5,
+                "candidate_multiplier": 5,
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline_custom = ChromaDiversityFilteringSearchPipeline(config_custom)
+        pipeline_custom.search("test query", top_k=5)
+        # Custom multiplier is 5, so top_k=5 should fetch 25 documents
+        mock_db_inst.query.assert_called_with(
+            query_embedding=[0.1] * 384,
+            top_k=25,
+            filters=None,
+            collection_name="test_diversity_filtering",
+        )

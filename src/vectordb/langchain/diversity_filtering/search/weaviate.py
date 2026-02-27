@@ -41,8 +41,9 @@ Configuration Schema:
         diversity.method: "mmr" or "clustering"
         diversity.max_documents: Max docs for MMR method
         diversity.lambda_param: Relevance-diversity trade-off (0.0-1.0)
-        diversity.num_clusters: Number of clusters for clustering method
-        diversity.samples_per_cluster: Docs per cluster
+        diversity.num_clusters: Number of clusters for clustering method (default: 3)
+        diversity.samples_per_cluster: Docs per cluster (default: 2)
+        diversity.candidate_multiplier: Over-fetch multiplier (default: 3)
         rag: Optional LLM configuration for answer generation
 
 Example:
@@ -208,9 +209,10 @@ class WeaviateDiversityFilteringSearchPipeline:
 
         # Over-fetch candidates to give diversity algorithm more options.
         # 3x multiplier provides enough candidates for effective diversity selection.
+        candidate_multiplier = self.diversity_config.get("candidate_multiplier", 3)
         retrieved_documents = self.db.query(
             query_embedding=query_embedding,
-            top_k=top_k * 3,
+            top_k=top_k * candidate_multiplier,
             filters=filters,
             collection_name=self.collection_name,
         )
@@ -228,9 +230,7 @@ class WeaviateDiversityFilteringSearchPipeline:
             # Clustering method: group documents into clusters, then sample
             # from each cluster to ensure topic coverage.
             num_clusters = self.diversity_config.get("num_clusters", 3)
-            samples_per_cluster = self.diversity_config.get(
-                "samples_per_cluster", top_k // 3
-            )
+            samples_per_cluster = self.diversity_config.get("samples_per_cluster", 2)
             diverse_documents = DiversityFilteringHelper.clustering_diversify(
                 documents=retrieved_documents,
                 embeddings=doc_embeddings,

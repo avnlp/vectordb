@@ -10,6 +10,7 @@ This module is particularly valuable when queries could be answered from multipl
 - Supports clustering-based diversity selection using KMeans
 - Retrieves a larger candidate set, then filters down to diverse representatives
 - Configurable `lambda_param` to balance relevance and diversity for MMR
+- Configurable `candidate_multiplier` to control over-fetching (default: 3x)
 - Optional clustering parameters for topic-coverage-oriented retrieval
 - Works with all five vector databases using a consistent interface
 - Can be combined with RAG for answer generation from diverse sources
@@ -23,7 +24,7 @@ Each database has a dedicated indexing pipeline that loads documents from a conf
 
 ### Search with Diversity Filtering
 
-The search pipeline first retrieves a broad set of candidate documents (3x `top_k`). By default, it then applies MMR to balance query relevance against redundancy among already-selected documents:
+The search pipeline first retrieves a broad set of candidate documents using a configurable multiplier (default: 3x `top_k`). By default, it then applies MMR to balance query relevance against redundancy among already-selected documents:
 
 `MMR(d) = lambda * sim(d, query) - (1 - lambda) * max_sim(d, selected)`
 
@@ -65,9 +66,10 @@ diversity:
   method: "mmr"  # or "clustering"
   max_documents: 10
   lambda_param: 0.5
+  candidate_multiplier: 3  # Over-fetch multiplier (default: 3)
   # For clustering method:
-  # num_clusters: 5
-  # samples_per_cluster: 2
+  # num_clusters: 3 (default)
+  # samples_per_cluster: 2 (default)
 
 search:
   top_k: 10

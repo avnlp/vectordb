@@ -70,10 +70,17 @@ class ChromaDiversityFilteringIndexingPipeline:
         logger.info("Generated embeddings for %d documents", len(docs))
 
         recreate = self.config.get("chroma", {}).get("recreate", False)
-        self.db.create_collection(
-            collection_name=self.collection_name,
-            recreate=recreate,
-        )
+        if recreate:
+            self.db.delete_collection(name=self.collection_name)
+            self.db.create_collection(
+                name=self.collection_name,
+                get_or_create=False,
+            )
+        else:
+            self.db.create_collection(
+                name=self.collection_name,
+                get_or_create=True,
+            )
 
         # Upsert documents
         num_indexed = self.db.upsert(
