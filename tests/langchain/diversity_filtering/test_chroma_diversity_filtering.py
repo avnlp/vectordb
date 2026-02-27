@@ -32,7 +32,7 @@ Pipeline Architecture:
 
     Search Pipeline:
         1. Embed query using dense embedding model
-        2. Retrieve candidate documents from Chroma (top_k * 2 for MMR pool)
+        2. Retrieve candidate documents from Chroma (top_k * 3 for MMR pool)
         3. Compute relevance scores: similarity(query, document)
         4. Iteratively select documents using MMR algorithm:
            a. Pick document with highest MMR score
@@ -49,7 +49,7 @@ Components Tested:
 Key Features:
     - MMR-based diversity-relevance balancing
     - Configurable lambda parameter for trade-off control
-    - Candidate pool expansion (retrieves 2x top_k for selection)
+    - Candidate pool expansion (retrieves 3x top_k for selection)
     - Iterative selection with diversity penalties
     - Optional RAG generation from diverse results
     - Chroma database integration
@@ -67,7 +67,7 @@ Configuration:
     Diversity filtering is configured in the search pipeline:
     - lambda_param: Trade-off between relevance and diversity (default: 0.5)
     - top_k: Number of diverse documents to return (default: 5)
-    - Candidate pool is automatically expanded to 2 * top_k
+    - Candidate pool is automatically expanded to 3 * top_k
 
 Benefits of MMR:
     - Reduces redundancy in search results
@@ -85,6 +85,8 @@ deterministic unit tests without external dependencies.
 """
 
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from vectordb.langchain.diversity_filtering.indexing.chroma import (
     ChromaDiversityFilteringIndexingPipeline,
@@ -326,7 +328,7 @@ class TestChromaDiversityFilteringSearch:
     Tested Behaviors:
         - Search pipeline initialization with MMR configuration
         - Query embedding for semantic search
-        - Candidate pool retrieval (2x top_k for MMR selection)
+        - Candidate pool retrieval (3x top_k for MMR selection)
         - MMR algorithm execution for diverse selection
         - Lambda parameter control over relevance-diversity trade-off
         - RAG generation from diverse documents
@@ -337,7 +339,7 @@ class TestChromaDiversityFilteringSearch:
         - RAGHelper: LLM initialization and answer generation
 
     MMR Algorithm:
-        1. Retrieve candidate documents (2 * top_k)
+        1. Retrieve candidate documents (3 * top_k)
         2. Compute relevance: similarity(query, each document)
         3. Iteratively select documents:
            - First: Highest relevance
@@ -389,8 +391,12 @@ class TestChromaDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.DiversityFilteringHelper.mmr_diversify"
+    )
     def test_search_execution(
         self,
+        mock_mmr_diversify,
         mock_llm_helper,
         mock_embed_query,
         mock_embedder_helper,
@@ -400,6 +406,7 @@ class TestChromaDiversityFilteringSearch:
         """Test search execution with MMR diversity filtering.
 
         Args:
+            mock_mmr_diversify: Mock for DiversityFilteringHelper.mmr_diversify
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
             mock_embedder_helper: Mock for EmbedderHelper.create_embedder
@@ -418,6 +425,7 @@ class TestChromaDiversityFilteringSearch:
         mock_db_inst.query.return_value = sample_documents
         mock_db.return_value = mock_db_inst
         mock_llm_helper.return_value = None
+        mock_mmr_diversify.return_value = sample_documents[:3]
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -425,6 +433,11 @@ class TestChromaDiversityFilteringSearch:
             "chroma": {
                 "persist_dir": "./test_chroma_data",
                 "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "mmr",
+                "max_documents": 5,
+                "lambda_param": 0.5,
             },
             "rag": {"enabled": False},
         }
@@ -434,6 +447,135 @@ class TestChromaDiversityFilteringSearch:
 
         assert result["query"] == "test query"
         assert len(result["documents"]) > 0
+        mock_mmr_diversify.assert_called_once()
+
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.DiversityFilteringHelper.clustering_diversify"
+    )
+    def test_search_execution_clustering_method(
+        self,
+        mock_cluster_diversify,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test search execution with clustering-based diversity filtering.
+
+        Validates that when ``diversity.method`` is ``"clustering"``, the pipeline
+        delegates to ``DiversityFilteringHelper.clustering_diversify`` rather than
+        the MMR path, and that cluster parameters (``num_clusters``,
+        ``samples_per_cluster``) flow through correctly.
+
+        Args:
+            mock_cluster_diversify: Mock for
+                DiversityFilteringHelper.clustering_diversify
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - clustering_diversify is called exactly once when method is "clustering"
+            - Result contains the query string
+            - Number of returned documents does not exceed top_k
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+        mock_cluster_diversify.return_value = sample_documents[:3]
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "clustering",
+                "num_clusters": 3,
+                "samples_per_cluster": 2,
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = ChromaDiversityFilteringSearchPipeline(config)
+        result = pipeline.search("test query", top_k=5)
+
+        assert result["query"] == "test query"
+        assert len(result["documents"]) <= 5
+        mock_cluster_diversify.assert_called_once()
+
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.EmbedderHelper.embed_query"
+    )
+    @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
+    def test_search_execution_invalid_method(
+        self,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test that an unrecognised diversity method raises ValueError.
+
+        Guards against misconfigured pipelines reaching a silent fallback by ensuring
+        any method name that is not ``"mmr"`` or ``"clustering"`` raises immediately
+        with an informative error message.
+
+        Args:
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for ChromaVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - ``ValueError`` is raised when ``diversity.method`` is ``"threshold"``
+            - Error message contains the phrase ``"Unknown diversity method"``
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "chroma": {
+                "persist_dir": "./test_chroma_data",
+                "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "threshold",
+                "max_documents": 5,
+                "lambda_param": 0.5,
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = ChromaDiversityFilteringSearchPipeline(config)
+        with pytest.raises(ValueError, match="Unknown diversity method"):
+            pipeline.search("test query", top_k=5)
 
     @patch("vectordb.langchain.diversity_filtering.search.chroma.ChromaVectorDB")
     @patch(
@@ -444,8 +586,12 @@ class TestChromaDiversityFilteringSearch:
     )
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.create_llm")
     @patch("vectordb.langchain.diversity_filtering.search.chroma.RAGHelper.generate")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.chroma.DiversityFilteringHelper.mmr_diversify"
+    )
     def test_search_with_rag(
         self,
+        mock_mmr_diversify,
         mock_rag_generate,
         mock_llm_helper,
         mock_embed_query,
@@ -456,6 +602,7 @@ class TestChromaDiversityFilteringSearch:
         """Test search with RAG generation from diverse documents.
 
         Args:
+            mock_mmr_diversify: Mock for DiversityFilteringHelper.mmr_diversify
             mock_rag_generate: Mock for RAGHelper.generate
             mock_llm_helper: Mock for RAGHelper.create_llm
             mock_embed_query: Mock for EmbedderHelper.embed_query
@@ -478,6 +625,7 @@ class TestChromaDiversityFilteringSearch:
         mock_llm_inst = MagicMock()
         mock_llm_helper.return_value = mock_llm_inst
         mock_rag_generate.return_value = "Test answer"
+        mock_mmr_diversify.return_value = sample_documents[:3]
 
         config = {
             "dataloader": {"type": "arc", "limit": 10},
@@ -485,6 +633,11 @@ class TestChromaDiversityFilteringSearch:
             "chroma": {
                 "persist_dir": "./test_chroma_data",
                 "collection_name": "test_diversity_filtering",
+            },
+            "diversity": {
+                "method": "mmr",
+                "max_documents": 5,
+                "lambda_param": 0.5,
             },
             "rag": {"enabled": True},
         }

@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from vectordb.langchain.diversity_filtering.indexing.pinecone import (
     PineconeDiversityFilteringIndexingPipeline,
 )
@@ -190,9 +192,9 @@ class TestPineconeDiversityFilteringSearch:
                 "namespace": "test-namespace",
             },
             "diversity": {
-                "method": "threshold",
+                "method": "mmr",
                 "max_documents": 5,
-                "similarity_threshold": 0.7,
+                "lambda_param": 0.5,
             },
             "rag": {"enabled": False},
         }
@@ -211,9 +213,9 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.RAGHelper.create_llm"
     )
     @patch(
-        "vectordb.langchain.diversity_filtering.search.pinecone.DiversificationHelper.diversify"
+        "vectordb.langchain.diversity_filtering.search.pinecone.DiversityFilteringHelper.mmr_diversify"
     )
-    def test_search_execution_threshold_method(
+    def test_search_execution_mmr_method(
         self,
         mock_diversify,
         mock_llm_helper,
@@ -222,7 +224,25 @@ class TestPineconeDiversityFilteringSearch:
         mock_db,
         sample_documents,
     ):
-        """Test search execution with threshold method."""
+        """Test search execution with MMR-based diversity filtering.
+
+        Validates that when ``diversity.method`` is ``"mmr"``, the pipeline calls
+        ``DiversityFilteringHelper.mmr_diversify`` with the configured ``lambda_param``
+        and returns a result set no larger than ``top_k``.
+
+        Args:
+            mock_diversify: Mock for DiversityFilteringHelper.mmr_diversify
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for PineconeVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - mmr_diversify is called exactly once with MMR configuration
+            - Result contains the original query string
+            - Returned document count does not exceed top_k
+        """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
@@ -239,9 +259,9 @@ class TestPineconeDiversityFilteringSearch:
                 "namespace": "test-namespace",
             },
             "diversity": {
-                "method": "threshold",
+                "method": "mmr",
                 "max_documents": 5,
-                "similarity_threshold": 0.7,
+                "lambda_param": 0.5,
             },
             "rag": {"enabled": False},
         }
@@ -264,7 +284,7 @@ class TestPineconeDiversityFilteringSearch:
         "vectordb.langchain.diversity_filtering.search.pinecone.RAGHelper.create_llm"
     )
     @patch(
-        "vectordb.langchain.diversity_filtering.search.pinecone.DiversificationHelper.clustering_based_diversity"
+        "vectordb.langchain.diversity_filtering.search.pinecone.DiversityFilteringHelper.clustering_diversify"
     )
     def test_search_execution_clustering_method(
         self,
@@ -275,7 +295,26 @@ class TestPineconeDiversityFilteringSearch:
         mock_db,
         sample_documents,
     ):
-        """Test search execution with clustering method."""
+        """Test search execution with clustering-based diversity filtering.
+
+        Validates that when ``diversity.method`` is ``"clustering"``, the pipeline
+        delegates to ``DiversityFilteringHelper.clustering_diversify`` and that
+        cluster parameters (``num_clusters``, ``samples_per_cluster``) are forwarded.
+
+        Args:
+            mock_cluster_diversify: Mock for
+                DiversityFilteringHelper.clustering_diversify
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for PineconeVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - clustering_diversify is called exactly once when method is "clustering"
+            - Result contains the original query string
+            - Returned document count does not exceed top_k
+        """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
@@ -316,9 +355,70 @@ class TestPineconeDiversityFilteringSearch:
     @patch(
         "vectordb.langchain.diversity_filtering.search.pinecone.RAGHelper.create_llm"
     )
+    def test_search_execution_invalid_method(
+        self,
+        mock_llm_helper,
+        mock_embed_query,
+        mock_embedder_helper,
+        mock_db,
+        sample_documents,
+    ):
+        """Test that an unrecognised diversity method raises ValueError.
+
+        Ensures the pipeline does not silently fall through to an unexpected code path
+        when a caller supplies an obsolete or misspelled method name such as
+        ``"threshold"``.
+
+        Args:
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for PineconeVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - ``ValueError`` is raised when ``diversity.method`` is ``"threshold"``
+            - Error message matches ``"Unknown diversity method"``
+        """
+        mock_embed_query.return_value = [0.1] * 384
+        mock_db_inst = MagicMock()
+        mock_db_inst.query.return_value = sample_documents
+        mock_db.return_value = mock_db_inst
+        mock_llm_helper.return_value = None
+
+        config = {
+            "dataloader": {"type": "arc", "limit": 10},
+            "embeddings": {"model": "test-model", "device": "cpu"},
+            "pinecone": {
+                "api_key": "test-api-key",
+                "index_name": "test-diversity-filtering",
+                "namespace": "test-namespace",
+            },
+            "diversity": {
+                "method": "threshold",
+                "max_documents": 5,
+                "lambda_param": 0.5,
+            },
+            "rag": {"enabled": False},
+        }
+
+        pipeline = PineconeDiversityFilteringSearchPipeline(config)
+        with pytest.raises(ValueError, match="Unknown diversity method"):
+            pipeline.search("test query", top_k=5)
+
+    @patch("vectordb.langchain.diversity_filtering.search.pinecone.PineconeVectorDB")
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.create_embedder"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.EmbedderHelper.embed_query"
+    )
+    @patch(
+        "vectordb.langchain.diversity_filtering.search.pinecone.RAGHelper.create_llm"
+    )
     @patch("vectordb.langchain.diversity_filtering.search.pinecone.RAGHelper.generate")
     @patch(
-        "vectordb.langchain.diversity_filtering.search.pinecone.DiversificationHelper.diversify"
+        "vectordb.langchain.diversity_filtering.search.pinecone.DiversityFilteringHelper.mmr_diversify"
     )
     def test_search_with_rag(
         self,
@@ -330,7 +430,25 @@ class TestPineconeDiversityFilteringSearch:
         mock_db,
         sample_documents,
     ):
-        """Test search with RAG generation."""
+        """Test that MMR search results are used to generate a RAG answer.
+
+        Validates the full end-to-end path where diverse documents retrieved via MMR
+        are passed to the LLM to synthesise a final answer. Ensures the generated
+        answer is surfaced in the result dictionary alongside the original documents.
+
+        Args:
+            mock_diversify: Mock for DiversityFilteringHelper.mmr_diversify
+            mock_rag_generate: Mock for RAGHelper.generate
+            mock_llm_helper: Mock for RAGHelper.create_llm
+            mock_embed_query: Mock for EmbedderHelper.embed_query
+            mock_embedder_helper: Mock for EmbedderHelper.create_embedder
+            mock_db: Mock for PineconeVectorDB class
+            sample_documents: Fixture providing test documents
+
+        Verifies:
+            - Query is preserved in the result
+            - RAG-generated answer is included in the result under ``"answer"``
+        """
         mock_embed_query.return_value = [0.1] * 384
         mock_db_inst = MagicMock()
         mock_db_inst.query.return_value = sample_documents
@@ -350,9 +468,9 @@ class TestPineconeDiversityFilteringSearch:
                 "namespace": "test-namespace",
             },
             "diversity": {
-                "method": "threshold",
+                "method": "mmr",
                 "max_documents": 5,
-                "similarity_threshold": 0.7,
+                "lambda_param": 0.5,
             },
             "rag": {"enabled": True},
         }

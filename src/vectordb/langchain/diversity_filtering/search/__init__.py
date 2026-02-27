@@ -6,11 +6,11 @@ cover different aspects of the query, reducing redundancy and improving
 information coverage.
 
 Diversity Filtering Methods:
-    1. Threshold-based (default):
-       - Iteratively selects documents most relevant to the query
-       - Filters out documents with similarity > threshold to already-selected docs
-       - Configurable: max_documents, similarity_threshold (default: 0.7)
-       - Best for: Fine-grained control over diversity vs relevance trade-off
+    1. MMR - Maximal Marginal Relevance (default):
+       - Balances query relevance with inter-document diversity
+       - Uses lambda parameter to control relevance-diversity trade-off
+       - Configurable: max_documents, lambda_param (default: 0.5)
+       - Best for: Retrieval where both relevance and diversity matter
 
     2. Clustering-based:
        - Groups retrieved documents into N clusters using embeddings
@@ -22,7 +22,7 @@ Pipeline Flow:
     1. Query Embedding: Convert query text to dense vector
     2. Over-fetch: Retrieve 3x top_k candidates from vector database
     3. Re-embedding: Generate embeddings for retrieved documents
-    4. Diversity Filtering: Apply threshold or clustering method
+    4. Diversity Filtering: Apply MMR or clustering method
     5. Limit: Return top_k diverse documents
     6. Optional RAG: Generate answer using diverse documents
 

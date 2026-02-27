@@ -7,7 +7,7 @@ The module includes two custom Haystack components -- a clustering-based diversi
 ## Overview
 
 - Retrieves a large candidate set from the vector database, then applies diversity filtering to select a smaller, more varied subset
-- Supports Maximum Margin Relevance (MMR) ranking to balance relevance and diversity via a configurable lambda parameter
+- Uses MMR as the primary ranking algorithm to balance relevance and diversity
 - Provides clustering-based diversity ranking using KMeans or HDBSCAN to group documents by topic and select representatives
 - Calculates diversity metrics including average pairwise cosine distance, cluster coverage, and diversity-relevance trade-off scores
 - Integrates optional RAG generation to produce answers grounded in the diversified document set
@@ -23,7 +23,7 @@ By default, indexing is **incremental** - documents are upserted into existing c
 
 ### Search with Diversity Filtering
 
-The search pipeline first retrieves a broad set of candidate documents (controlled by the retrieval top-k setting). It then applies a diversity ranker -- either the built-in Haystack sentence transformer diversity ranker using MMR, or the custom clustering-based ranker -- to select a smaller number of documents that maximize both relevance and diversity. The MMR lambda parameter controls the trade-off: values closer to zero favor diversity while values closer to one favor relevance.
+The search pipeline first retrieves a broad set of candidate documents (controlled by `retrieval.top_k_candidates`). It then applies a diversity ranker. The default and recommended setting is `diversity.algorithm: "mmr"`, which uses Haystack's `SentenceTransformersDiversityRanker` with `strategy="maximum_margin_relevance"`. The MMR lambda parameter controls the trade-off: values closer to zero favor diversity while values closer to one favor relevance.
 
 ### Clustering-Based Ranking
 
@@ -53,41 +53,31 @@ Configuration is driven by YAML files stored in the `configs/` directory, organi
 
 ```yaml
 dataset:
-  name: triviaqa
-  split: test
-  max_documents: 1000
+  name: "triviaqa"
+  split: "train"
+  max_documents: null
+
+document_store:
+  type: "qdrant"
+  location: ":memory:"
+  collection_name: "triviaqa_diversity"
+  recreate_index: false
 
 embedding:
-  model: sentence-transformers/all-MiniLM-L6-v2
+  model: "sentence-transformers/all-MiniLM-L6-v2"
   dimension: 384
   batch_size: 32
   device: null
-
-index:
-  name: triviaqa_diversity
-  recreate: false  # Default: false (incremental/upsert). Set true to recreate collection
 
 retrieval:
   top_k_candidates: 100
 
 diversity:
-  algorithm: maximum_margin_relevance
+  algorithm: "mmr"  # or "greedy", "clustering"
   top_k: 10
-  mmr_lambda: 0.5
-  similarity_metric: cosine
-
-rag:
-  enabled: false
-  provider: groq
-  model: llama-3.3-70b-versatile
-  temperature: 0.7
-  max_tokens: 2048
-
-vectordb:
-  type: qdrant
-  qdrant:
-    url: ${QDRANT_URL}
-    api_key: ${QDRANT_API_KEY}
+  mmr:
+    lambda_threshold: 0.5
+    use_native_qdrant: false
 ```
 
 ## Directory Structure

@@ -8,15 +8,15 @@ Sample data fixtures:
     sample_documents: LangChain Document objects with varied sources.
 
 Configuration fixtures:
-    milvus_diversity_filtering_config: Milvus with threshold-based filtering.
+    milvus_diversity_filtering_config: Milvus with MMR filtering.
     pinecone_diversity_filtering_config: Pinecone diversity configuration.
     qdrant_diversity_filtering_config: Qdrant diversity configuration.
     weaviate_diversity_filtering_config: Weaviate diversity configuration.
 
 Diversity parameters:
-    method: Filtering algorithm (threshold, mmr, clustering).
+    method: Filtering algorithm (mmr, clustering).
     max_documents: Maximum documents to return after filtering.
-    similarity_threshold: Minimum inter-document distance threshold.
+    lambda_param: Relevance-diversity trade-off for MMR.
 """
 
 import pytest
@@ -63,9 +63,9 @@ def milvus_diversity_filtering_config() -> dict:
             "dimension": 384,
         },
         "diversity": {
-            "method": "threshold",
+            "method": "mmr",
             "max_documents": 5,
-            "similarity_threshold": 0.7,
+            "lambda_param": 0.5,
         },
         "rag": {"enabled": False},
     }
@@ -85,9 +85,9 @@ def pinecone_diversity_filtering_config() -> dict:
             "metric": "cosine",
         },
         "diversity": {
-            "method": "threshold",
+            "method": "mmr",
             "max_documents": 5,
-            "similarity_threshold": 0.7,
+            "lambda_param": 0.5,
         },
         "rag": {"enabled": False},
     }
@@ -106,9 +106,9 @@ def qdrant_diversity_filtering_config() -> dict:
             "dimension": 384,
         },
         "diversity": {
-            "method": "threshold",
+            "method": "mmr",
             "max_documents": 5,
-            "similarity_threshold": 0.7,
+            "lambda_param": 0.5,
         },
         "rag": {"enabled": False},
     }
@@ -126,9 +126,9 @@ def weaviate_diversity_filtering_config() -> dict:
             "collection_name": "TestDiversityFiltering",
         },
         "diversity": {
-            "method": "threshold",
+            "method": "mmr",
             "max_documents": 5,
-            "similarity_threshold": 0.7,
+            "lambda_param": 0.5,
         },
         "rag": {"enabled": False},
     }

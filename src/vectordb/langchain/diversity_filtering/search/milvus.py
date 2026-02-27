@@ -6,11 +6,11 @@ results to ensure the returned documents cover different aspects of the query,
 reducing redundancy and improving information coverage.
 
 Diversity Filtering Methods:
-    1. Threshold-based (default):
-       - Iteratively selects documents that are most relevant to the query
-       - Filters out documents with similarity > threshold to already-selected docs
-       - Configurable: max_documents, similarity_threshold (default: 0.7)
-       - Best for: Fine-grained control over diversity vs relevance trade-off
+    1. MMR - Maximal Marginal Relevance (default):
+       - Balances query relevance with inter-document diversity
+       - Uses lambda parameter to control relevance-diversity trade-off
+       - Configurable: max_documents, lambda_param (default: 0.5)
+       - Best for: Retrieval where both relevance and diversity matter
 
     2. Clustering-based:
        - Groups retrieved documents into N clusters using embeddings
@@ -28,7 +28,7 @@ Pipeline Architecture:
     1. Query Embedding: Convert query text to dense vector
     2. Over-fetch: Retrieve 3x top_k candidates from Milvus
     3. Re-embedding: Generate embeddings for retrieved documents
-    4. Diversity Filtering: Apply threshold or clustering method
+    4. Diversity Filtering: Apply MMR or clustering method
     5. Limit: Return top_k diverse documents
     6. Optional RAG: Generate answer using diverse documents
 
@@ -39,9 +39,9 @@ Configuration Schema:
     Optional:
         milvus.port: Server port (default: 19530)
         milvus.db_name: Database name
-        diversity.method: "threshold" or "clustering"
-        diversity.max_documents: Max docs for threshold method
-        diversity.similarity_threshold: Similarity cutoff (0.0-1.0)
+        diversity.method: "mmr" or "clustering"
+        diversity.max_documents: Max docs for MMR method
+        diversity.lambda_param: Relevance-diversity trade-off (0.0-1.0)
         diversity.num_clusters: Number of clusters for clustering method
         diversity.samples_per_cluster: Docs per cluster
         rag: Optional LLM configuration for answer generation
@@ -60,16 +60,17 @@ Example:
 
 See Also:
     - vectordb.langchain.diversity_filtering.indexing.milvus: Document indexing
-    - vectordb.utils.diversification_helper: Diversity algorithm implementations
+    - vectordb.langchain.diversity_filtering.helpers:
+      Diversity algorithm implementations
 """
 
 import logging
 from typing import Any
 
 from vectordb.databases.milvus import MilvusVectorDB
+from vectordb.langchain.diversity_filtering.helpers import DiversityFilteringHelper
 from vectordb.langchain.utils import (
     ConfigLoader,
-    DiversificationHelper,
     EmbedderHelper,
     RAGHelper,
 )
@@ -83,7 +84,7 @@ class MilvusDiversityFilteringSearchPipeline:
 
     Implements diversity-aware document retrieval by over-fetching candidates
     from Milvus and applying post-processing to select diverse results.
-    Supports both threshold-based and clustering-based diversity methods.
+    Supports both MMR and clustering-based diversity methods.
 
     Attributes:
         config: Validated configuration dictionary for Milvus connection,
@@ -92,7 +93,7 @@ class MilvusDiversityFilteringSearchPipeline:
         db: MilvusVectorDB instance for vector search operations.
         collection_name: Name of the Milvus collection to search.
         diversity_config: Configuration for diversity filtering parameters.
-        method: Diversity method - "threshold" or "clustering".
+        method: Diversity method - "mmr" or "clustering".
         llm: Optional LangChain LLM for RAG answer generation.
 
     Design Decisions:
@@ -107,7 +108,7 @@ class MilvusDiversityFilteringSearchPipeline:
         >>> config = {
         ...     "milvus": {"host": "localhost", "collection_name": "docs"},
         ...     "embedder": {"model_name": "all-MiniLM-L6-v2"},
-        ...     "diversity": {"method": "threshold", "similarity_threshold": 0.7},
+        ...     "diversity": {"method": "mmr", "lambda_param": 0.5},
         ... }
         >>> pipeline = MilvusDiversityFilteringSearchPipeline(config)
         >>> results = pipeline.search("AI ethics", top_k=5)
@@ -146,9 +147,9 @@ class MilvusDiversityFilteringSearchPipeline:
         self.collection_name = milvus_config.get("collection_name")
 
         # Configure diversity filtering parameters.
-        # Defaults to threshold-based method with sensible defaults.
+        # Defaults to MMR with sensible defaults.
         self.diversity_config = self.config.get("diversity", {})
-        self.method = self.diversity_config.get("method", "threshold")
+        self.method = self.diversity_config.get("method", "mmr")
 
         # Initialize optional LLM for RAG answer generation.
         self.llm = RAGHelper.create_llm(self.config)
@@ -166,13 +167,13 @@ class MilvusDiversityFilteringSearchPipeline:
         """Execute diversity filtering search.
 
         Performs semantic search with post-processing diversity filtering.
-        Over-fetches candidates from Milvus, then applies either threshold-based
-        or clustering-based diversity selection to return diverse results.
+        Over-fetches candidates from Milvus, then applies either MMR or
+        clustering-based diversity selection to return diverse results.
 
         The diversity filtering process:
             1. Retrieve 3x top_k candidates from Milvus
             2. Re-embed retrieved documents for consistency
-            3. Apply selected diversity method (threshold or clustering)
+            3. Apply selected diversity method (MMR or clustering)
             4. Limit results to top_k diverse documents
             5. Optionally generate RAG answer
 
@@ -225,31 +226,35 @@ class MilvusDiversityFilteringSearchPipeline:
         ]
 
         # Apply diversity filtering based on configured method.
-        if self.method == "threshold":
-            # Threshold method: greedily select documents, filtering out those
-            # too similar to already-selected ones.
-            max_documents = self.diversity_config.get("max_documents", top_k)
-            similarity_threshold = self.diversity_config.get(
-                "similarity_threshold", 0.7
-            )
-            diverse_documents = DiversificationHelper.diversify(
-                documents=retrieved_documents,
-                embeddings=doc_embeddings,
-                max_documents=max_documents,
-                similarity_threshold=similarity_threshold,
-            )
-        else:  # clustering method
+        if self.method == "clustering":
             # Clustering method: group documents into clusters, then sample
             # from each cluster to ensure topic coverage.
             num_clusters = self.diversity_config.get("num_clusters", 3)
             samples_per_cluster = self.diversity_config.get(
                 "samples_per_cluster", top_k // 3
             )
-            diverse_documents = DiversificationHelper.clustering_based_diversity(
+            diverse_documents = DiversityFilteringHelper.clustering_diversify(
                 documents=retrieved_documents,
                 embeddings=doc_embeddings,
                 num_clusters=num_clusters,
                 samples_per_cluster=samples_per_cluster,
+            )
+        elif self.method == "mmr":
+            # MMR method: balance relevance to the query with novelty against
+            # already-selected documents.
+            max_documents = self.diversity_config.get("max_documents", top_k)
+            lambda_param = self.diversity_config.get("lambda_param", 0.5)
+            diverse_documents = DiversityFilteringHelper.mmr_diversify(
+                documents=retrieved_documents,
+                embeddings=doc_embeddings,
+                query_embedding=query_embedding,
+                max_documents=max_documents,
+                lambda_param=lambda_param,
+            )
+        else:
+            raise ValueError(
+                f"Unknown diversity method: {self.method}. "
+                "Expected one of: ['mmr', 'clustering']"
             )
 
         # Limit to requested top_k (diversity methods may return more).

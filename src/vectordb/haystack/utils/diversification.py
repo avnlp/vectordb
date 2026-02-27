@@ -1,34 +1,18 @@
-"""Semantic diversification for Haystack retrieval results.
+"""Sequential similarity count filter for Haystack retrieval results.
 
-This module provides diversification utilities for reducing redundancy in
-Haystack pipeline results. Diversification filters out documents that are
-too semantically similar to already-selected documents.
+This module provides a lightweight deduplication utility that processes
+documents in their current order and removes candidates that are too similar
+to too many already-selected documents.
 
 Algorithm:
-    The diversification algorithm iterates through documents in their original
-    order (typically ranked by relevance) and includes each document only if
-    it is sufficiently dissimilar to all previously-selected documents.
+    For each document (in original relevance order):
+        1. Count how many selected docs have cosine_sim >= threshold.
+        2. Keep the document only if count < max_similar_docs.
 
-    Similarity is measured using cosine similarity between document embeddings.
-    A document is rejected if it exceeds the similarity threshold with more
-    than max_similar_docs already-selected documents.
-
-Configuration:
-    Diversification is controlled by a configuration dictionary:
-        semantic_diversification:
-          enabled: true  # Enable/disable diversification
-          diversity_threshold: 0.7  # Cosine similarity threshold (0-1)
-          max_similar_docs: 2  # Max similar docs before rejection
-
-Use Cases:
-    - Post-retrieval filtering to reduce near-duplicate results
-    - Preprocessing for summarization to avoid repetitive content
-    - Improving result variety for exploratory queries
-
-Usage:
-    >>> from vectordb.haystack.utils import DiversificationHelper
-    >>> config = {"semantic_diversification": {"enabled": True, "threshold": 0.7}}
-    >>> diversified = DiversificationHelper.apply(documents, config)
+Note:
+    This utility is not an MMR reranker and does not optimize a global
+    relevance-diversity objective. Haystack MMR behavior is implemented in
+    the diversity_filtering pipelines via SentenceTransformersDiversityRanker.
 """
 
 import math
@@ -38,12 +22,7 @@ from haystack import Document
 
 
 class DiversificationHelper:
-    """Helper class for semantic diversification of search results.
-
-    Filters documents based on embedding similarity to reduce redundancy.
-    Documents are processed in order, with each candidate checked against
-    all previously-selected documents.
-    """
+    """Helper class for sequential similarity count filtering."""
 
     @classmethod
     def apply(
@@ -51,14 +30,14 @@ class DiversificationHelper:
         documents: list[Document],
         config: dict[str, Any],
     ) -> list[Document]:
-        """Apply semantic diversification to search results.
+        """Apply sequential similarity count filtering to search results.
 
         Args:
             documents: List of retrieved documents with embeddings.
             config: Configuration dict with 'semantic_diversification' key.
 
         Returns:
-            Diversified subset of documents.
+            Filtered subset of documents.
         """
         diversification_config = config.get("semantic_diversification", {})
         if not diversification_config.get("enabled", False):
@@ -85,7 +64,7 @@ class DiversificationHelper:
         threshold: float,
         max_similar: int,
     ) -> bool:
-        """Check if document should be included in diversified results.
+        """Check whether a document passes the similarity count rule.
 
         Args:
             doc: Document to check.

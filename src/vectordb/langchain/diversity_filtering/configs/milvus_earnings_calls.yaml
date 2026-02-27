@@ -20,9 +20,9 @@ search:
   top_k: 10
 
 diversity:
-  method: "threshold"
+  method: "mmr"
   max_documents: 10
-  similarity_threshold: 0.7
+  lambda_param: 0.5
 
 rag:
   enabled: false

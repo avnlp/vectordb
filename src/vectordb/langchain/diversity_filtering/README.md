@@ -6,11 +6,11 @@ This module is particularly valuable when queries could be answered from multipl
 
 ## Overview
 
-- Removes near-duplicate documents based on embedding similarity thresholds
-- Supports clustering-based diversity selection using KMeans or HDBSCAN
+- Uses Maximal Marginal Relevance (MMR) as the default diversity strategy
+- Supports clustering-based diversity selection using KMeans
 - Retrieves a larger candidate set, then filters down to diverse representatives
-- Configurable similarity threshold for determining document redundancy
-- Balances relevance and diversity through adjustable parameters
+- Configurable `lambda_param` to balance relevance and diversity for MMR
+- Optional clustering parameters for topic-coverage-oriented retrieval
 - Works with all five vector databases using a consistent interface
 - Can be combined with RAG for answer generation from diverse sources
 - Configuration-driven through YAML files with environment variable substitution
@@ -23,15 +23,19 @@ Each database has a dedicated indexing pipeline that loads documents from a conf
 
 ### Search with Diversity Filtering
 
-The search pipeline first retrieves a broad set of candidate documents, typically three to five times the number ultimately requested. It then analyzes the embeddings of these candidates to identify and remove redundant documents. Documents with similarity scores above a configurable threshold are considered duplicates, and only one representative is kept from each redundant group.
+The search pipeline first retrieves a broad set of candidate documents (3x `top_k`). By default, it then applies MMR to balance query relevance against redundancy among already-selected documents:
+
+`MMR(d) = lambda * sim(d, query) - (1 - lambda) * max_sim(d, selected)`
+
+Lower `lambda_param` values favor diversity, while higher values favor relevance.
 
 For clustering-based approaches, the pipeline groups documents into topic clusters and selects the most relevant document from each cluster. This ensures the final result set covers multiple distinct topic areas rather than variations of the same content.
 
 ### Diversity Strategies
 
-**Threshold-based filtering** compares document embeddings pairwise and removes documents that exceed a similarity threshold. The pipeline keeps the most relevant document from each similar group. This approach is fast and effective for removing obvious duplicates.
+**MMR (default)** balances relevance to the query with novelty against selected results. This is the recommended strategy for RAG retrieval when both relevance and coverage matter.
 
-**Clustering-based selection** groups documents into clusters using algorithms like KMeans or HDBSCAN. The pipeline selects one representative from each cluster, ensuring topic diversity. The number of clusters can be configured to control the diversity-relevance trade-off.
+**Clustering-based selection** groups documents into clusters using KMeans. The pipeline selects representatives near each cluster centroid to ensure topic diversity.
 
 ## Supported Databases
 
@@ -45,7 +49,7 @@ For clustering-based approaches, the pipeline groups documents into topic cluste
 
 ## Configuration
 
-Configuration is driven by YAML files stored in the `configs/` directory, organized by database and dataset. The configuration controls the candidate retrieval count, diversity method, similarity threshold, and optional RAG generation.
+Configuration is driven by YAML files stored in the `configs/` directory, organized by database and dataset. The configuration controls diversity method parameters and optional RAG generation.
 
 ```yaml
 pinecone:
@@ -58,9 +62,9 @@ embeddings:
   batch_size: 32
 
 diversity:
-  method: "threshold"  # or "clustering"
-  candidate_multiplier: 3  # Retrieve 3x the final count
-  similarity_threshold: 0.85  # Documents above this are considered duplicates
+  method: "mmr"  # or "clustering"
+  max_documents: 10
+  lambda_param: 0.5
   # For clustering method:
   # num_clusters: 5
   # samples_per_cluster: 2

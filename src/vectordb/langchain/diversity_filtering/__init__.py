@@ -7,11 +7,11 @@ aspects of the query topic, reducing redundancy and improving information covera
 
 Diversity Filtering Concepts:
 
-    1. Threshold-based (default):
-       - Iteratively selects documents that are most relevant to the query
-       - Filters out documents with similarity > threshold to already-selected docs
-       - Configurable: max_documents, similarity_threshold (default: 0.7)
-       - Best for: Fine-grained control over diversity vs relevance trade-off
+    1. MMR - Maximal Marginal Relevance (default):
+       - Balances query relevance with inter-document diversity
+       - Uses lambda parameter to control relevance-diversity trade-off
+       - Configurable: max_documents, lambda_param (default: 0.5)
+       - Best for: Retrieval where both relevance and diversity matter
 
     2. Clustering-based:
        - Groups retrieved documents into N clusters using embeddings
@@ -20,14 +20,9 @@ Diversity Filtering Concepts:
        - Best for: Ensuring coverage of distinct topic areas
 
 Integration with MMR:
-    Diversity filtering complements MMR (Maximal Marginal Relevance) by providing
-    post-processing diversity algorithms. While MMR balances relevance and diversity
-    during retrieval using a lambda parameter, diversity filtering operates on
-    retrieved candidates to select diverse subsets using either:
-    - Inter-document similarity thresholds
-    - Clustering algorithms on document embeddings
-
-    Together, they provide both retrieval-time and post-processing diversity control.
+    Diversity filtering uses MMR as its default post-processing strategy for
+    retrieved candidates, with clustering available as an alternative strategy
+    when explicit topic coverage is preferred.
 
 Architecture:
     indexing/: Document indexing pipelines for all vector stores
@@ -55,7 +50,7 @@ Pipeline Flow:
         1. Embed query using same embedder as indexing
         2. Over-fetch: Retrieve 3x top_k candidates from vector database
         3. Re-embed: Generate embeddings for retrieved documents
-        4. Apply diversity filtering (threshold or clustering method)
+        4. Apply diversity filtering (MMR or clustering method)
         5. Return top_k diverse documents
         6. Optionally generate RAG answer using diverse documents
 
@@ -71,9 +66,9 @@ Configuration Schema:
         - Database connection (API keys, URLs, collection names)
         - Embedding model (provider, model name, dimensions)
     Optional:
-        - diversity.method: "threshold" or "clustering"
-        - diversity.max_documents: Max docs for threshold method
-        - diversity.similarity_threshold: Similarity cutoff (0.0-1.0)
+        - diversity.method: "mmr" or "clustering"
+        - diversity.max_documents: Max docs for MMR method
+        - diversity.lambda_param: Relevance-diversity trade-off (0.0-1.0)
         - diversity.num_clusters: Number of clusters for clustering method
         - diversity.samples_per_cluster: Docs per cluster
         - rag: Optional LLM configuration for answer generation
