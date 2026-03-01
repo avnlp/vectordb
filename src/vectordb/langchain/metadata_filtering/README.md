@@ -1,124 +1,97 @@
 # Metadata Filtering (LangChain)
 
-Metadata filtering extends vector search with structured field-level constraints, enabling queries that combine semantic similarity with precise attribute matching. By applying metadata filters, search results can be narrowed to documents that satisfy specific criteria such as matching a category, falling within a date range, or exceeding a confidence threshold.
-
-The module supports both server-side filtering (where the database applies filters before or during the vector search) and client-side filtering (where results are post-processed after retrieval). Filter conditions are defined in configuration and support operators including equality, comparison, membership, and substring matching.
-
-## Overview
-
-- Field-level metadata filtering combined with dense vector search
-- Server-side filter pass-through to databases that support native filtered search
-- Client-side post-retrieval filtering for additional conditions defined in configuration
-- Configurable filter conditions with operators such as equals, greater-than-or-equal, less-than, in-list, and contains
-- Optional RAG answer generation using an LLM (Groq or OpenAI-compatible endpoints)
-- Configuration-driven through YAML files with environment variable substitution
-- 25 pre-built configuration files covering all database and dataset combinations
+Metadata filtering applies structured constraints to retrieval so only documents matching specific field conditions are searched. This enables precise scope control alongside semantic similarity scoring.
 
 ## How It Works
 
-### Indexing
+1. **Indexed metadata**: During indexing, documents are stored with structured metadata fields. LangChain backends preserve these as metadata on each document record.
+2. **Filter expression at query time**: A filter expression is attached to the LangChain retriever. The backend evaluates the filter before or alongside ANN similarity search.
+3. **Scoped retrieval**: Only documents satisfying the filter conditions enter the similarity ranking. The top-k most similar documents within the filtered set are returned.
+4. **Backend translation**: Filter conditions are expressed in a MongoDB-style dict format and translated to the backend's native filter syntax by `FiltersHelper` (from `utils/filters.py`).
 
-The indexing pipeline loads a dataset, generates dense embeddings using a sentence-transformer model, creates or recreates the target collection in the vector database, and upserts all embedded documents along with their metadata fields. Metadata fields stored during indexing become available for filtering at search time. Each database has a dedicated indexing implementation that handles connection setup and collection management according to its specific API.
+LangChain vector stores expose filtering via their `similarity_search(query, filter=...)` or retriever `search_kwargs={"filter": ...}` interfaces. The filter format varies slightly per backend:
 
-### Search
+| Backend | Filter Format |
+|---|---|
+| Chroma | `{"field": {"$eq": value}}` |
+| Milvus | Milvus expression string |
+| Pinecone | Pinecone JSON filter (`{"$and": [...]}`) |
+| Qdrant | `qdrant_client.http.models.Filter` object |
+| Weaviate | Weaviate `Filter` class |
 
-The search pipeline embeds the incoming query using the same dense model used during indexing. Filters can be applied at two levels. First, native database filters are passed directly to the vector database query, allowing the database to restrict the candidate set before performing similarity search. Second, if additional filter conditions are defined in the pipeline configuration, client-side filtering removes documents that do not match after retrieval. When RAG is enabled, the filtered documents are passed as context to an LLM for answer generation.
+## When to Use It
 
-## Supported Databases
+- Multi-domain corpora where results must be scoped by category, topic, or source.
+- Time-windowed retrieval where only recent documents are relevant.
+- Entity-constrained questions where the answer must reference a specific named entity.
+- Compliance constraints that mandate scoping by data classification or jurisdiction.
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | MongoDB-style filter syntax |
-| Weaviate | Supported | GraphQL where-clause filters |
-| Chroma | Supported | MongoDB-style filter syntax |
-| Milvus | Supported | String expression filters |
-| Qdrant | Supported | Structured filter model objects |
+## When Not to Use It
+
+- Sparse or inconsistently populated metadata. Filters on unreliable fields produce unpredictably scoped results.
+- Early experiments before verifying that metadata fields are consistently normalized.
+- Over-constrained filter combinations that eliminate all relevant candidates.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Higher precision when metadata is reliable and consistently normalized |
+| Latency | Often similar or better than unfiltered search because the candidate set is smaller |
+| Cost | Usually neutral; smaller filtered sets reduce downstream reranking and generation cost |
+
+## Filter Syntax (Common Dict Format)
+
+```python
+# Equality
+{"category": {"$eq": "science"}}
+
+# Range
+{"year": {"$gt": 2020}}
+
+# Set membership
+{"language": {"$in": ["en", "fr"]}}
+
+# Combined
+{"$and": [{"category": {"$eq": "news"}}, {"year": {"$gte": 2023}}]}
+```
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file using flat naming. Below is an example showing the key sections:
-
 ```yaml
-dataloader:
-  type: "triviaqa"           # triviaqa, arc, popqa, factscore, earnings_calls
-  split: "test"
-  limit: 100
-  use_text_splitter: false
-
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  device: "cpu"
-  batch_size: 32
-
-pinecone:                     # Database-specific section (one per config)
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "lc-metadata-filter-triviaqa"
-  namespace: ""
-  dimension: 384
-  metric: "cosine"
-  recreate: false
-
-filters:
-  conditions:
-    - field: "source"
-      value: "wikipedia"
-      operator: "equals"
-    - field: "year"
-      value: 2020
-      operator: "gte"
-
 search:
   top_k: 10
-
-rag:
-  enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  name: "lc_metadata_filtering_pinecone"
-  level: "INFO"
+  filters:
+    category:
+      "$eq": "science"
+    year:
+      "$gte": 2020
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-metadata_filtering/
-├── __init__.py
-├── README.md
-├── indexing/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone metadata filtering indexing
-│   ├── weaviate.py                    # Weaviate metadata filtering indexing
-│   ├── chroma.py                      # Chroma metadata filtering indexing
-│   ├── milvus.py                      # Milvus metadata filtering indexing
-│   └── qdrant.py                      # Qdrant metadata filtering indexing
-├── search/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone metadata filtering search
-│   ├── weaviate.py                    # Weaviate metadata filtering search
-│   ├── chroma.py                      # Chroma metadata filtering search
-│   ├── milvus.py                      # Milvus metadata filtering search
-│   └── qdrant.py                      # Qdrant metadata filtering search
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── __init__.py
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── pinecone_popqa.yaml
-    ├── pinecone_factscore.yaml
-    ├── pinecone_earnings_calls.yaml
-    ├── weaviate_triviaqa.yaml
-    ├── ...
-    ├── chroma_*.yaml
-    ├── milvus_*.yaml
-    └── qdrant_*.yaml
-```
+| Setting | Why It Matters |
+|---|---|
+| `filters` | Main scope control; incorrect filters eliminate all relevant results |
+| `search.top_k` | Increase if filtering makes the candidate set sparse |
+| Metadata schema | Consistent field names and values are the foundation of reliable filtering |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/langchain/semantic_search/` - Dense-only semantic search pipelines
-- `src/vectordb/langchain/hybrid_indexing/` - Combined dense and sparse search pipelines
-- `src/vectordb/langchain/utils/` - Shared utilities for configuration loading, embedding, data loading, and document filtering
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+- **Filter syntax mismatch**: Each backend uses different filter syntax. Use `FiltersHelper` to translate from the common dict format to backend-native syntax rather than writing raw backend filters in application code.
+- **Missing metadata normalization**: If some documents have `"category": "Science"` and others `"category": "science"`, equality filters miss one group.
+- **Combining too many hard filters**: Each additional condition shrinks the candidate pool. Start with the single most important constraint and verify non-zero results before adding more.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `multi_tenancy/` for full tenant isolation with lifecycle management.
+- Use `namespaces/` for lighter logical partitioning.
+- Combine with `reranking/` for higher precision within the filtered set.

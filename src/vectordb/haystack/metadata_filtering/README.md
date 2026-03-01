@@ -1,154 +1,99 @@
-# Metadata Filtering
+# Metadata Filtering (Haystack)
 
-Metadata filtering adds structured, field-level constraints to vector search queries. Rather than relying solely on vector similarity, this module allows narrowing results by document attributes such as category, date, score, or any other metadata field stored alongside the vectors. Filters are defined declaratively in YAML configuration and translated into each database's native filter expression format at runtime.
-
-The module includes built-in timing instrumentation that measures the cost of pre-filtering, vector search, and overall query execution. Selectivity metrics track what fraction of the total document set passes the filter conditions, providing insight into filter effectiveness and query performance.
-
-## Overview
-
-- Structured filtering with operators including equality, comparison, membership, range, and substring matching
-- Server-side filter execution where the database supports it, with client-side fallback
-- Per-database filter expression builders that translate a common filter specification into native query syntax
-- Timing metrics for pre-filter, vector search, and total execution time
-- Selectivity analysis to estimate the fraction of documents matching a filter
-- Declarative filter schema and test conditions defined in YAML configuration
-- 25 pre-built configuration files covering all database and dataset combinations
+Metadata filtering applies structured constraints to retrieval so that only documents matching specific field conditions are considered. This enables scope control alongside semantic similarity scoring.
 
 ## How It Works
 
-### Indexing Phase
+1. **Indexed metadata**: During indexing, each document is stored with structured metadata fields — such as `category`, `date`, `source`, `language`, or any domain-specific attribute from the dataset.
+2. **Filter expression at query time**: A filter expression (dict or backend-native format) is attached to the search call. The backend applies this filter before or alongside the ANN similarity search.
+3. **Scoped retrieval**: Only documents that satisfy the filter conditions enter the similarity ranking. The final result is the top-k most similar documents within the filtered set.
+4. **Backend translation**: Filter conditions are expressed in a MongoDB-style dict format (`{"field": {"$eq": value}, "other_field": {"$in": [...]}}`) and translated by each backend wrapper or the `FiltersHelper` to the native filter syntax.
 
-The indexing pipeline loads a dataset, generates dense embeddings for each document, and stores the vectors along with their metadata fields in the target database. The metadata schema is defined in the configuration, specifying which fields exist, their data types, and which filter operators are valid for each field. Each database-specific indexing module handles collection creation with the appropriate schema, embedding generation, and batch insertion.
+Each backend has its own filter implementation. Chroma uses `where` dicts, Milvus uses boolean expression strings (`metadata["field"] == "value"`), Pinecone uses `$eq`/`$in` JSON filters, Qdrant uses `Filter` + `FieldCondition` objects, and Weaviate uses its own `Filter` DSL.
 
-### Search Phase
+## When to Use It
 
-The search pipeline translates the filter conditions from the configuration into the database's native filter expression format. Each database uses a specialized expression builder: for example, the Milvus builder produces string expressions like `category == "science" and score >= 0.9`, while the Pinecone builder produces MongoDB-style dictionaries. The pipeline then executes a filtered vector search, retrieving only documents that satisfy both the metadata constraints and the vector similarity criteria. Timing metrics are captured at each stage to measure filter overhead and search latency.
+- Multi-domain corpora where searches must be scoped to a specific domain, category, or tenant.
+- Time-windowed retrieval where only recent documents are relevant.
+- Entity-constrained questions where results must mention a specific named entity stored in metadata.
+- Policy or compliance constraints that mandate data scoping by source, classification, or jurisdiction.
 
-### Supported Filter Operators
+## When Not to Use It
 
-| Operator | String Fields | Numeric Fields | Description |
-|----------|---------------|----------------|-------------|
-| eq | Yes | Yes | Equals |
-| in | Yes | Yes | Value in a given list |
-| contains | Yes | No | Substring match |
-| gt | No | Yes | Greater than |
-| gte | No | Yes | Greater than or equal |
-| lt | No | Yes | Less than |
-| lte | No | Yes | Less than or equal |
-| range | No | Yes | Between a minimum and maximum value |
+- Metadata that is sparsely populated or inconsistently normalized across documents. Filters on unreliable metadata produce unpredictably scoped results.
+- Over-constrained filter combinations in early experiments. Start with one filter condition, verify it works, then add more.
+- Queries where the user intent cannot be expressed as a structured constraint on available metadata fields.
 
-## Supported Databases
+## Tradeoffs
 
-| Database | Status | Native Filter Format |
-|----------|--------|---------------------|
-| Pinecone | Supported | MongoDB-style dictionary |
-| Weaviate | Supported | GraphQL where clause |
-| Chroma | Supported | MongoDB-style dictionary |
-| Milvus | Supported | String expression |
-| Qdrant | Supported | Qdrant filter model objects |
+| Dimension | What to Expect |
+|---|---|
+| Quality | Higher precision when metadata is reliable and consistently populated |
+| Latency | Often similar or better than unfiltered search because the search space is smaller |
+| Cost | Usually neutral; smaller candidate sets can reduce downstream generation cost |
+
+## Filter Syntax (Common Dict Format)
+
+```python
+# Equality
+{"category": {"$eq": "science"}}
+
+# Range
+{"year": {"$gt": 2020}}
+
+# Set membership
+{"language": {"$in": ["en", "fr"]}}
+
+# Compound (AND)
+{"$and": [{"category": {"$eq": "news"}}, {"year": {"$gte": 2023}}]}
+```
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file. Below is an example showing the key sections:
-
 ```yaml
-milvus:
-  host: "${MILVUS_HOST:-localhost}"
-  port: "${MILVUS_PORT:-19530}"
-
-collection:
-  name: "arc_metadata_filtered"
-  description: "ARC dataset with metadata filtering"
-
-dataloader:
-  type: "haystack"
-  dataset_name: "ai2_arc"
-  split: "test"
-  limit: 1000
-
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  dimension: 384
-  batch_size: 32
-
-metadata_filtering:
-  test_query: "What is the main function of mitochondria?"
-
-  schema:
-    - field: "category"
-      type: "string"
-      operators: ["eq", "in", "contains"]
-      description: "Document category"
-    - field: "score"
-      type: "float"
-      operators: ["eq", "gt", "gte", "lt", "lte", "range"]
-      description: "Relevance score"
-
-  test_filters:
-    - name: "high_confidence_science"
-      description: "Science documents with high confidence"
-      conditions:
-        - field: "category"
-          operator: "eq"
-          value: "science"
-        - field: "score"
-          operator: "gte"
-          value: 0.9
-
-logging:
-  level: "INFO"
-  name: "metadata_filtering_pipeline"
+search:
+  top_k: 10
+  filters:
+    category:
+      "$eq": "science"
+    year:
+      "$gte": 2020
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-metadata_filtering/
-├── __init__.py                        # Package exports for all pipelines and types
-├── README.md
-├── base.py                            # Abstract base class for filtering pipelines
-├── vectordb_pipeline_type.py          # Core types: filter fields, conditions, specs, builders
-├── common/                            # Shared utilities
-│   ├── __init__.py
-│   ├── config.py                      # Configuration loading and validation
-│   ├── dataloader.py                  # Document loading from dataset factory
-│   ├── embeddings.py                  # Dense embedder factory
-│   ├── filters.py                     # Filter parsing and validation
-│   ├── rag.py                         # Optional RAG answer generation
-│   ├── timer.py                       # Timing instrumentation
-│   └── types.py                       # Data classes for filters, timing, and results
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py
-│   ├── weaviate.py
-│   ├── chroma.py
-│   ├── milvus.py
-│   └── qdrant.py
-├── search/                            # Database-specific search pipelines
-│   ├── __init__.py
-│   ├── pinecone.py
-│   ├── weaviate.py
-│   ├── chroma.py
-│   ├── milvus.py
-│   └── qdrant.py
-├── pinecone.py                        # Legacy Pinecone filtering pipeline
-├── weaviate.py                        # Legacy Weaviate filtering pipeline
-├── chroma.py                          # Legacy Chroma filtering pipeline
-├── milvus.py                          # Legacy Milvus filtering pipeline
-├── qdrant.py                          # Legacy Qdrant filtering pipeline
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── milvus_triviaqa.yaml
-    ├── milvus_arc.yaml
-    ├── pinecone_triviaqa.yaml
-    ├── qdrant_triviaqa.yaml
-    ├── weaviate_triviaqa.yaml
-    ├── chroma_triviaqa.yaml
-    └── ...                            # Remaining database-dataset combinations
-```
+| Setting | Why It Matters |
+|---|---|
+| `filters` | The main control over retrieval scope; incorrect filters eliminate all relevant results |
+| `search.top_k` | Balance precision vs recall inside the filtered set; increase if filter makes the set sparse |
+| Metadata schema | Consistent field names and value types across documents are the foundation of reliable filtering |
 
-## Related Modules
+## Per-Backend Notes
 
-- `src/vectordb/haystack/semantic_search/` - Dense-only semantic search pipelines (can be combined with filtering)
-- `src/vectordb/haystack/hybrid_indexing/` - Hybrid dense-plus-sparse search pipelines
-- `src/vectordb/haystack/utils/` - Shared utilities for configuration, embedding, and data loading
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+Each backend in `metadata_filtering/` has its own indexing and search scripts that account for backend-specific filter syntax and indexing requirements:
+
+- **Chroma** (`chroma.py`): Uses Chroma `where` dicts with `$eq`, `$in`, `$contains` operators.
+- **Milvus** (`milvus.py`): Uses boolean expression strings; metadata fields are accessed via `metadata["field"]` JSON path syntax.
+- **Pinecone** (`pinecone.py`): Uses Pinecone's JSON filter format with `$eq`, `$ne`, `$in`, `$gt`, `$lt`, `$gte`, `$lte`.
+- **Qdrant** (`qdrant.py`): Uses `Filter` + `FieldCondition` objects built by `QdrantVectorDB._build_filter()`.
+- **Weaviate** (`weaviate.py`): Uses Weaviate v4 `Filter` class with property conditions.
+
+## Common Pitfalls
+
+- **Filter syntax mismatch**: Using Pinecone's `$in` syntax for a Chroma query (or vice versa) causes silent failures or errors. Always use the wrapper's filter builder methods rather than raw backend syntax.
+- **Missing metadata normalization at ingest**: If some documents have `"category": "Science"` and others have `"category": "science"`, equality filters will miss one group.
+- **Combining too many hard filters**: Each additional filter condition shrinks the candidate pool. Start with the single most important constraint and verify the retrieved count is non-zero.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `multi_tenancy/` for hard isolation requirements with tenant lifecycle management.
+- Use `namespaces/` for lighter logical partitioning without per-field filter syntax.
+- Combine with `reranking/` to further improve ranking quality within the filtered set.

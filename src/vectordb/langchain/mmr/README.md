@@ -1,122 +1,84 @@
-# Maximal Marginal Relevance (LangChain)
+# MMR (LangChain)
 
-Maximal Marginal Relevance (MMR) is a diversity-aware retrieval strategy that balances relevance to the query with diversity among the returned documents. Standard vector search often returns near-duplicate results when the top candidates cluster around the same content. MMR addresses this by penalizing candidates that are too similar to documents already selected, ensuring that the final result set covers a broader range of information.
-
-The pipeline implements a two-phase approach: first, it over-fetches a larger candidate set from the vector database using standard dense similarity search, then it applies the MMR reranking algorithm to select a smaller, more diverse subset. The lambda parameter controls the trade-off, where higher values favor relevance and lower values favor diversity.
-
-## Overview
-
-- Diversity-aware retrieval using the MMR reranking algorithm
-- Over-fetches candidates from the vector database to provide a broad pool for reranking
-- Lambda parameter controls the relevance-versus-diversity trade-off (0 = maximum diversity, 1 = maximum relevance)
-- Greedy selection: the highest-relevance document is chosen first, then each subsequent document is scored with a penalty for similarity to already-selected documents
-- Optional RAG answer generation using an LLM (Groq or OpenAI-compatible endpoints)
-- Configuration-driven through YAML files with environment variable substitution
-- 25 pre-built configuration files covering all database and dataset combinations
+MMR (Maximal Marginal Relevance) is a diversity-aware reranking strategy that selects documents maximizing both relevance to the query and novelty relative to already-selected documents.
 
 ## How It Works
 
-### Indexing
+The `MMRHelper` class (from `utils/mmr.py`) implements the full MMR algorithm in pure Python with NumPy:
 
-The indexing pipeline loads a dataset, generates dense embeddings using a sentence-transformer model, creates or recreates the target collection in the vector database, and upserts all embedded documents. The indexing phase is identical to standard dense indexing, as MMR reranking is applied only at search time. Each database has a dedicated indexing implementation that handles connection setup and collection management according to its specific API.
+1. **Initial retrieval**: A standard first-pass retrieval returns a large candidate pool (`fetch_k`). All candidate embeddings are collected alongside the query embedding.
+2. **Greedy MMR selection**: Documents are selected iteratively:
+   - Compute `relevance = cosine_similarity(document, query)` for all remaining candidates.
+   - Compute `redundancy = max(cosine_similarity(document, selected_doc))` over all already-selected documents.
+   - Score: `MMR(d) = λ × relevance − (1 − λ) × redundancy`.
+   - Select the document with the highest MMR score and remove it from the candidate pool.
+3. **Result**: A ranked list of `k` documents balancing strong relevance with minimal redundancy.
 
-### Search
+The `lambda_param` controls the tradeoff:
+- `1.0`: Pure relevance (identical to standard ranking).
+- `0.7–0.8`: Mild diversity penalty (recommended for precision-oriented tasks).
+- `0.5`: Balanced relevance and diversity (good default for most RAG use cases).
+- `0.3–0.4`: Stronger diversity emphasis (useful for exploratory search and summarization).
+- `0.0`: Pure diversity (maximum spread, ignores relevance).
 
-The search pipeline embeds the incoming query using the same dense model used during indexing. It retrieves a larger-than-needed candidate set from the vector database (controlled by the top_k parameter). The candidate embeddings and the query embedding are then passed to the MMR algorithm, which greedily selects documents by scoring each candidate as:
+`MMRHelper.mmr_rerank()` returns `(Document, score)` tuples. `MMRHelper.mmr_rerank_simple()` returns just documents for simpler integration.
 
-```
-MMR = lambda * similarity(query, doc) - (1 - lambda) * max_similarity(doc, selected_docs)
-```
+## When to Use It
 
-The algorithm selects mmr_k documents from the candidate pool, returning a result set that is both relevant to the query and internally diverse. When RAG is enabled, the MMR-selected documents are passed as context to an LLM for answer generation.
+- Open-ended questions where the corpus contains multiple relevant subtopics.
+- Summarization tasks where the generator benefits from diverse source coverage.
+- Dense corpora with many near-duplicate chunks from the same article.
 
-## Supported Databases
+## When Not to Use It
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | Uses namespaces for logical partitioning |
-| Weaviate | Supported | Uses collections for organization |
-| Chroma | Supported | Lightweight local or client-server deployment |
-| Milvus | Supported | Uses collections with configurable metrics |
-| Qdrant | Supported | Supports both local and server deployments |
+- Fact-lookup tasks where the single most relevant snippet is what matters.
+- Very small `top_k` values (fewer than 4) where diversity cannot operate meaningfully.
+- Latency-sensitive paths where embedding-based MMR computation is too expensive.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Better topical coverage; may slightly lower top-1 precision |
+| Latency | Low-to-moderate overhead; requires document embeddings at MMR time |
+| Cost | Neutral to slightly positive from better context breadth |
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file using flat naming. Below is an example showing the key sections:
-
 ```yaml
-dataloader:
-  type: "triviaqa"           # triviaqa, arc, popqa, factscore, earnings_calls
-  split: "test"
-  limit: 100
-  use_text_splitter: false
+mmr:
+  lambda_param: 0.5     # Relevance-diversity balance
+  k: 10                 # Number of documents to select
+  fetch_k: 30           # Candidate pool before MMR selection
 
 embeddings:
   model: "sentence-transformers/all-MiniLM-L6-v2"
-  device: "cpu"
-  batch_size: 32
-
-pinecone:                     # Database-specific section (one per config)
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "lc-mmr-triviaqa"
-  namespace: ""
-  dimension: 384
-  metric: "cosine"
-  recreate: false
-
-search:
-  top_k: 20                  # Number of candidates to over-fetch
-  mmr_k: 5                   # Number of results after MMR reranking
-  lambda_param: 0.5          # Relevance vs diversity trade-off
-
-rag:
-  enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  name: "lc_mmr_pinecone"
-  level: "INFO"
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-mmr/
-├── __init__.py
-├── README.md
-├── indexing/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone MMR indexing
-│   ├── weaviate.py                    # Weaviate MMR indexing
-│   ├── chroma.py                      # Chroma MMR indexing
-│   ├── milvus.py                      # Milvus MMR indexing
-│   └── qdrant.py                      # Qdrant MMR indexing
-├── search/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone MMR search
-│   ├── weaviate.py                    # Weaviate MMR search
-│   ├── chroma.py                      # Chroma MMR search
-│   ├── milvus.py                      # Milvus MMR search
-│   └── qdrant.py                      # Qdrant MMR search
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── pinecone_popqa.yaml
-    ├── pinecone_factscore.yaml
-    ├── pinecone_earnings_calls.yaml
-    ├── weaviate_triviaqa.yaml
-    ├── ...
-    ├── chroma_*.yaml
-    ├── milvus_*.yaml
-    └── qdrant_*.yaml
-```
+| Setting | Why It Matters |
+|---|---|
+| `mmr.lambda_param` | The most important knob; tune based on whether your task prioritizes precision or coverage |
+| `mmr.fetch_k` | Larger pools give MMR more options to diversify from; should be larger than `k` |
+| `mmr.k` | Final selected set size; smaller = less context noise, larger = more coverage |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/langchain/semantic_search/` - Dense-only semantic search pipelines (without diversity reranking)
-- `src/vectordb/langchain/reranking/` - Two-stage retrieval with cross-encoder reranking
-- `src/vectordb/langchain/utils/` - Shared utilities for configuration loading, embedding, data loading, MMR computation, and RAG generation
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+- **Confusing `fetch_k` and `k`**: `fetch_k` is the input pool size; `k` is the output size. Always set `fetch_k > k`.
+- **Using default `lambda_param` without evaluation**: Different tasks benefit from different diversity levels. Evaluate against your query set.
+- **Applying MMR to tiny candidate sets**: MMR over 3–4 candidates produces nearly the same result as standard ranking. Use larger pools.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `diversity_filtering/` for a simpler threshold-based deduplication approach.
+- Use `reranking/` when maximum relevance precision is the goal.
+- Use `contextual_compression/` to shorten the MMR-selected context if it is still too long.

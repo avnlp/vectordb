@@ -1,111 +1,75 @@
-# Reranking
+# Reranking (Haystack)
 
-Two-stage retrieval pipelines that combine fast dense vector search with cross-encoder reranking for improved relevance. The first stage retrieves a large candidate set using approximate nearest neighbor search over document embeddings. The second stage rescores each candidate using a cross-encoder model that jointly processes the query and document text, producing more accurate relevance judgments than embedding similarity alone.
-
-The initial retrieval over-fetches by a factor of three to ensure the reranker has a broad candidate pool. After rescoring, only the top results are returned, balancing precision with latency. All five supported vector databases share a consistent interface through a common base class pattern, with database-specific logic isolated in thin subclasses.
-
-## Overview
-
-- Two-stage retrieval: fast dense search followed by cross-encoder reranking
-- Over-fetches candidates by 3x in the first stage to maximize reranker effectiveness
-- Supports multiple cross-encoder models including multilingual and lightweight options
-- Separate indexing and search pipelines for independent scaling
-- Configuration-driven via YAML files with environment variable support
-- Integrated evaluation using contextual recall, precision, and faithfulness metrics
+Reranking is a two-stage retrieval pattern. A fast first-pass retriever returns a broad candidate pool, and a more powerful cross-encoder model then reranks those candidates by scoring each query-document pair jointly. This produces a significantly more precise final ranking than single-stage retrieval alone.
 
 ## How It Works
 
-### Indexing
+1. **First-pass retrieval**: The standard semantic search pipeline retrieves a large candidate pool (typically 20–50 documents). This step is fast because it uses ANN search over precomputed embeddings.
+2. **Cross-encoder reranking**: The candidate pool is passed to `SentenceTransformersSimilarityRanker`, which scores each `(query, document)` pair by running the query and document together through a cross-encoder model. Cross-encoders apply self-attention across the full query-document pair, capturing fine-grained semantic interactions that bi-encoder similarity cannot.
+3. **Top-k selection**: The reranked list is truncated to the configured `top_k`. This smaller, higher-quality set is what gets passed to the generator.
 
-The indexing pipeline loads documents from a configured dataset, generates dense embeddings using a sentence transformer model, creates or recreates the target collection in the vector database, and upserts all embedded documents. Each database has a dedicated indexing implementation that handles connection setup and collection management according to its specific API.
+The `RerankerFactory.create(config)` helper creates and warms up the `SentenceTransformersSimilarityRanker` from the config dict. Warm-up loads model weights before the first query to avoid cold-start latency.
 
-### Search
+Recommended reranker models:
+- `BAAI/bge-reranker-v2-m3`: High accuracy, multilingual, moderate inference speed.
+- `cross-encoder/ms-marco-MiniLM-L-6-v2`: Faster, English-focused, good for latency-sensitive pipelines.
+- `BAAI/bge-reranker-base`: Good balance of speed and accuracy.
 
-The search pipeline embeds the incoming query using the same sentence transformer model used during indexing. It then retrieves three times the requested number of results from the vector database using dense similarity search. The over-fetched candidate set is passed to a cross-encoder reranker, which jointly encodes each query-document pair to produce a more accurate relevance score. The reranked results are truncated to the final requested count and returned.
+## When to Use It
 
-## Supported Databases
+- High-accuracy QA tasks where the rank of the first relevant document matters (MRR and NDCG).
+- Cases where first-pass retrieval recall is acceptable but the top-1 or top-3 precision is weak.
+- Any pipeline where you can afford higher per-query latency in exchange for better ranking quality.
 
-| Database | Indexing Module | Search Module | Notes |
-|----------|----------------|---------------|-------|
-| Pinecone | `indexing/pinecone.py` | `search/pinecone.py` | Serverless managed service |
-| Weaviate | `indexing/weaviate.py` | `search/weaviate.py` | GraphQL-based queries |
-| Chroma | `indexing/chroma.py` | `search/chroma.py` | Local or cloud deployment |
-| Milvus | `indexing/milvus.py` | `search/milvus.py` | Distributed vector database |
-| Qdrant | `indexing/qdrant.py` | `search/qdrant.py` | Payload filtering support |
+## When Not to Use It
+
+- Ultra-low-latency APIs where adding even 50–200 ms of cross-encoder inference is unacceptable.
+- Cost-constrained pipelines with very large candidate pools (reranking 100 candidates is expensive; use smaller `candidate_pool_size`).
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Often the single largest precision gain available in a retrieval pipeline |
+| Latency | Higher than first-pass retrieval alone; scales linearly with candidate pool size |
+| Cost | Cross-encoder inference is more expensive per document than ANN search |
 
 ## Configuration
 
-Each database-dataset combination has its own YAML configuration file. The configuration controls database connection parameters, embedding model selection, reranker model and top-k settings, dataloader type and limits, and evaluation metrics.
-
 ```yaml
-qdrant:
-  host: "${QDRANT_HOST:-localhost}"
-  port: "${QDRANT_PORT:-6333}"
-  api_key: "${QDRANT_API_KEY:-}"
-
-collection:
-  name: "triviaqa_reranking"
-
-dataloader:
-  type: "triviaqa"
-  dataset_name: "trivia_qa"
-  split: "test"
-  limit: null
-
-embeddings:
-  model: "Qwen/Qwen3-Embedding-0.6B"
-  batch_size: 32
+search:
+  top_k: 5               # Final result count after reranking
 
 reranker:
-  type: "cross_encoder"
-  model: "BAAI/bge-reranker-v2-m3"
-  top_k: 5
-
-evaluation:
-  enabled: true
-  metrics:
-    - contextual_recall
-    - contextual_precision
-
-logging:
-  name: "qdrant_reranking"
-  level: "INFO"
+  model: "BAAI/bge-reranker-v2-m3"  # Required: full model path
+  top_k: 5               # Matches or is less than search.top_k
+  candidate_pool_size: 20  # First-pass retrieval breadth; feeds the reranker input
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-src/vectordb/haystack/reranking/
-├── __init__.py                        # Public exports for all pipeline classes
-├── configs/                           # YAML configs (25 files: 5 databases x 5 datasets)
-│   ├── qdrant_triviaqa.yaml
-│   ├── qdrant_arc.yaml
-│   ├── qdrant_popqa.yaml
-│   ├── qdrant_factscore.yaml
-│   ├── qdrant_earnings_calls.yaml
-│   ├── pinecone_triviaqa.yaml
-│   ├── ...
-│   └── chroma_earnings_calls.yaml
-├── indexing/                          # Indexing pipelines
-│   ├── __init__.py
-│   ├── chroma.py                      # Chroma indexing implementation
-│   ├── milvus.py                      # Milvus indexing implementation
-│   ├── pinecone.py                    # Pinecone indexing implementation
-│   ├── qdrant.py                      # Qdrant indexing implementation
-│   └── weaviate.py                    # Weaviate indexing implementation
-├── search/                            # Search pipelines with reranking
-│   ├── __init__.py
-│   ├── chroma.py                      # Chroma search with reranking
-│   ├── milvus.py                      # Milvus search with reranking
-│   ├── pinecone.py                    # Pinecone search with reranking
-│   ├── qdrant.py                      # Qdrant search with reranking
-│   └── weaviate.py                    # Weaviate search with reranking
-└── README.md
-```
+| Setting | Why It Matters |
+|---|---|
+| `reranker.model` | Primary quality and cost tradeoff lever |
+| `candidate_pool_size` (first-pass top_k) | Too small = missing evidence; too large = slow reranking |
+| `reranker.top_k` | Final context size; balance between coverage and token cost |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/utils/` - Shared configuration loading, embedder factory, and reranker factory
-- `src/vectordb/haystack/contextual_compression/` - Alternative post-retrieval compression approach
-- `src/vectordb/haystack/semantic_search/` - Dense indexing without reranking stage
-- `src/vectordb/haystack/agentic_rag/` - Full RAG pipelines with generation
+- **Reranking too few candidates**: If the cross-encoder never sees the relevant document because first-pass retrieval did not retrieve it, reranking cannot recover it. Set `candidate_pool_size` to at least 2–5× your final `top_k`.
+- **Weak first-pass retrieval**: Reranking can reshuffle candidates but cannot add new ones. Fix retrieval recall first (better embedding model, larger pool, or hybrid retrieval).
+- **Ignoring latency in production**: Reranking 20 documents per query may add 100–300 ms depending on the model and hardware. Benchmark on representative query loads before deploying.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Combine with `hybrid_indexing/` for stronger first-pass recall feeding better candidates into the reranker.
+- Use `contextual_compression/` after reranking if the top-ranked documents are still too long or noisy for the generator.
+- Use `mmr/` instead of reranking when result diversity matters more than pure precision.

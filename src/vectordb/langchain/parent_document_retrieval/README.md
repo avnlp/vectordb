@@ -1,134 +1,74 @@
-# Parent Document Retrieval
+# Parent Document Retrieval (LangChain)
 
-Hierarchical document retrieval that indexes small chunks for precise matching but returns larger parent documents for context. This approach solves the chunk-size tradeoff in retrieval systems: small chunks match queries accurately but lack surrounding context needed for comprehensive answers, while large chunks provide context but match imprecisely.
-
-The module maintains a mapping between chunks and their parent documents, enabling retrieval at the chunk level followed by reconstruction of the full parent context. This is particularly valuable for long documents where different sections might address different aspects of a query.
-
-## Overview
-
-- Indexes small chunks for precise semantic matching
-- Returns full parent documents to provide comprehensive context
-- Maintains chunk-to-parent mapping in a dedicated store
-- Configurable chunk and parent sizes with overlap control
-- Multiple retrieval modes: chunks only, parents only, or combined
-- Supports all five vector databases with consistent interface
-- Parent store persistence for production deployments
-- Configuration-driven through YAML files with environment variable substitution
+Parent document retrieval indexes small child chunks for precise semantic matching but returns the larger parent document context for coherent answer generation. This balances retrieval precision with generation completeness.
 
 ## How It Works
 
-### Indexing Phase
+1. **Split into parents and children**: Source documents are split into large parent chunks. Each parent is further split into smaller child chunks. Each child stores its `parent_id` as metadata.
+2. **Index children**: Only child chunks are embedded and stored in the vector database. Embeddings of focused small chunks provide better retrieval precision than embeddings of long parent documents.
+3. **Retrieve children**: At query time, child chunk embeddings are compared to the query embedding. The top-k most similar children are retrieved.
+4. **Resolve parents**: The `parent_store.py` module manages the parent-child ID mapping. Retrieved children are de-referenced to their parent documents. Duplicate parents (when multiple children share the same parent) are deduplicated.
+5. **Return parent context**: The full text of the resolved parent documents is returned, giving the generator coherent, narrative-complete context.
 
-The indexing pipeline processes documents through a two-stage approach. First, parent documents are loaded from the dataset and stored in a parent document store. Each parent document receives a unique identifier. Then, the pipeline splits parent documents into smaller chunks using configurable size and overlap parameters. Each chunk is embedded and indexed into the vector database with metadata linking it to its parent document ID.
+LangChain's `ParentDocumentRetriever` can be used as an alternative to the custom `parent_store.py` logic for some backends.
 
-The chunking strategy balances precision and coverage. Smaller chunks (256-512 tokens) enable fine-grained matching to specific query terms. Overlap between chunks ensures that content spanning chunk boundaries is not lost. The parent store maintains the complete parent documents indexed by their identifiers.
+## When to Use It
 
-### Search Phase
+- Long source documents (articles, reports) where chunk-only context is too fragmented for coherent answers.
+- Multi-hop questions requiring several paragraphs of context from the same source.
+- Any pipeline where retrieval precision matters (small chunks) but generation coherence also matters (full parent context).
 
-The search pipeline embeds the query and retrieves the most similar chunks from the vector database. The chunk metadata includes parent document identifiers, which are extracted from the retrieved chunks. The pipeline then looks up the corresponding parent documents from the parent store, returning the full parent content rather than the small chunks.
+## When Not to Use It
 
-This approach ensures that while matching occurs at a fine-grained level (chunks), the returned context is comprehensive (full parents). If multiple chunks from the same parent are retrieved, the parent is returned only once to avoid duplication.
+- Short, self-contained documents where splitting adds no retrieval benefit.
+- Pipelines with strict memory constraints where returning multiple large parent documents exceeds the generator's context window.
 
-### Parent Store
+## Tradeoffs
 
-The parent document store maintains the mapping between chunk IDs and parent documents. It provides:
-
-- **Storage**: In-memory storage of parent documents indexed by ID
-- **Persistence**: Optional save/load to disk for production deployments
-- **Lookup**: Efficient retrieval of parents by chunk ID or parent ID
-- **Deduplication**: Ensures each parent is returned only once even if multiple chunks reference it
-
-The store can be persisted to disk and reloaded across sessions, enabling stateful production deployments where the parent store survives restarts.
-
-### Retrieval Modes
-
-The pipeline supports multiple retrieval modes depending on the use case:
-
-**Parent Only Mode** retrieves chunks, maps to parents, and returns only the unique parent documents. This is the default mode and provides the best balance of precision and context.
-
-**With Context Mode** returns both the matched chunks and their parent documents, allowing the consumer to see exactly which parts matched while still having full context available.
-
-**Context Window Mode** retrieves a parent document and extracts a window around the matched chunk, returning just that portion rather than the full parent.
-
-## Supported Databases
-
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | Namespace-scoped parent storage |
-| Weaviate | Supported | Collection-based parent storage |
-| Chroma | Supported | Works with persistent storage |
-| Milvus | Supported | Partition-aware parent lookup |
-| Qdrant | Supported | Payload-based parent references |
+| Dimension | What to Expect |
+|---|---|
+| Quality | Better coherence and context completeness for generated answers |
+| Latency | Moderate overhead from parent resolution step after retrieval |
+| Cost | Potentially higher generation tokens if parent chunks are large |
 
 ## Configuration
 
-Configuration is stored in YAML files organized by database and dataset. The configuration controls chunking parameters, parent store settings, and retrieval mode.
-
 ```yaml
-pinecone:
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "parent-doc-index"
-  namespace: ""
+indexing:
+  parent_chunk_size: 512    # Tokens per parent chunk (stored for generation)
+  child_chunk_size: 128     # Tokens per child chunk (stored for retrieval)
+  chunk_overlap: 20
 
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  batch_size: 32
-
-chunking:
-  chunk_size: 512
-  chunk_overlap: 50
-  parent_size: 2048  # Size of parent documents
-
-parent_store:
-  store_path: "./parent_store.pkl"  # Optional persistence
-  auto_save: true
-
-retrieval:
-  mode: "parent_only"  # or "with_context", "context_window"
-  top_k: 5
-  max_parents: 10
-
-rag:
-  enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  level: "INFO"
+search:
+  top_k: 5                  # Child chunks to retrieve
+  max_parent_docs: 3        # Maximum unique parents to return
+  retrieval_mode: "with_parents"
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-parent_document_retrieval/
-├── __init__.py                        # Package exports
-├── parent_store.py                    # Parent document storage and mapping
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone parent doc indexing
-│   ├── weaviate.py                    # Weaviate parent doc indexing
-│   ├── chroma.py                      # Chroma parent doc indexing
-│   ├── milvus.py                      # Milvus parent doc indexing
-│   └── qdrant.py                      # Qdrant parent doc indexing
-├── search/                            # Database-specific search pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone parent doc search
-│   ├── weaviate.py                    # Weaviate parent doc search
-│   ├── chroma.py                      # Chroma parent doc search
-│   ├── milvus.py                      # Milvus parent doc search
-│   └── qdrant.py                      # Qdrant parent doc search
-└── configs/                           # YAML configs organized by database
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── weaviate_triviaqa.yaml
-    └── ...                            # (25+ config files total)
-```
+| Setting | Why It Matters |
+|---|---|
+| `child_chunk_size` | Smaller = more precise retrieval; too small may lose necessary context in the child itself |
+| `parent_chunk_size` | Larger = more coherent generation context; too large exceeds context window |
+| `max_parent_docs` | Controls downstream token usage when multiple children map to the same parent |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/langchain/semantic_search/` - Standard chunk-level semantic search
-- `src/vectordb/langchain/contextual_compression/` - Post-retrieval compression of parent docs
-- `src/vectordb/langchain/hybrid_indexing/` - Hybrid search with parent document retrieval
-- `src/vectordb/dataloaders/` - Dataset loaders with parent document support
+- **Parent chunks too large**: If parents exceed the generator's context window, they must be truncated, losing the coherence benefit.
+- **Inconsistent child-parent ID linking**: If parent IDs are not consistently stored and retrieved, resolution fails silently and the pipeline degrades to child-only retrieval.
+- **No deduplication for multiple children per parent**: Without deduplication, the same parent appears multiple times in the returned context, wasting token budget.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `semantic_search/` as the baseline when documents are already short and self-contained.
+- Combine with `contextual_compression/` to shorten retrieved parent context if it exceeds token budgets.
+- Add `reranking/` on child results before parent resolution to improve which parents are selected.

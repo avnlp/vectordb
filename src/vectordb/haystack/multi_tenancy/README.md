@@ -1,184 +1,76 @@
-# Multi-Tenancy
+# Multi-Tenancy (Haystack)
 
-This module provides tenant-isolated data management for Retrieval-Augmented Generation pipelines. Each supported vector database uses its native isolation mechanism to ensure that documents and queries are scoped to a specific tenant. The module handles tenant lifecycle management including creation, indexing, querying, retrieval, RAG generation, statistics tracking, and deletion.
-
-Tenant isolation strategies vary by database. Pinecone uses namespaces, Weaviate uses native multi-tenancy with per-tenant shards, Milvus uses partition keys with filter-enforced isolation, Qdrant uses tiered multitenancy with payload-based filtering, and Chroma uses tenant and database scoping. Despite these differences, all databases expose a consistent pipeline interface through `BaseMultitenancyPipeline` for indexing, retrieval, and RAG operations.
-
-## Overview
-
-- Provides tenant-scoped indexing, retrieval, and RAG pipelines for all five databases
-- All indexing pipelines inherit from `BaseMultitenancyPipeline` for a consistent interface
-- Uses each database's native isolation mechanism for secure data separation
-- Manages the full tenant lifecycle: creation, existence checks, listing, statistics, and deletion
-- Resolves tenant context from explicit values, environment variables, or configuration files
-- Tracks timing metrics for all operations (embedding, indexing, search, generation)
-- Supports environment variable substitution in all configuration files
-- Includes a CLI entry point for common tenant management operations
+Multi-tenancy ensures that documents indexed for one tenant are completely invisible to queries made in the context of another tenant. It is the data isolation mechanism for shared-infrastructure RAG systems serving multiple customers or business units.
 
 ## How It Works
 
-### Tenant Context Resolution
+Tenant isolation is implemented differently per backend, but the pattern is consistent:
 
-Every operation requires a tenant context, which identifies the target tenant. The context can be created explicitly by specifying a tenant identifier, loaded from the environment (via the TENANT_ID variable), or derived from a configuration file. The tenant context is passed to pipeline constructors and can be overridden on individual operations.
+1. **Tenant context at indexing**: During document insertion, a tenant identifier is attached to each document. The `inject_scope_to_metadata()` utility (from `vectordb.utils.scope`) adds `"tenant_id": "tenant_a"` (or the configured scope field) to every document's metadata.
+2. **Tenant-aware schema**: Some backends use physical isolation at the storage layer. Others use logical isolation via metadata filters.
+3. **Tenant filtering at query time**: Every search call automatically applies a tenant isolation filter so only documents matching the current tenant's ID are considered. The `inject_scope_to_filter()` utility injects the tenant condition into the query filter using `$and` + `$eq`.
 
-### Isolation Strategies
+### Per-Backend Isolation Mechanisms
 
-Each database implements tenant isolation using its strongest available mechanism:
+| Backend | Isolation Mechanism |
+|---|---|
+| **Chroma** (`chroma/`) | Separate Chroma `tenant` and `database` context per tenant. The `ChromaVectorDB.with_tenant()` method returns a new wrapper instance scoped to the tenant. |
+| **Milvus** (`milvus/`) | Partition key field (`is_partition_key=True`) routes documents to different physical partitions. Queries scoped by partition key value skip non-matching partitions entirely. |
+| **Pinecone** (`pinecone/`) | Namespace-based isolation. Each tenant gets its own namespace; queries are scoped to that namespace. |
+| **Qdrant** (`qdrant/`) | `is_tenant` payload index optimization with `tenant_id` metadata field. Qdrant optimizes filter performance when a field is marked as a tenant key. |
+| **Weaviate** (`weaviate/`) | Native Weaviate tenants. Tenants are created with `create_tenants()`, and the collection context is switched with `with_tenant()` before upsert or query. |
 
-- **Pinecone**: Each tenant maps to a namespace within a shared index. Namespaces provide physical isolation at the serverless level with minimal overhead, supporting hundreds of thousands of tenants per index.
-- **Weaviate**: Uses native multi-tenancy with per-tenant shards. Each tenant gets a dedicated shard within the collection, providing physical isolation. Supports automatic tenant creation and tens of thousands of tenants per collection.
-- **Milvus**: Uses a partition key field combined with filter expressions. Documents are tagged with a tenant identifier and physically routed to partitions. Filter expressions enforce isolation at query time, supporting millions of tenants.
-- **Qdrant**: Implements tiered multitenancy where small tenants share a collection with payload-based filtering and large tenants can be promoted to dedicated collections. Supports mixed tenant sizes efficiently.
-- **Chroma**: Uses tenant and database scoping to isolate data. Each tenant maps to a combination of Chroma tenant and database identifiers, providing logical isolation.
+## When to Use It
 
-### Pipeline Types
+- SaaS products where multiple customers share the same RAG infrastructure but must not see each other's data.
+- Internal platforms where different business units have separate document sets and must be kept isolated.
+- Any scenario with a hard contractual or regulatory requirement that customer data not be co-mingled in queries.
 
-The module provides three pipeline types per database, all inheriting from `BaseMultitenancyPipeline`:
+## When Not to Use It
 
-- **Indexing Pipeline** (`*MultitenancyIndexingPipeline`): Ingests documents with tenant-scoped metadata using the `index_documents()` method
-- **Retrieval Pipeline** (`*MultitenancySearchPipeline`): Searches within a tenant's scope and returns ranked documents with scores
-- **RAG Pipeline**: Combines retrieval with language model generation to produce tenant-scoped answers grounded in retrieved context
+- Single-tenant deployments with no isolation requirement — the added complexity provides no value.
+- Early prototypes where data isolation is not yet a concern and adds configuration overhead.
 
-All indexing pipelines implement the unified interface defined by `BaseMultitenancyPipeline`:
+## Tradeoffs
 
-```python
-from vectordb.haystack.multi_tenancy import (
-    BaseMultitenancyPipeline,
-    ChromaMultitenancyIndexingPipeline,
-    MilvusMultitenancyIndexingPipeline,
-    PineconeMultitenancyIndexingPipeline,
-    QdrantMultitenancyIndexingPipeline,
-    WeaviateMultitenancyIndexingPipeline,
-)
-
-# All pipelines inherit from BaseMultitenancyPipeline
-assert issubclass(ChromaMultitenancyIndexingPipeline, BaseMultitenancyPipeline)
-
-# Initialize with config path
-pipeline = ChromaMultitenancyIndexingPipeline(
-    config_path="configs/chroma_triviaqa.yaml",
-    tenant_context=TenantContext(tenant_id="tenant-123"),
-)
-
-# Index documents using the standard interface
-num_indexed = pipeline.index_documents(documents, tenant_id="tenant-123")
-
-# Query with tenant isolation
-results = pipeline.query("your query", top_k=10, tenant_id="tenant-123")
-
-# Tenant lifecycle management
-pipeline.create_tenant("new-tenant")
-exists = pipeline.tenant_exists("tenant-123")
-stats = pipeline.get_tenant_stats("tenant-123")
-tenants = pipeline.list_tenants()
-pipeline.delete_tenant("old-tenant")
-```
-
-## Supported Databases
-
-| Database | Isolation Strategy | Max Tenants | Overhead |
-|----------|-------------------|-------------|----------|
-| Pinecone | Namespaces | 100k+ per index | Minimal |
-| Weaviate | Native multi-tenancy (per-tenant shards) | 10k-100k+ per collection | Moderate |
-| Milvus | Partition key with filter expressions | Hundreds of thousands to millions | Minimal |
-| Qdrant | Tiered multitenancy (payload filters) | 10k-100k+ with tiered promotion | Minimal for small tenants |
-| Chroma | Tenant and database scoping | Thousands to tens of thousands | Minimal |
+| Dimension | What to Expect |
+|---|---|
+| Quality | Improves result correctness by preventing cross-tenant contamination |
+| Latency | Usually neutral; partition-key (Milvus) and native-tenant (Weaviate) isolation can improve query speed |
+| Cost | Operational overhead for tenant lifecycle management (creation, deletion, monitoring) |
 
 ## Configuration
 
-Each database-dataset combination has a dedicated YAML configuration file. Below is an example showing the key sections:
-
 ```yaml
-pipeline:
-  name: "milvus_arc_multitenancy"
-  description: "Milvus multi-tenancy pipeline for ARC dataset"
-
-database:
-  type: "milvus"
-
-collection:
-  name: "arc_multitenancy"
-  description: "ARC dataset with tenant isolation"
-
-multitenancy:
-  strategy: "partition_key"
-  field_name: "tenant_id"
-  partition_key_isolation: true
-  num_partitions: 64
-
-embedding:
-  model_name: "Qwen/Qwen3-Embedding-0.6B"
-  dimension: 1024
-  batch_size: 32
-  device: "auto"
-
-dataset:
-  name: "arc"
-  split: "test"
-  max_samples: 10000
-
-retrieval:
-  top_k: 10
-  metric: "cosine"
-
-generator:
-  type: "openai"
-  model: "gpt-3.5-turbo"
-  api_key: "${OPENAI_API_KEY}"
-  kwargs:
-    temperature: 0.7
-    max_tokens: 256
-
-logging:
-  level: "INFO"
+multi_tenancy:
+  tenant_id: "tenant_a"         # Tenant identifier for this pipeline run
+  scope_field: "tenant_id"      # Metadata field name used for isolation
+  isolation_mode: "partition"   # Backend-specific; e.g., "partition", "namespace", "tenant"
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-multi_tenancy/
-├── __init__.py                          # Package exports for all pipelines and types
-├── README.md                            # This file
-├── base.py                              # Abstract base class for multi-tenancy pipelines
-├── vectordb_multitenancy_type.py        # Shared type definitions and dataclasses
-├── common/                              # Shared utilities
-│   ├── __init__.py
-│   ├── config.py                        # Configuration loading
-│   ├── embeddings.py                    # Embedding model wrappers
-│   ├── rag.py                           # RAG generation utilities
-│   ├── tenant_context.py                # Tenant context manager
-│   ├── timing.py                        # Operation timing metrics
-│   └── types.py                         # Result types and enums
-├── chroma/                              # Chroma database implementation
-│   ├── __init__.py
-│   ├── indexing.py                      # Tenant-scoped document indexing
-│   └── search.py                        # Tenant-scoped retrieval and RAG
-├── milvus/                              # Milvus database implementation
-│   ├── __init__.py
-│   ├── indexing.py
-│   └── search.py
-├── pinecone/                            # Pinecone database implementation
-│   ├── __init__.py
-│   ├── indexing.py
-│   └── search.py
-├── qdrant/                              # Qdrant database implementation
-│   ├── __init__.py
-│   ├── indexing.py
-│   └── search.py
-├── weaviate/                            # Weaviate database implementation
-│   ├── __init__.py
-│   ├── indexing.py
-│   └── search.py
-└── configs/                             # 25 YAML configs (5 databases x 5 datasets)
-    ├── chroma_arc.yaml
-    ├── chroma_earnings_calls.yaml
-    ├── ...
-    ├── weaviate_popqa.yaml
-    └── weaviate_triviaqa.yaml
-```
+| Setting | Why It Matters |
+|---|---|
+| `tenant_id` propagation | Missing tenant context in any pipeline stage allows cross-tenant data leakage |
+| `isolation_mode` | Controls which backend-native mechanism is used; choose the most performant for your backend |
+| Default tenant policy | Define safe behavior when tenant context is absent (reject the query or use a default tenant) |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/namespaces/` - Namespace and partition management for data organization
-- `src/vectordb/haystack/rag/` - Standard RAG pipelines without tenant isolation
-- `src/vectordb/dataloaders/haystack/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and Earnings Calls
+- **Missing tenant context in one pipeline stage**: If indexing stamps `tenant_id` on documents but the search script does not apply the filter, all tenants' data becomes visible. Verify both stages use the same scope injection utilities.
+- **Using soft metadata filters instead of native tenant primitives**: On backends that support native tenant isolation (Weaviate, Milvus partition keys), soft filtering is less efficient and potentially less reliable than using the native mechanism.
+- **No tenant onboarding policy**: Define how new tenants are provisioned (collection creation, tenant registration, initial data ingestion) and how departed tenants are cleaned up.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `namespaces/` for lighter logical partitioning without full tenant lifecycle management.
+- Combine with `metadata_filtering/` to apply additional per-tenant constraints within an already isolated context.

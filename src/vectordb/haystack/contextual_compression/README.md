@@ -1,118 +1,106 @@
-# Contextual Compression
+# Contextual Compression (Haystack)
 
-Post-retrieval document compression pipelines that reduce the volume of retrieved content before passing it to a downstream language model. The pipeline retrieves more documents than ultimately needed (over-fetching by 2x), then applies a compression step that either filters or summarizes the candidate set down to the most relevant passages. This reduces token consumption during generation while preserving the information most pertinent to the query.
-
-Two compression strategies are available. Cross-encoder reranking scores each retrieved document against the query and retains only the highest-scoring results, discarding irrelevant candidates without any LLM calls. LLM-based extraction uses a language model to read each retrieved document and extract only the passages relevant to the query, producing condensed versions that carry the same information in fewer tokens.
-
-## Overview
-
-- Two compression strategies: cross-encoder reranking and LLM-based passage extraction
-- Over-fetches by 2x during initial retrieval to ensure the compressor has sufficient candidates
-- Cross-encoder reranking operates locally without LLM API calls for cost-efficient filtering
-- LLM extraction produces condensed document summaries focused on query-relevant content
-- Shared base class with database-specific subclasses handling only connection and retrieval logic
-- Token counting utilities to measure compression ratios and token savings
+Contextual compression reduces retrieved documents to their most query-relevant fragments before passing the context to the generator. This improves generation quality by reducing noise and irrelevant content, and reduces token cost by shortening the generator's input.
 
 ## How It Works
 
-### Indexing
+After standard retrieval, the `ContextCompressor` component (from `components/context_compressor.py`) processes the retrieved documents with an LLM. Three compression strategies are available:
 
-The indexing pipeline loads documents from a configured dataset, generates dense embeddings using a sentence transformer model, and writes the embedded documents to the target vector database collection. Each database has a dedicated indexing implementation that handles collection creation and document upsert according to its specific API. The indexing process is identical regardless of which compression strategy will be used at search time.
+### Abstractive Compression
 
-### Search
+An LLM reads the full retrieved context and generates a summary focused on information relevant to the query. The summary captures key facts using the LLM's own language.
 
-The search pipeline embeds the incoming query and retrieves an initial candidate set from the vector database, typically fetching twice the number of documents ultimately requested. The candidates are then passed through the configured compressor. When using reranking, a cross-encoder model scores each query-document pair and the results are sorted by relevance score, keeping only the top results. When using LLM extraction, a language model processes each document and extracts only the passages relevant to the query, returning condensed versions. The compressed result set is truncated to the final requested count and returned.
+```
+Query: "What causes auroras?"
+Retrieved: 3 documents, each 500 words
+Compressed: 1 paragraph summarizing the solar wind-magnetic field interaction
+```
 
-## Supported Databases
+### Extractive Compression
 
-| Database | Search Module | Indexing Module | Notes |
-|----------|---------------|-----------------|-------|
-| Pinecone | `search/pinecone_search.py` | `indexing/pinecone_indexing.py` | Serverless managed service |
-| Weaviate | `search/weaviate_search.py` | `indexing/weaviate_indexing.py` | GraphQL-based queries |
-| Chroma | `search/chroma_search.py` | `indexing/chroma_indexing.py` | Local or cloud deployment |
-| Milvus | `search/milvus_search.py` | `indexing/milvus_indexing.py` | Distributed vector database |
-| Qdrant | `search/qdrant_search.py` | `indexing/qdrant_indexing.py` | Payload filtering support |
+An LLM selects the most relevant sentences from the retrieved text and returns them verbatim, without rephrasing. This preserves exact wording from source documents — useful when faithfulness to the original is important.
+
+```
+Returned: The 5 most relevant sentences, extracted from their original documents
+```
+
+### Relevance Filtering
+
+Each paragraph in the retrieved context is scored 0–100 for relevance to the query. Paragraphs below the configured threshold are dropped. The output is a subset of the original paragraphs.
+
+```
+Threshold: 50
+Input: 6 paragraphs across 2 documents
+Output: 4 paragraphs that scored >= 50
+```
+
+All compression methods fall back to returning the original context unchanged if the LLM call fails, ensuring the pipeline never breaks due to a compression error.
+
+The `compression_utils.py` file contains shared utilities for token counting and context building used across compression strategies.
+
+## When to Use It
+
+- Long source documents or large candidate sets where the retrieved context substantially exceeds the generator's context window.
+- Pipelines with high token cost where reducing the generator's input by 50–80% has meaningful economic impact.
+- Cases where retrieved documents contain relevant paragraphs embedded in large amounts of irrelevant background material.
+- Generation quality that is degraded by noisy or tangential context; compression can improve answer faithfulness.
+
+## When Not to Use It
+
+- Very short passages (one or two sentences per document) where compression removes needed nuance.
+- Pipelines that already operate with minimal clean context; compression overhead is not justified.
+- Strict latency requirements — each compression call adds one LLM round-trip.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Often improves generation grounding by removing noise; may lose nuance with aggressive compression |
+| Latency | Extra LLM call adds 200–2000 ms depending on context length and model |
+| Cost | Can reduce generation cost despite added compression cost if context shrinks significantly |
 
 ## Configuration
 
-Each database has per-dataset YAML configuration files organized by database and dataset, with separate files for each compression strategy. The configuration controls database connection parameters, embedding model selection, retrieval top-k for over-fetching, compression type and model, and optional RAG generation.
-
 ```yaml
-milvus:
-  host: "${MILVUS_HOST:-localhost}"
-  port: "${MILVUS_PORT:-19530}"
-
-collection:
-  name: "triviaqa_compression"
-
-embeddings:
-  model: "Qwen/Qwen3-Embedding-0.6B"
-  dimension: 1024
-
-retrieval:
-  top_k: 20
-
 compression:
-  type: "reranking"
-  top_k: 5
-  reranker:
-    type: "cross_encoder"
-    model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  strategy: "abstractive"       # "abstractive", "extractive", or "relevance_filter"
+  max_tokens: 2048              # For abstractive: max output tokens
+  num_sentences: 5             # For extractive: number of sentences to keep
+  relevance_threshold: 0.5     # For relevance_filter: minimum score to keep (0.0–1.0)
+  compression_top_k: 3         # Number of retrieved documents to feed into compressor
 
-rag:
-  enabled: false
-  llm:
-    provider: "groq"
-    model: "llama-3.3-70b-versatile"
-
-logging:
-  name: "contextual_compression"
-  level: "INFO"
+llm:
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  api_base_url: "https://api.groq.com/openai/v1"
+  temperature: 0.0             # Deterministic compression
+  max_tokens: 2048
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-src/vectordb/haystack/contextual_compression/
-├── __init__.py                        # Public exports for pipeline and utility classes
-├── base.py                            # Abstract base class with shared orchestration logic
-├── compression_utils.py               # Compressor factory, token counter, result formatting
-├── evaluation.py                      # Compression quality metrics calculation
-├── configs/                           # YAML configs (50 files: 5 DBs x 5 datasets x 2 strategies)
-│   ├── __init__.py
-│   ├── milvus/
-│   │   ├── triviaqa/
-│   │   │   ├── reranking.yaml
-│   │   │   └── llm_extraction.yaml
-│   │   ├── arc/
-│   │   ├── popqa/
-│   │   ├── factscore/
-│   │   └── earnings_calls/
-│   ├── pinecone/                      # Same nested structure per dataset
-│   ├── qdrant/
-│   ├── chroma/
-│   └── weaviate/
-├── indexing/                          # Database-specific indexing implementations
-│   ├── __init__.py
-│   ├── base_indexing.py               # Base indexing class
-│   ├── milvus_indexing.py             # Milvus document indexing
-│   ├── pinecone_indexing.py           # Pinecone document indexing
-│   ├── qdrant_indexing.py             # Qdrant document indexing
-│   ├── chroma_indexing.py             # Chroma document indexing
-│   └── weaviate_indexing.py           # Weaviate document indexing
-├── search/                            # Database-specific search with compression
-│   ├── __init__.py
-│   ├── milvus_search.py               # Milvus retrieval and compression
-│   ├── pinecone_search.py             # Pinecone retrieval and compression
-│   ├── qdrant_search.py               # Qdrant retrieval and compression
-│   ├── chroma_search.py               # Chroma retrieval and compression
-│   └── weaviate_search.py             # Weaviate retrieval and compression
-└── README.md
-```
+| Setting | Why It Matters |
+|---|---|
+| `compression.strategy` | Extractive is safest (preserves original text); abstractive is most concise; relevance filter is most configurable |
+| `compression.compression_top_k` | Controls how many retrieved documents are sent to the compressor; balance quality vs latency |
+| `compression.relevance_threshold` | For relevance filter only: too high removes useful context; too low keeps everything |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/reranking/` - Dedicated two-stage reranking pipelines (related but separate focus)
-- `src/vectordb/haystack/semantic_search/` - Standard dense indexing without compression
-- `src/vectordb/haystack/cost_optimized_rag/` - Cost-aware RAG with conditional compression
-- `src/vectordb/haystack/agentic_rag/` - Full RAG pipelines with generation
+- **Over-compressing**: Setting `num_sentences` to 1 or `max_tokens` to 100 may remove the exact evidence needed for the answer. Start conservatively (5–10 sentences or 500–1000 tokens).
+- **Compressing before fixing retrieval quality**: If retrieval recall is poor, compression cannot recover missing evidence. Establish strong retrieval first, then add compression.
+- **Not auditing answer faithfulness after compression changes**: Abstractive compression in particular may paraphrase source material in ways that subtly alter factual content. Spot-check generated answers against source documents.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+`llm_extraction`, `reranking` (specialized configs for compression evaluation scenarios).
+
+## Next Steps
+
+- Use `reranking/` as an alternative when improving result ranking is the primary goal rather than reducing context length.
+- Use `cost_optimized_rag/` for a broader budget-control strategy that combines compression with retrieval breadth controls.
+- Combine with `parent_document_retrieval/` when parent documents are retrieved but need trimming before generation.

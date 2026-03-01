@@ -1,56 +1,177 @@
-# LangChain Utilities
+# Utils (LangChain)
 
-This module provides shared utility helpers used across all LangChain feature modules. Each helper encapsulates a specific concern -- configuration loading, embedding creation, document filtering, result merging, reranking, diversification, and RAG generation -- so that feature modules can focus on orchestrating these capabilities rather than reimplementing them.
+Shared helper classes used across all LangChain feature pipelines. These utilities centralize repeated operations so individual feature implementations stay concise and consistent.
 
-Compared to the Haystack utilities module, the LangChain utilities include two additional helpers not found in the Haystack counterpart: one for computing maximal marginal relevance scores and one for generating sparse embeddings. These are provided here because LangChain pipelines manage these operations explicitly in user code, whereas the Haystack integration delegates them to built-in pipeline nodes.
+## Modules
 
-## Overview
+### `EmbedderHelper` (`embeddings.py`)
 
-- Configuration loading with YAML parsing and environment variable resolution
-- Dataset integration for loading and chunking documents from supported datasets
-- Dense embedding creation using HuggingFace sentence-transformer models
-- Sparse embedding creation using SPLADE-based models from sentence-transformers
-- Document filtering by metadata fields, nested JSON paths, and custom predicates with support for ten comparison operators
-- Result fusion for combining results from multiple queries using reciprocal rank fusion or weighted scoring
-- Maximal marginal relevance reranking to balance relevance and diversity in search results
-- Semantic diversification using greedy selection or clustering-based approaches
-- Cross-encoder reranking for improved relevance scoring of query-document pairs
-- RAG answer generation with configurable prompt templates and LLM integration
+Helper for creating and using HuggingFace embedding models within LangChain pipelines.
 
-## How It Works
+| Method | Description |
+|---|---|
+| `create_embedder(config)` | Creates a `HuggingFaceEmbeddings` instance from the `embeddings` config section |
+| `embed_documents(embedder, documents)` | Embeds a list of LangChain `Document` objects, returning `(documents, embeddings)` tuple |
+| `embed_query(embedder, query)` | Embeds a single query string, returning a `list[float]` vector |
 
-The configuration loader reads YAML files and resolves environment variable references, providing a dictionary that other helpers consume to initialize their dependencies. The dataset integration helper loads documents from one of five supported datasets (TriviaQA, ARC, PopQA, FactScore, or EarningsCall) and optionally applies recursive text splitting for chunking.
+Config structure:
 
-The dense embedding helper wraps HuggingFace sentence-transformer models to produce vector representations for documents and queries. The sparse embedding helper wraps the sentence-transformers sparse encoder (using SPLADE models) to produce sparse token-weight dictionaries, with optional L2 normalization for both document and query embeddings.
-
-The document filter supports ten comparison operators (equals, contains, starts-with, ends-with, greater-than, less-than, greater-or-equal, less-or-equal, in, and not-in) and can traverse nested JSON paths within document metadata. It also supports arbitrary predicate functions for custom filtering logic.
-
-The result merger implements two fusion strategies for combining results from multiple retrieval passes: reciprocal rank fusion and weighted merge scoring. Both strategies support per-result-set weighting and include deduplication by document content or metadata key. The `dedup_key` parameter allows specifying a metadata field (e.g., document ID) for more robust deduplication when documents have similar content but different identifiers.
-
-The maximal marginal relevance helper iteratively selects documents that balance query relevance against redundancy with already-selected documents, controlled by a lambda trade-off parameter. The diversification helper provides both a greedy similarity-threshold approach and a clustering-based approach (using k-means) for selecting diverse document subsets.
-
-The cross-encoder reranker scores query-document pairs jointly using a HuggingFace cross-encoder model and returns documents sorted by relevance, optionally truncated to a top-k limit. The RAG helper formats retrieved documents into a prompt template and generates answers using a language model.
-
-## Directory Structure
-
-```
-utils/
-    __init__.py              # Package exports for all utility helpers
-    config.py                # Configuration loading (re-exports from Haystack utils)
-    dataloader.py            # Dataset loading and document chunking
-    diversification.py       # Semantic diversification (greedy and clustering-based)
-    embeddings.py            # Dense embedding creation with HuggingFace models
-    filters.py               # Document filtering by metadata, JSON paths, and predicates
-    fusion.py                # Result merging with reciprocal rank fusion and weighted scoring
-    mmr.py                   # Maximal marginal relevance reranking (LangChain-specific)
-    rag.py                   # RAG prompt formatting and answer generation
-    reranker.py              # Cross-encoder reranking with HuggingFace models
-    sparse_embeddings.py     # Sparse embedding creation with SPLADE models (LangChain-specific)
+```yaml
+embeddings:
+  model: "sentence-transformers/all-MiniLM-L6-v2"  # Required
+  device: "cpu"                                       # Optional: "cpu" or "cuda"
+  batch_size: 32                                      # Optional
 ```
 
-## Related Modules
+```python
+from vectordb.langchain.utils import EmbedderHelper
 
-- `src/vectordb/haystack/utils/` - Haystack utility helpers (shared configuration loader, no MMR or sparse embedder)
-- `src/vectordb/langchain/components/` - Higher-level pipeline components that build on these utilities
-- `src/vectordb/utils/` - Core shared utilities (document converters, logging)
-- `src/vectordb/dataloaders/langchain/` - LangChain-specific dataset loaders consumed by the dataloader helper
+config = {"embeddings": {"model": "sentence-transformers/all-MiniLM-L6-v2", "device": "cpu"}}
+embedder = EmbedderHelper.create_embedder(config)
+query_vec = EmbedderHelper.embed_query(embedder, "What is machine learning?")
+```
+
+GPU acceleration (10–50× speedup for batch operations): set `device: "cuda"` when a GPU is available.
+
+---
+
+### `RerankerHelper` (`reranker.py`)
+
+Helper for reranking retrieved documents using HuggingFace cross-encoder models from `langchain-community`.
+
+| Method | Description |
+|---|---|
+| `create_reranker(config)` | Creates `HuggingFaceCrossEncoder` from the `reranker.model` config field |
+| `rerank(reranker, query, documents, top_k)` | Scores and sorts documents; returns sorted documents |
+| `rerank_with_scores(reranker, query, documents, top_k)` | Returns `list[(Document, float)]` for when scores are needed downstream |
+
+Config structure:
+
+```yaml
+reranker:
+  model: "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Default if not specified
+```
+
+```python
+from vectordb.langchain.utils import RerankerHelper
+
+reranker = RerankerHelper.create_reranker(config)
+reranked = RerankerHelper.rerank(reranker, query, documents, top_k=5)
+```
+
+---
+
+### `MMRHelper` (`mmr.py`)
+
+Pure-Python MMR (Maximal Marginal Relevance) algorithm using NumPy cosine similarity.
+
+| Method | Description |
+|---|---|
+| `cosine_similarity(embedding1, embedding2)` | Computes cosine similarity between two vectors |
+| `mmr_rerank(documents, embeddings, query_embedding, lambda_param, k)` | Full MMR selection returning `list[(Document, score)]` |
+| `mmr_rerank_simple(documents, embeddings, query_embedding, k, lambda_param)` | Simplified version returning only documents |
+
+The `lambda_param` controls the relevance-diversity tradeoff (1.0 = pure relevance, 0.0 = pure diversity).
+
+```python
+from vectordb.langchain.utils import MMRHelper
+
+reranked = MMRHelper.mmr_rerank_simple(documents, embeddings, query_embedding, k=10, lambda_param=0.5)
+```
+
+---
+
+### `ResultMerger` (`fusion.py`)
+
+Score fusion for combining dense and sparse retrieval results in hybrid search pipelines.
+
+| Method | Description |
+|---|---|
+| `fuse_rrf(dense, sparse, top_k, k=60)` | Reciprocal Rank Fusion — rank-based, no score normalization needed |
+| `fuse_weighted(dense, sparse, top_k, dense_weight, sparse_weight)` | Weighted inverse-rank fusion for explicit control |
+| `fuse(dense, sparse, top_k, strategy="rrf", **kwargs)` | Unified interface |
+
+Both methods deduplicate by document ID (falling back to content prefix) before fusion.
+
+```python
+from vectordb.langchain.utils import ResultMerger
+
+fused = ResultMerger.fuse_rrf(dense_results, sparse_results, top_k=10)
+```
+
+---
+
+### `RAGHelper` (`rag.py`)
+
+Helper for LLM-based answer generation from retrieved LangChain documents.
+
+| Method | Description |
+|---|---|
+| `create_llm(config)` | Creates a `ChatGroq` instance; returns `None` if `rag.enabled: false` |
+| `format_prompt(query, documents, template)` | Formats documents into a numbered context prompt |
+| `generate(llm, query, documents, template)` | Generates an answer using the LLM and returns it as a string |
+
+Config structure:
+
+```yaml
+rag:
+  enabled: true
+  model: "llama-3.3-70b-versatile"
+  api_key: "${GROQ_API_KEY}"
+  temperature: 0.7
+  max_tokens: 2048
+```
+
+Default prompt: `{context}\n\nQuestion: {query}\n\nAnswer:`.
+
+---
+
+### `DocumentConverter` (`document_converter.py`)
+
+Converts between LangChain `Document` objects and backend-native storage formats. Used by indexing scripts to prepare documents for upsert.
+
+---
+
+### `FiltersHelper` (`filters.py`)
+
+Translates MongoDB-style filter dicts to backend-native filter syntax for LangChain vector stores. Called by feature pipelines that need to pass metadata filters to LangChain retrievers.
+
+---
+
+### `SparseEmbeddingHelper` (`sparse_embeddings.py`)
+
+Creates and applies sparse embedding models for LangChain hybrid search pipelines. Handles SPLADE-style sparse encoding and conversion to backend-native sparse vector formats.
+
+---
+
+### `DiversificationHelper` (`diversification.py`)
+
+Sequential cosine similarity count filter for near-duplicate removal. Processes documents in original order and drops candidates that are too similar to too many already-selected documents.
+
+Config section:
+
+```yaml
+semantic_diversification:
+  enabled: true
+  diversity_threshold: 0.7
+  max_similar_docs: 2
+```
+
+---
+
+### `ConfigLoader` (`config.py`)
+
+Re-exports `ConfigLoader` from `vectordb.utils.config_loader` to provide a consistent import path for LangChain feature pipelines.
+
+```python
+from vectordb.langchain.utils import ConfigLoader
+
+config = ConfigLoader.load("configs/pinecone_triviaqa.yaml")
+ConfigLoader.validate(config, "pinecone")
+```
+
+## Common Pitfalls
+
+- **Copy-pasting utility logic into feature scripts**: All embedding creation, reranking, MMR, and generation should go through these helpers for consistency.
+- **Mixing framework-specific helpers**: LangChain utilities use `langchain_core.documents.Document` and `HuggingFaceEmbeddings`. Do not mix Haystack-specific helpers (which use `haystack.Document` and `SentenceTransformersDocumentEmbedder`) into LangChain pipelines.
+- **Not handling `None` from `RAGHelper.create_llm()`**: When `rag.enabled: false`, `create_llm()` returns `None`. Check before calling `generate()`.

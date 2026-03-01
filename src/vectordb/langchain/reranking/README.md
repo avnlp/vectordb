@@ -1,118 +1,74 @@
 # Reranking (LangChain)
 
-Two-stage retrieval pipelines that combine fast dense vector search with cross-encoder reranking for improved relevance. The first stage retrieves a large candidate set using approximate nearest neighbor search over document embeddings. The second stage rescores each candidate using a cross-encoder model that jointly processes the query and document text, producing more accurate relevance judgments than embedding similarity alone.
-
-The initial retrieval over-fetches by a configurable factor (typically three times the final result count) to ensure the reranker has a broad candidate pool. After rescoring, only the top results are returned, balancing precision with latency. All five supported vector databases share a consistent pipeline interface, with database-specific logic isolated in dedicated modules.
-
-## Overview
-
-- Two-stage retrieval: fast dense search followed by cross-encoder reranking
-- Over-fetches candidates in the first stage to maximize reranker effectiveness
-- Supports multiple cross-encoder models for rescoring
-- Separate indexing and search pipelines for independent scaling
-- Optional RAG answer generation using an LLM (Groq or OpenAI-compatible endpoints)
-- Configuration-driven via YAML files with environment variable support
-- 25 pre-built configuration files covering all database and dataset combinations
+Reranking is a two-stage retrieval pattern. A fast first-pass retriever returns a broad candidate pool, and a cross-encoder model then scores each query-document pair jointly to produce a more precise final ranking.
 
 ## How It Works
 
-### Indexing
+1. **First-pass retrieval**: The semantic search pipeline retrieves a large candidate pool (typically 20–50 documents) using fast ANN search over precomputed embeddings.
+2. **Cross-encoder reranking**: The candidate pool is passed to `RerankerHelper` (from `utils/reranker.py`), which creates a `HuggingFaceCrossEncoder` and scores each `(query, document)` pair. Cross-encoders run the query and document through the same model simultaneously, enabling fine-grained attention over query-document interactions.
+3. **Top-k selection**: The reranked list is sorted by cross-encoder score and truncated to the final `top_k`. This smaller, higher-precision set is passed to the generator.
 
-The indexing pipeline loads documents from a configured dataset, generates dense embeddings using a sentence-transformer model, creates or recreates the target collection in the vector database, and upserts all embedded documents. The indexing phase is identical to standard dense indexing, as reranking is applied only at search time. Each database has a dedicated indexing implementation that handles connection setup and collection management according to its specific API.
+`RerankerHelper.create_reranker(config)` instantiates the cross-encoder from the config. `RerankerHelper.rerank(reranker, query, documents, top_k)` applies reranking and returns sorted documents. `rerank_with_scores()` returns `(Document, score)` tuples when scores are needed downstream.
 
-### Search
+Recommended models:
+- `cross-encoder/ms-marco-MiniLM-L-6-v2`: Fast, English-focused.
+- `cross-encoder/ms-marco-MiniLM-L-12-v2`: More accurate, slower.
+- `BAAI/bge-reranker-v2-m3`: High accuracy, multilingual.
 
-The search pipeline embeds the incoming query using the same sentence-transformer model used during indexing. It then retrieves a larger-than-needed candidate set from the vector database (controlled by the top_k parameter). The over-fetched candidates are passed to a cross-encoder reranker, which jointly encodes each query-document pair to produce a more accurate relevance score than cosine similarity alone. The reranked results are truncated to the final requested count (rerank_k) and returned. When RAG is enabled, the reranked documents are passed as context to an LLM for answer generation.
+## When to Use It
 
-## Supported Databases
+- High-accuracy QA where top-1 or top-3 precision is the key metric.
+- Cases where first-pass recall is acceptable but ranking quality is weak.
+- Pipelines where latency allows an extra 100–300 ms for reranking.
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | Serverless managed service |
-| Weaviate | Supported | GraphQL-based queries |
-| Chroma | Supported | Local or cloud deployment |
-| Milvus | Supported | Distributed vector database |
-| Qdrant | Supported | Payload filtering support |
+## When Not to Use It
+
+- Ultra-low-latency APIs where additional model inference is unacceptable.
+- Very large candidate pools (100+ documents) where cross-encoder inference cost is prohibitive.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Often the largest single precision gain in the pipeline |
+| Latency | Higher than single-stage retrieval; scales linearly with candidate pool size |
+| Cost | Cross-encoder inference is more expensive per document than ANN search |
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file using flat naming. Below is an example showing the key sections:
-
 ```yaml
-dataloader:
-  type: "triviaqa"           # triviaqa, arc, popqa, factscore, earnings_calls
-  split: "test"
-  limit: 100
-  use_text_splitter: false
-
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  device: "cpu"
-  batch_size: 32
+search:
+  candidate_pool_size: 20    # First-pass retrieval breadth
+  top_k: 5                   # Final result count after reranking
 
 reranker:
-  model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
-
-pinecone:                     # Database-specific section (one per config)
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "lc-reranking-triviaqa"
-  namespace: ""
-  dimension: 384
-  metric: "cosine"
-  recreate: false
-
-search:
-  top_k: 20                  # Number of candidates to over-fetch
-  rerank_k: 5                # Number of results after reranking
-
-rag:
-  enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  name: "lc_reranking_pinecone"
-  level: "INFO"
+  model: "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Required
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-reranking/
-├── __init__.py
-├── README.md
-├── indexing/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone reranking indexing
-│   ├── weaviate.py                    # Weaviate reranking indexing
-│   ├── chroma.py                      # Chroma reranking indexing
-│   ├── milvus.py                      # Milvus reranking indexing
-│   └── qdrant.py                      # Qdrant reranking indexing
-├── search/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone search with reranking
-│   ├── weaviate.py                    # Weaviate search with reranking
-│   ├── chroma.py                      # Chroma search with reranking
-│   ├── milvus.py                      # Milvus search with reranking
-│   └── qdrant.py                      # Qdrant search with reranking
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── pinecone_popqa.yaml
-    ├── pinecone_factscore.yaml
-    ├── pinecone_earnings_calls.yaml
-    ├── weaviate_triviaqa.yaml
-    ├── ...
-    ├── chroma_*.yaml
-    ├── milvus_*.yaml
-    └── qdrant_*.yaml
-```
+| Setting | Why It Matters |
+|---|---|
+| `reranker.model` | Primary quality and cost tradeoff; larger models score better but slower |
+| `candidate_pool_size` | Too small = missing evidence; too large = slow reranking. Set to 2–5× final `top_k`. |
+| `search.top_k` | Final context size sent to the generator |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/langchain/semantic_search/` - Dense-only semantic search pipelines (without reranking stage)
-- `src/vectordb/langchain/mmr/` - Diversity-aware retrieval using Maximal Marginal Relevance
-- `src/vectordb/langchain/utils/` - Shared utilities for configuration loading, embedding, data loading, reranker creation, and RAG generation
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+- **Reranking too few candidates**: If the relevant document is not in the first-pass candidate pool, reranking cannot help. Set `candidate_pool_size` generously (at least 15–25).
+- **Weak first-pass retrieval**: Reranking reorders candidates but cannot add new ones. Fix retrieval recall first.
+- **Not measuring latency impact**: Benchmark reranking latency on representative query loads before committing to production.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Combine with `hybrid_indexing/` for stronger first-pass recall feeding better candidates to the reranker.
+- Use `contextual_compression/` after reranking to further shorten the final context.
+- Use `mmr/` when result diversity matters more than maximum precision.
