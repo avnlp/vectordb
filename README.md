@@ -264,6 +264,14 @@ result = pipeline.run(query="Explain how neural networks learn", top_k=10)
 print(result["final_answer"])
 ```
 
+## Documentation
+
+Comprehensive documentation is available under [`docs/`](docs/README.md), including:
+
+- Core architecture and configuration references
+- Framework-specific guides for Haystack and LangChain
+- Feature-level conceptual and API-oriented documentation
+
 ## Contributing
 
 Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for detailed contribution guidelines.
