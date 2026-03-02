@@ -1,115 +1,90 @@
-# Semantic Search
+# Semantic Search (Haystack)
 
-Semantic search provides end-to-end dense vector retrieval pipelines for all five supported vector databases. Documents are embedded into dense vectors using a sentence-transformer model, stored in a vector database, and retrieved at query time by computing cosine similarity between a query embedding and the stored document embeddings.
-
-The module supports optional post-retrieval features including client-side metadata filtering, semantic diversification to reduce redundant results, and retrieval-augmented generation (RAG) to produce natural-language answers grounded in the retrieved documents.
-
-## Overview
-
-- Dense vector indexing using sentence-transformer embedding models
-- Similarity search with configurable distance metrics (cosine, euclidean, dot product)
-- Client-side metadata filtering with operators such as equality, comparison, and membership
-- Semantic diversification to remove near-duplicate results based on a similarity threshold
-- Optional RAG answer generation using an LLM (Groq or OpenAI-compatible endpoints)
-- Fully configuration-driven through YAML files with environment variable substitution
-- 25 pre-built configuration files covering all database and dataset combinations
+Semantic search retrieves documents by meaning rather than exact keyword overlap. Documents and queries are converted into dense vector embeddings by the same model, and similarity is measured by cosine distance in the embedding space.
 
 ## How It Works
 
-### Indexing Phase
+1. **Indexing**: Each document's text is passed through a SentenceTransformers model (`SentenceTransformersDocumentEmbedder`) to produce a dense float vector. The vector and the document metadata are stored in the target vector database.
+2. **Query embedding**: At search time, the query string is embedded with the same model (`SentenceTransformersTextEmbedder`) to produce a query vector.
+3. **Nearest-neighbor retrieval**: The database performs approximate nearest-neighbor (ANN) search over indexed embeddings and returns the top-k most similar documents ranked by cosine similarity score.
+4. **Optional filtering**: Metadata filters can be applied to restrict the candidate set before similarity scoring, using the backend's native filter syntax.
 
-The indexing pipeline loads a dataset through the dataloader, converts each record into a Haystack document, and passes the documents through a dense embedding model. The resulting vectors and associated metadata are then upserted into the target vector database. Each database-specific indexing module handles the connection setup, index or collection creation, and batch insertion according to that database's native protocol.
+The `EmbedderFactory` (from `utils/embeddings.py`) creates and warms up both the document and text embedders from the config file. Warm-up pre-loads the model weights so the first real call does not incur cold-start latency.
 
-### Search Phase
+## When to Use It
 
-The search pipeline embeds the incoming query text using the same dense model used during indexing. It then issues a nearest-neighbor search against the vector database, retrieving the top-k most similar documents by cosine similarity. If metadata filters are provided, they are applied to narrow results. When semantic diversification is enabled, the pipeline removes documents that are too similar to one another based on a configurable diversity threshold. If RAG is enabled, the retrieved documents are passed as context to an LLM, which generates a concise answer to the original query.
+- Natural-language questions where the phrasing in the question may differ from the phrasing in documents.
+- General-purpose RAG starting points before specializing with advanced features.
+- Any corpus where exact keyword overlap between query and documents is unreliable.
 
-## Supported Databases
+## When Not to Use It
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | Uses namespaces for logical partitioning |
-| Weaviate | Supported | Uses collections for organization |
-| Chroma | Supported | Lightweight local or client-server deployment |
-| Milvus | Supported | Uses collections with configurable metrics |
-| Qdrant | Supported | Supports both local and server deployments |
+- Strict compliance or legal workflows where specific terms must appear verbatim.
+- Very small corpora (fewer than a few hundred documents) where BM25 already saturates quality.
+- Keyword-heavy technical workloads with domain acronyms and jargon where semantic generalization is unhelpful.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Strong semantic recall; can miss exact terminology |
+| Latency | Low to moderate; dominated by embedding model inference |
+| Cost | Embedding model compute + vector search cost per query |
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file. Below is an example showing the key sections:
+Each backend has a set of config files under `configs/`. A typical config looks like:
 
 ```yaml
-dataloader:
-  type: "arc"              # triviaqa, arc, popqa, factscore, earnings_calls
-  split: "test"
-  limit: 1000
+pinecone:
+  api_key: "${PINECONE_API_KEY}"
+  index_name: "semantic-search"
 
 embeddings:
   model: "sentence-transformers/all-MiniLM-L6-v2"
   device: "cpu"
   batch_size: 32
 
-pinecone:                  # Database-specific section (one per config)
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "semantic-arc"
-  namespace: ""
-  dimension: 384
-  metric: "cosine"
+dataloader:
+  dataset: "triviaqa"
+  split: "test"
+  limit: 500
 
 search:
   top_k: 10
 
-semantic_diversification:
-  enabled: false
-  diversity_threshold: 0.7
-  max_similar_docs: 2
-
 rag:
   enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  api_base_url: "https://api.groq.com/openai/v1"
-  temperature: 0.7
-  max_tokens: 2048
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-semantic_search/
-├── __init__.py                        # Package exports for all pipelines
-├── README.md
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone dense indexing
-│   ├── weaviate.py                    # Weaviate dense indexing
-│   ├── chroma.py                      # Chroma dense indexing
-│   ├── milvus.py                      # Milvus dense indexing
-│   └── qdrant.py                      # Qdrant dense indexing
-├── search/                            # Database-specific search pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone semantic search
-│   ├── weaviate.py                    # Weaviate semantic search
-│   ├── chroma.py                      # Chroma semantic search
-│   ├── milvus.py                      # Milvus semantic search
-│   └── qdrant.py                      # Qdrant semantic search
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── pinecone/
-    │   ├── triviaqa.yaml
-    │   ├── arc.yaml
-    │   ├── popqa.yaml
-    │   ├── factscore.yaml
-    │   └── earnings_calls.yaml
-    ├── weaviate/                       # Same 5 dataset files per database
-    ├── chroma/
-    ├── milvus/
-    └── qdrant/
-```
+| Setting | Why It Matters |
+|---|---|
+| `embeddings.model` | The single largest quality lever. Better models produce more meaningful similarity scores. |
+| `search.top_k` | Controls how many candidates are returned. Too small misses evidence; too large increases downstream cost. |
+| `dataloader.limit` | Controls corpus size for experiments. Start small to validate the pipeline, then scale up. |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/utils/` - Shared utilities for configuration loading, embedding, data loading, filtering, diversification, and RAG generation
-- `src/vectordb/haystack/hybrid_indexing/` - Hybrid dense-plus-sparse search pipelines
-- `src/vectordb/haystack/metadata_filtering/` - Structured field-level filtering pipelines
-- `src/vectordb/haystack/mmr/` - Diversity-aware retrieval using Maximal Marginal Relevance
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+- **Mismatched embedding models**: Using a different model for indexing and querying produces meaningless similarity scores. Always use the same `model` value in both indexing and search configs.
+- **Oversized chunks**: Large text chunks blur the embedding signal, making the vector represent too many topics at once. Shorter, focused chunks usually produce better retrieval.
+- **Too small `top_k`**: If relevant evidence is rarely in the top 3 results, increasing `top_k` to 10 or 20 and then applying reranking usually helps more than tuning the embedding model.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+Each backend has an indexing script in `indexing/` and a search script in `search/`.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA. Config files are named `{backend}_{dataset}.yaml` inside `configs/`.
+
+## Next Steps
+
+After establishing a semantic search baseline:
+
+- Add `reranking/` for better final-result precision.
+- Switch to `hybrid_indexing/` if your queries mix natural language with domain keywords.
+- Add `metadata_filtering/` if your corpus has reliable structured attributes to constrain results.

@@ -1,136 +1,281 @@
-# Vector Databases
+<h1 align="center"> <a href="https://github.com/avnlp/vectordb"> VectorDB </a> </h1>
 
-- Vector databases store and manage data as high-dimensional vectors, enabling similarity-based retrieval.
-- They are designed to efficiently find the most relevant entries by comparing vector embeddings, which represent the semantic meaning of data.
-- Vector databases are integral to Retrieval-Augmented Generation (RAG) pipelines, where they enhance the retrieval of contextually relevant information before the response generation stage.
+<div align="center">
 
-The main goal of this repo is to compare and contrast the functionality of the vector databases. We compare the following vector databases:
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/avnlp/vectordb)
+[![CI](https://img.shields.io/github/actions/workflow/status/avnlp/vectordb/ci.yml?branch=main&label=CI&logo=githubactions)](https://github.com/avnlp/vectordb/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/github/avnlp/vectordb/graph/badge.svg)](https://codecov.io/github/avnlp/vectordb)
+[![Ruff](https://img.shields.io/github/actions/workflow/status/avnlp/vectordb/ci.yml?branch=main&label=Ruff&logo=ruff)](https://github.com/avnlp/vectordb/actions/workflows/ci.yml)
+[![MyPy](https://img.shields.io/github/actions/workflow/status/avnlp/vectordb/ci.yml?branch=main&label=MyPy&logo=python)](https://github.com/avnlp/vectordb/actions/workflows/ci.yml)
+[![Bandit](https://img.shields.io/github/actions/workflow/status/avnlp/vectordb/ci.yml?branch=main&label=Bandit&logo=owasp)](https://github.com/avnlp/vectordb/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/avnlp/vectordb/ci.yml?branch=main&label=Tests&logo=pytest)](https://github.com/avnlp/vectordb/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/avnlp/vectordb?color=green)](https://github.com/avnlp/vectordb/blob/main/LICENSE)
 
-- Pinecone
-- Weaviate
-- Chroma
-- Milvus
-- Qdrant
-## Installation
+</div>
 
-```bash
-pip install git+https://github.com/avnlp/vectordb
-```
+VectorDB provides a unified, production-oriented toolkit for Semantic Search and Retrieval-Augmented Generation across five vector databases, with feature parity between Haystack and LangChain.
 
-## Vector Embeddings
+It ships ready-to-run pipelines for Dense, Sparse, and Hybrid Retrieval, plus advanced RAG capabilities like Reranking, Query Enhancement, Contextual Compression, Parent-Child Retrieval, and Agentic Retrieval Loops. The design is configuration-driven, environment-variable friendly, and built for consistent benchmarking across databases and datasets. Use it to build, compare, and deploy retrieval systems without re-implementing logic per backend.
 
-There are two main types of vector embeddings:
+## Vector Databases
 
-- Dense Embeddings
-- Sparse Embeddings
+- **Pinecone**: Managed vector database with namespaces and native sparse-dense hybrid retrieval.
+- **Weaviate**: Open-source vector search with BM25 hybrid retrieval, collections, and multi-tenancy.
+- **Qdrant**: High-performance search with payload filtering and scalar or binary quantization.
+- **Milvus**: Scalable vector database with partition-key isolation and hybrid retrieval.
+- **Chroma**: Lightweight vector store for local development and rapid prototyping.
 
-### Dense Embeddings
+## Datasets & Evaluation
 
-- A dense embedding represents the semantic meaning of a piece of text in a high-dimensional numerical representation, where each element (or dimension) in the vector contains a real-valued number that contributes to the overall representation of the data's features.
-- Pinecone, Weaviate, and Chroma support creation of indexes/collections with dense embeddings.
+VectorDB includes dataset loaders and standardized evaluation utilities so you can benchmark retrieval quality across databases and frameworks.
 
-### Sparse Embeddings
+Supported datasets:
 
-- Sparse vectors have very large number of dimensions, where only a small proportion of values are non-zero.
-- When used for keywords search, each sparse vector represents a document; the dimensions represent words from a dictionary, and the values represent the importance of these words in the document.
-- Keyword search algorithms like the BM25 algorithm compute the relevance of text documents based on the number of keyword matches, their frequency, and other factors based on token presence in the document.
+- **TriviaQA** - Open-domain question-answer pairs for general knowledge retrieval.
+- **ARC** - Science reasoning questions requiring multi-hop inference.
+- **PopQA** - Factoid questions about popular entities.
+- **FactScore** - Atomic facts for verification and hallucination detection.
+- **Earnings Calls** - Financial transcript Q&A for domain-specific RAG.
+
+Built-in evaluation metrics:
+
+- Recall@k
+- Precision@k
+- MRR
+- NDCG@k
+- Hit rate
+
+## Features
+
+| Feature | What it enables |
+|:--|:--|
+| **Semantic Search** | Dense vector retrieval with metadata filters and optional answer generation. |
+| **Sparse Search** | Keyword-focused retrieval using sparse encoders for exact terminology. |
+| **Hybrid Search** | Dense + sparse retrieval fused with RRF or weighted scoring. |
+| **Reranking** | Two-stage retrieval using cross-encoders or API rerankers for higher precision. |
+| **MMR Diversity** | Maximal marginal relevance to balance relevance and diversity. |
+| **Diversity Filtering** | Remove near-duplicate results using similarity or clustering. |
+| **Metadata Filtering** | Structured filtering on fields and nested JSON paths. |
+| **JSON Indexing** | Index and query structured JSON documents with path-based filters. |
+| **Query Enhancement** | Multi-query, HyDE, and step-back prompting to improve recall. |
+| **Contextual Compression** | Reduce retrieved context via reranking or LLM extraction. |
+| **Parent Document Retrieval** | Index chunks but return parent documents or context windows. |
+| **Namespaces** | Logical partitioning for environment separation and dataset versioning. |
+| **Multi-Tenancy** | Tenant isolation using database-specific strategies at scale. |
+| **Cost-Optimized RAG** | Hybrid retrieval with local sparse embeddings and optional generation to reduce API cost. |
+| **Agentic RAG** | Iterative retrieval loop with search, reflect, and refine steps. |
+
+### Semantic Search (Dense Search)
+
+Semantic Search converts text into high-dimensional vectors using transformer embedding models, then finds documents with similar vector representations. This approach understands synonyms, paraphrases, and conceptual similarity—queries like "car" will match documents about "automobile" even without exact keyword overlap.
+
+- Supports any SentenceTransformers model
+- Optional semantic diversification removes near-duplicate results
+- Integrates with Groq or OpenAI for RAG answer generation
+- Metadata filters narrow results by category, date, source, or custom fields
+
+### Sparse Search (Keyword Search)
+
+Sparse Search uses SPLADE models to create sparse vectors that emphasize specific terms, similar to traditional BM25 but with learned term importance. This excels when exact terminology matters—legal documents, product SKUs, or technical specifications.
+
+- Supports SPLADE-based or BM25-style sparse encoders
+- Weaviate uses native BM25 without external embeddings
+- Works alongside dense search or as a standalone retrieval method
 
 ### Hybrid Search
 
-- Hybrid search in Pinecone leverages a single sparse-dense index, enabling simultaneous retrieval based on both keyword relevance (sparse vector) and semantic context (dense vector). Querying this index requires providing both the sparse and dense vector representations of the query.
-- During Index creation both dense and sparse embeddings need to be computed and specified for each document. This is an additional step that can be time-consuming for large datasets.
-- Weaviate’s Hybrid search combines BM25-based keyword search and vector-based semantic search by merging the results from both methods. To enable hybrid search, the query must specify `hybrid=True`, allowing for retrieval that balances exact term matching and contextual understanding.
-- Weaviate does not allow you to use custom sparse vectors for hybrid search. Only dense embeddings are required when creating the collection.
-- Chroma does not currently support hybrid search capabilities.  
+Hybrid search runs both dense and sparse retrieval in parallel, then fuses results using Reciprocal Rank Fusion (RRF) or weighted combination. You get the best of both worlds: semantic understanding for concepts plus keyword precision for specific terms.
 
-## Storing vector embeddings in a vector database
+- Dense + sparse fusion with configurable weights
+- RRF handles score normalization automatically
+- Built-in evaluation metrics: Recall@k, MRR, NDCG, Precision@k
+- No FastEmbed dependency—uses native SentenceTransformers sparse encoders
 
-- The Pinecone vector database stores vector embeddings in an Index. Each index can be partitioned into multiple namespaces.
-- Every index is made up of one or more namespaces and they are uniquely identified by a namespace name. Every record exists in exactly one namespace.
-- Queries and other operations are confined to one namespace, so different requests can search different subsets of your index.
+### Metadata Filtering
 
-Example: Creating an Index with multiple namespaces
+Filter search results using structured document attributes before or after vector search. A product catalog might filter by `category = "electronics"` and `price < 500` while still ranking by semantic relevance.
+
+- Operators: equals, not equals, greater than, less than, in list, contains, range
+- Database-specific expression builders generate optimal filter syntax
+- Selectivity analysis helps optimize filter order for performance
+- Timing metrics track pre-filter vs. vector search latency
+
+### Reranking
+
+Two-stage retrieval first casts a wide net with fast vector search, then uses a cross-encoder model to precisely score the top candidates. Cross-encoders see query and document together, enabling much finer relevance judgments than embedding similarity alone.
+
+- Models: modern cross-encoder rerankers and lightweight scoring models
+- Integrated evaluation with contextual recall, precision, and faithfulness metrics
+
+### MMR (Maximal Marginal Relevance)
+
+MMR balances relevance with diversity by penalizing documents too similar to those already selected. The result set covers more aspects of a topic instead of repeating similar content.
+
+- Tune relevance vs. diversity to fit the task
+- Uses SentenceTransformers DiversityRanker component
+- Particularly useful for summarization and exploratory search
+
+### Namespaces
+
+Namespaces partition data within a single index, enabling logical separation without managing multiple collections. Use cases include separating development from production data, versioning document sets, or organizing by content type.
+
+- Pinecone: native namespace support
+- Milvus: partition-based isolation
+- Qdrant, Chroma, Weaviate: collection-based separation
+- Cross-namespace search queries multiple partitions simultaneously
+
+### Multi-Tenancy
+
+Multi-tenancy isolates customer data so each tenant only sees their own documents. Isolation
+strategies include namespaces, partitions, payload filters, and tenant-scoped collections,
+tailored to the selected vector database.
+
+| Database | Isolation Strategy | Scale |
+|-|-|-|
+| Milvus | Partition key with filter expressions | Millions of tenants |
+| Weaviate | Native multi-tenancy with per-tenant shards | Enterprise-grade |
+| Pinecone | Namespace-based isolation | 100,000+ tenants |
+| Qdrant | Payload-based with optimized indexes | Tiered promotion |
+| Chroma | Tenant and database scoping | Flexible |
+
+### Query Enhancement
+
+Query enhancement rewrites user queries to improve retrieval. Three techniques address different challenges:
+
+- **Multi-Query** generates N variations of the original query, retrieves for each, and fuses results. Handles ambiguous or underspecified questions.
+- **HyDE (Hypothetical Document Embeddings)** asks an LLM to write a hypothetical answer, then searches for documents similar to that answer. Bridges the vocabulary gap between questions and documents.
+- **Step-Back Prompting** generates a more abstract version of the query to retrieve broader context before answering specific questions.
+
+### Parent Document Retrieval
+
+Index small chunks for precise matching, but return the larger parent document for context. This solves the chunk-size tradeoff: small chunks match accurately, but lack the surrounding context needed for good answers.
+
+- Retrieval modes: children only, with parents, or context window
+- Configurable parent and child chunk sizes with overlap
+- In-memory parent store links chunks to their source documents
+
+### Contextual Compression
+
+Reduce retrieved context to only the most relevant passages, cutting token costs for LLM generation. Two approaches trade off speed versus precision:
+
+- **Reranking-based** uses cross-encoders to score and filter passages (fast, nearly free)
+- **LLM extraction** asks a model to extract only relevant sentences (slower, more precise)
+
+Metrics track compression ratio and tokens saved per query.
+
+### Cost-Optimized RAG
+
+Production RAG pipelines need cost controls. This module provides:
+
+- **Pre-filtering** narrows the search space before vector operations
+- **Batch processing** groups multiple queries for efficient embedding and search
+- **Result caching** with LRU eviction avoids repeated searches
+- **Cost monitoring** tracks API calls, tokens, and estimated costs per operation
+
+### Agentic RAG
+
+Agentic RAG introduces a decision-making loop where an LLM agent controls the retrieval process. Instead of a fixed pipeline, the agent chooses actions based on what it learns:
+
+- **Route** — Decide whether to search, reflect, or generate based on current state
+- **Search** — Retrieve relevant documents from the vector database
+- **Compress** — Extract the most relevant passages from retrieved documents
+- **Reflect** — Evaluate answer quality and decide whether to iterate
+- **Generate** — Produce the final answer when confident
+
+The agent can iterate multiple times, refining its search strategy based on what it finds. This handles complex questions that require multiple retrieval steps or benefit from self-correction.
+
+### JSON Indexing
+
+Index and search structured JSON documents with nested field support. Query by JSON paths while still leveraging vector similarity for the text content.
+
+### Diversity Filtering
+
+Remove redundant documents using clustering or embedding similarity. When search returns many near-duplicates, diversity filtering selects representative documents to maximize information coverage.
+
+## Installation
+
+The project uses [uv](https://github.com/astral-sh/uv) for dependency management. First, ensure uv is installed:
+
+```bash
+# Install uv (if not already installed)
+pip install uv
+```
+
+Then install the project dependencies:
+
+```bash
+# Install dependencies
+uv sync
+
+# Activate the virtual environment
+source .venv/bin/activate
+```
+
+## Quick Start
+
+For detailed usage examples, see the feature-level READMEs under `src/vectordb/`.
+
+### Semantic Search (Haystack)
 
 ```python
-pinecone_vector_db = PineconeVectorDB(api_key=pinecone_api_key)
-pinecone_vector_db.create_index(
-    index_name="arc_index",
-    dimension=768,
-    metric="dotproduct",
-    spec=ServerlessSpec(cloud="aws", region="us-east-1"),
+from vectordb.haystack.semantic_search import PineconeSemanticSearchPipeline
+
+pipeline = PineconeSemanticSearchPipeline(
+    "src/vectordb/haystack/semantic_search/configs/pinecone/arc.yaml"
 )
-pinecone_vector_db.upsert(data=arc_train, namespace="train")
-pinecone_vector_db.upsert(data=arc_dev, namespace="dev")
+result = pipeline.search("What is photosynthesis?", top_k=5)
+
+for doc in result["documents"]:
+    print(doc.content)
 ```
 
-Example: Querying a specific namespace
+### Hybrid Search (Haystack)
 
 ```python
-pinecone_vector_db.query(vector=query_embedding, namespace="dev", top_k=5)
-```
+from vectordb.haystack.hybrid_indexing import MilvusHybridSearchPipeline
 
-- The Weaviate vector database stores vector embeddings in a Collection.
-- Multiple independent collections can be part of a single Weaviate Cluster.
-
-Example: Creating multiple independent collections in a Weaviate Cluster
-
-```python
-weaviate_vector_db = WeaviateVectorDB(cluster_url=weaviate_cluster_url, api_key=weaviate_api_key)
-weaviate_vector_db.create_collection(collection_name="arc_train")
-weaviate_vector_db.create_collection(collection_name="arc_dev")
-```
-
-- The Chroma vector database stores vector embeddings in a Collection. It does not support namespaces. Each collection is independent.
-
-Example: Creating a Chroma Collection
-
-```python
-chroma_vector_db = ChromaVectorDB(path="./chroma")
-chroma_vector_db.create_collection(name="arc_train")
-```
-
-## Metadata Filtering
-
-- Metadata fields are a way to add information to individual vectors to give them more meaning. By adding metadata to your vectors, you can filter by those fields at query time. You can limit your vector search based on metadata.
-- All three vector databases let you attach metadata key-value pairs to vectors in an index/collection, and specify filter expressions when you query it.
-- The metadata is included in the payload when you add your vectors.
-
-Example: Metadata Filters in Pinecone
-
-Pinecone supports metadata filtering using the `filter` parameter. The `filter` parameter takes a dictionary that specifies a filter expression.
-
-```python
-query_response = pinecone_vector_db.query(
-    vector=dense_question_embedding,
-    sparse_vector=sparse_question_embedding,
-    top_k=10,
-    include_metadata=True,
-    namespace="test_namespace",
-    filter={"$and": [{"id": {"$eq": "752235"}}, {"title": {"$eq": "Pete Sampras"}}]},
+pipeline = MilvusHybridSearchPipeline(
+    "src/vectordb/haystack/hybrid_indexing/configs/milvus_triviaqa.yaml"
 )
+result = pipeline.run(query="machine learning algorithms", top_k=10)
 ```
 
-Example: Metadata Filters in Weaviate
-
-Metadata filters in Weaviate are passed using the `filters` parameter. A list of `Filter` objects can be passed to the `filters` parameter.
+### Semantic Search (LangChain)
 
 ```python
-query_response = weaviate_vector_db.query(
-    vector=dense_question_embedding,
-    query_string=question,
-    limit=10,
-    hybrid=True,
-    alpha=0.5,
-    filters=Filter.by_property("text").like("Pete Sampras"),
+from vectordb.langchain.semantic_search import WeaviateSemanticSearchPipeline
+
+pipeline = WeaviateSemanticSearchPipeline(
+    "src/vectordb/langchain/semantic_search/configs/weaviate_popqa.yaml"
 )
+result = pipeline.search("Who invented the telephone?", top_k=5)
 ```
 
-Example: Metadata Filters in Chroma
-
-Metadata filters in ChromaDB can be used to filter documents based on specific metadata or content criteria during a query. They are passed using `where_document` parameter.
+### Agentic RAG (LangChain)
 
 ```python
-query_response = chroma_vector_db.query(
-    query_embedding=dense_question_embedding, n_results=10, where_document={"$contains": "Pete Sampras"}
+from vectordb.langchain.agentic_rag import PineconeAgenticRAGPipeline
+
+pipeline = PineconeAgenticRAGPipeline(
+    "src/vectordb/langchain/agentic_rag/configs/pinecone_triviaqa.yaml"
 )
+result = pipeline.run(query="Explain how neural networks learn", top_k=10)
+
+print(result["final_answer"])
 ```
+
+## Documentation
+
+Comprehensive documentation is available under [`docs/`](docs/README.md), including:
+
+- Core architecture and configuration references
+- Framework-specific guides for Haystack and LangChain
+- Feature-level conceptual and API-oriented documentation
+
+## Contributing
+
+Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for detailed contribution guidelines.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

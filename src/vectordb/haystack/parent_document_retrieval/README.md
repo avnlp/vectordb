@@ -1,114 +1,79 @@
-# Parent Document Retrieval
+# Parent Document Retrieval (Haystack)
 
-Hierarchical chunking pipelines that split documents into parent and child chunks to balance retrieval precision with context richness. Only the smaller child chunks are embedded and stored in the vector database, where their compact size enables precise semantic matching against queries. When a child chunk matches, the system returns the corresponding parent chunk instead, providing the downstream language model with a broader context window that captures surrounding information the child alone would miss.
-
-This approach addresses a fundamental tension in retrieval-augmented generation: small chunks match queries more precisely, but large chunks provide more complete context for answer generation. By decoupling the unit of retrieval (child) from the unit of context (parent), the pipeline achieves both goals simultaneously.
-
-## Overview
-
-- Hierarchical document splitting into parent chunks and smaller child chunks
-- Child chunks are embedded and indexed for precise semantic matching
-- Parent chunks are stored separately and returned when their children match a query
-- Auto-merging retrieval automatically resolves child matches to parent documents
-- Configurable chunk sizes, overlap, and merge thresholds
-- In-memory parent document store for fast parent lookups during search
+Parent document retrieval indexes small child chunks for precise semantic matching but returns the larger parent context for answer generation. This balances retrieval precision (achieved with focused small chunks) and generation coherence (achieved with rich parent context).
 
 ## How It Works
 
-### Indexing
+1. **Split into parents and children**: Each source document is split into large parent chunks (typically 512–2048 tokens). Each parent is then further split into smaller child chunks (typically 64–256 tokens). The child chunks are linked to their parent by a stored parent ID.
+2. **Index children**: Only the child chunks are embedded and stored in the vector database. Their metadata includes `parent_id` pointing to the parent document.
+3. **Retrieve children**: At query time, the query embedding is compared to child chunk embeddings. The top-k most similar children are retrieved.
+4. **Resolve parents**: Retrieved children are mapped back to their parent documents using `parent_id`. Duplicate parents (when multiple children from the same parent are retrieved) are deduplicated.
+5. **Return parent context**: The full text of the resolved parent documents is returned to the generator, providing coherent, complete context.
 
-The indexing pipeline loads documents from a configured dataset and splits them using a hierarchical document splitter that produces two levels: larger parent chunks and smaller child chunks nested within them. Parent-child relationships are tracked via metadata. The parent chunks are written to an in-memory document store for later retrieval. The child (leaf) chunks are embedded using a sentence transformer model and upserted into the vector database. Only the leaf-level chunks receive embeddings, keeping the index focused on fine-grained semantic units.
+The `utils/` subdirectory contains parent-child mapping helpers. The `indexing/` scripts handle both the splitting and dual-storage logic, and the `search/` scripts handle the child-to-parent resolution step.
 
-### Search
+## When to Use It
 
-The search pipeline embeds the incoming query and searches the vector database for matching child chunks, over-sampling by a factor of three to ensure broad coverage. The matched child chunks are passed to an auto-merging retriever, which looks up the corresponding parent documents from the in-memory store. When enough children from the same parent match the query (controlled by a merge threshold), the parent document is returned in place of its children. The final result set contains parent-level documents that provide richer context than the individual child chunks that triggered the match.
+- Long source documents (articles, reports, books) where semantic matching on the full document is too coarse but chunk-only context is too fragmented for coherent answers.
+- Cases where precise retrieval matters (small child chunks are semantically focused) but coherent generation also matters (larger parents provide narrative context).
+- Multi-hop questions that need several paragraphs of context from the same source document.
 
-## Supported Databases
+## When Not to Use It
 
-| Database | Indexing Module | Search Module | Notes |
-|----------|----------------|---------------|-------|
-| Pinecone | `indexing/pinecone.py` | `search/pinecone.py` | Serverless managed service |
-| Weaviate | `indexing/weaviate.py` | `search/weaviate.py` | GraphQL-based queries |
-| Chroma | `indexing/chroma.py` | `search/chroma.py` | Local or cloud deployment |
-| Milvus | `indexing/milvus.py` | `search/milvus.py` | Distributed vector database |
-| Qdrant | `indexing/qdrant.py` | `search/qdrant.py` | Payload filtering support |
+- Corpora of short, self-contained documents where splitting adds no retrieval benefit.
+- Pipelines with strict memory constraints where returning multiple large parent documents would exceed the generator's context window.
+- Situations where child-to-parent ID mapping is unreliable (for example, dynamically generated documents without stable IDs).
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Better coherence and context completeness for generated answers |
+| Latency | Moderate overhead from parent document resolution step after retrieval |
+| Cost | Potentially higher generation token usage if parent chunks are large |
 
 ## Configuration
 
-Each database-dataset combination has a dedicated YAML configuration file. The configuration controls chunking parameters (parent and child sizes, overlap), retrieval settings (top-k, merge threshold), embedding model selection, and database connection details.
-
 ```yaml
-logging:
-  name: haystack_parent_doc_qdrant_triviaqa
-  level: INFO
+indexing:
+  parent_chunk_size: 512      # Token size of parent chunks stored for generation
+  child_chunk_size: 128       # Token size of child chunks stored for retrieval
+  chunk_overlap: 20           # Overlap between consecutive chunks
 
-embeddings:
-  model: Qwen/Qwen3-Embedding-0.6B
-
-chunking:
-  child_chunk_size_words: 25
-  parent_chunk_size_words: 100
-  split_overlap: 5
-
-retrieval:
-  top_k: 5
-  merge_threshold: 0.5
-
-dataloader:
-  type: triviaqa
-  dataset_name: trivia_qa
-  split: test
-  index_limit: 500
-  eval_limit: 100
-
-database:
-  type: qdrant
-  qdrant:
-    url: ${QDRANT_URL}
-    api_key: ${QDRANT_API_KEY}
-    collection_name: parent_doc_children_triviaqa
+search:
+  top_k: 5                    # Number of child chunks to retrieve
+  max_parent_docs: 3          # Maximum unique parent documents to return
+  retrieval_mode: "with_parents"  # "with_parents", "children_only", or "context_window"
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-src/vectordb/haystack/parent_document_retrieval/
-├── __init__.py                        # Public exports for all pipeline classes
-├── configs/                           # YAML configs (25 files: 5 databases x 5 datasets)
-│   ├── qdrant_triviaqa_config.yaml
-│   ├── qdrant_arc_config.yaml
-│   ├── qdrant_popqa_config.yaml
-│   ├── qdrant_factscore_config.yaml
-│   ├── qdrant_earnings_calls_config.yaml
-│   ├── pinecone_triviaqa_config.yaml
-│   ├── ...
-│   └── weaviate_earnings_calls_config.yaml
-├── indexing/                          # Indexing pipelines with hierarchical splitting
-│   ├── __init__.py
-│   ├── chroma.py                      # Chroma parent document indexing
-│   ├── milvus.py                      # Milvus parent document indexing
-│   ├── pinecone.py                    # Pinecone parent document indexing
-│   ├── qdrant.py                      # Qdrant parent document indexing
-│   └── weaviate.py                    # Weaviate parent document indexing
-├── search/                            # Search pipelines with auto-merging retrieval
-│   ├── __init__.py
-│   ├── chroma.py                      # Chroma parent document search
-│   ├── milvus.py                      # Milvus parent document search
-│   ├── pinecone.py                    # Pinecone parent document search
-│   ├── qdrant.py                      # Qdrant parent document search
-│   └── weaviate.py                    # Weaviate parent document search
-├── utils/                             # Shared utilities
-│   ├── __init__.py
-│   ├── config.py                      # Configuration loading with env var resolution
-│   ├── hierarchy.py                   # Document hierarchy utilities
-│   ├── ids.py                         # Document ID generation
-│   └── metadata.py                    # Metadata management for parent-child links
-└── README.md
-```
+| Setting | Why It Matters |
+|---|---|
+| `child_chunk_size` | Smaller chunks improve retrieval precision by focusing the embedding signal |
+| `parent_chunk_size` | Larger parents provide more context but consume more tokens per generation call |
+| `max_parent_docs` | Controls downstream token usage when multiple children map to the same parent |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/semantic_search/` - Standard flat dense indexing without hierarchy
-- `src/vectordb/haystack/contextual_compression/` - Post-retrieval compression as alternative context strategy
-- `src/vectordb/haystack/reranking/` - Two-stage retrieval with cross-encoder reranking
-- `src/vectordb/dataloaders/` - Dataset loading for all supported datasets
+- **Parent chunks too large**: If parent chunks exceed the generator's context window, the returned context must be truncated, losing the benefit of parent resolution.
+- **Weak child-parent ID linking**: If parent IDs are not consistently stored and retrieved, the mapping step fails silently and the pipeline degrades to child-only retrieval.
+- **No deduplication when multiple children map to the same parent**: Without deduplication, the same parent document appears multiple times in the returned context, wasting token budget.
+
+## Output Structure
+
+The `RetrievedDocument` dataclass (from `vectordb.utils.output`) includes a `matched_children` field that lists the specific child chunks that matched the query within each returned parent document. This is useful for highlighting which parts of the parent were responsible for its retrieval.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `semantic_search/` as the baseline when documents are already short and self-contained.
+- Combine with `contextual_compression/` to shorten retrieved parent context if it still exceeds token budgets.
+- Use `reranking/` on the retrieved children before parent resolution to improve which parents are selected.

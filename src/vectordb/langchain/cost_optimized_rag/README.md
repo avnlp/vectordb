@@ -1,146 +1,89 @@
-# Cost-Optimized RAG
+# Cost-Optimized RAG (LangChain)
 
-Production retrieval-augmented generation pipelines designed with resource awareness for managed vector database services that charge by request or compute unit. The pipelines apply cost optimization strategies including result caching to avoid repeated searches, batch processing for efficient embedding generation, pre-filtering to narrow the search space before vector operations, and cost monitoring to track API calls and token consumption.
-
-This module provides a balance between retrieval quality and operational cost, making it suitable for high-volume production deployments where efficiency matters. All behavior is controlled through YAML configuration files with environment variable substitution for secrets and deployment-specific parameters.
-
-## Overview
-
-- Hybrid search using Weaviate's native BM25 + dense vector fusion
-- Single dense embedding API call per query for cost efficiency
-- Configurable alpha parameter to balance vector vs. keyword search
-- Optional RAG generation with LLM for answer synthesis
-- Lazy initialization of expensive components like language models
-- Support for all five vector databases with database-specific optimizations
-- 25 pre-built configuration files covering all database and dataset combinations
+Cost-optimized RAG provides explicit controls over compute and token spend across retrieval and generation stages, enabling predictable cost per query without unacceptable quality degradation.
 
 ## How It Works
 
-### Indexing Phase
+Cost optimization is achieved through coordinated controls across multiple pipeline stages:
 
-The indexing pipeline loads documents from a configured dataset, embeds them using a sentence transformer model, and writes them to the target vector database collection. Collections are created with configurable vector parameters including dimensionality, distance metric, and optional quantization settings. Payload indexes can be defined in configuration to enable efficient metadata filtering at search time, reducing the number of vectors scanned per query. Documents are upserted in configurable batch sizes to manage memory and network overhead.
+1. **Retrieval breadth reduction**: A smaller `candidate_pool_size` reduces the number of documents retrieved, embeddings compared, and candidates processed by any downstream reranker or compressor.
+2. **Context compression**: Compressed documents sent to the generator mean fewer input tokens per query, directly reducing LLM inference cost.
+3. **Model tiering**: Using a faster, cheaper model (for example, Llama 3.1 8B via Groq) for routing and evaluation decisions, and a more capable model only for final answer generation.
+4. **Context budget enforcement**: A `context_budget` parameter caps the maximum tokens sent to the generator regardless of how many documents were retrieved.
 
-### Search Phase
+`RAGHelper.create_llm(config)` creates a `ChatGroq` instance with the configured model tier. The same `RAGHelper.generate()` and `RAGHelper.format_prompt()` methods are used, but context is capped at the budget before formatting.
 
-The search pipeline embeds the incoming query using a dense embedding model and executes a hybrid search against the Weaviate database. The hybrid search combines dense vector similarity with BM25 keyword matching in a single query, controlled by the alpha parameter. Retrieved documents are passed to a language model for answer generation when RAG is enabled. Cost metrics are collected throughout the pipeline execution for monitoring and optimization.
+## When to Use It
 
-### Cost Optimization Strategies
+- Production systems with explicit monthly LLM cost targets.
+- High-query-volume workloads where small per-query savings compound to significant monthly reductions.
+- Services with latency SLOs where both cost and response time must be controlled.
 
-**Hybrid Search** leverages Weaviate's native hybrid search capability that combines dense semantic vectors with BM25 lexical search in a single query. This eliminates the need for separate sparse embedding generation and client-side fusion, reducing computational overhead.
+## When Not to Use It
 
-**Single API Call** generates only one dense embedding per query using a cost-effective API-based model. The sparse component is handled by Weaviate's built-in BM25, avoiding additional embedding API calls.
+- Research and benchmarking runs where absolute quality matters more than cost.
+- Small-scale workloads where optimization effort is not economically justified.
+- Early experimentation phases — establish a quality baseline before optimizing cost.
 
-**Configurable Alpha** allows tuning the balance between vector search (semantic matching) and BM25 (keyword matching) to optimize for both quality and cost based on use case requirements.
+## Tradeoffs
 
-**Lazy Initialization** defers the creation of expensive components like language models until they are actually needed. This reduces startup time and resource consumption for pipelines that may not always require answer generation.
-
-## Supported Databases
-
-| Database | Status | Cost Optimization Notes |
-|----------|--------|-------------------------|
-| Pinecone | Supported | Hybrid search with RRF fusion, batch upserts |
-| Weaviate | Supported | Native hybrid search (BM25 + vector), alpha parameter tuning |
-| Chroma | Supported | Client-side hybrid search with RRF fusion |
-| Milvus | Supported | Native hybrid search with RRF fusion |
-| Qdrant | Supported | Native hybrid search with RRF fusion |
+| Dimension | What to Expect |
+|---|---|
+| Quality | Near-baseline quality when tuned carefully; degrades if compression or pool is too aggressive |
+| Latency | Can improve (smaller pool) or worsen (compression overhead) depending on settings |
+| Cost | Primary goal — 30–70% reduction achievable with careful tuning |
 
 ## Configuration
 
-Each database has per-dataset YAML configuration files organized by database and dataset. The configuration controls all standard pipeline parameters including embeddings, chunking, search, and RAG generation.
-
 ```yaml
-dataloader:
-  type: "triviaqa"
-  split: "test"
-  limit: 100
-  use_text_splitter: false
-
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  device: "cpu"
-  batch_size: 32  # Batch size for embedding generation
-
-chunking:
-  chunk_size: 1000
-  chunk_overlap: 200
-  separators:
-    - "\n\n"
-    - "\n"
-    - " "
-    - ""
-
-pinecone:
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "lc-cost-optimized-rag-triviaqa"
-  namespace: ""
-  dimension: 384
-  metric: "cosine"
-  recreate: false
-
 search:
-  top_k: 10
-  alpha: 0.5  # Weaviate hybrid search parameter (1.0 = vector only, 0.0 = BM25 only)
+  candidate_pool_size: 15     # First-pass retrieval breadth (smaller = cheaper)
+  top_k: 5
+
+cost_optimization:
+  context_budget: 2000        # Maximum tokens for generator context
+  model_tiering:
+    routing_model: "llama-3.1-8b-instant"
+    generation_model: "llama-3.3-70b-versatile"
+  compression:
+    enabled: true
+    type: "embedding_filter"
+    relevance_threshold: 0.5
 
 rag:
-  enabled: false
+  enabled: true
   model: "llama-3.3-70b-versatile"
   api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  name: "lc_cost_optimized_rag_pinecone"
-  level: "INFO"
 ```
 
-### Configuration Sections
+## Settings to Tune First
 
-- **dataloader**: Dataset source configuration including type, split, and document limit
-- **embeddings**: Embedding model settings with batch size for efficient processing
-- **chunking**: Document splitting parameters (chunk size, overlap, separators)
-- **<database>**: Database-specific connection settings (pinecone, weaviate, chroma, milvus, qdrant)
-- **search**: Search parameters including top_k results and alpha for Weaviate hybrid search
-- **rag**: Optional RAG generation with LLM model, API key, and token limits
-- **logging**: Logging configuration with custom name and log level
+| Setting | Why It Matters |
+|---|---|
+| `candidate_pool_size` | Primary retrieval cost lever; reducing from 50 to 15 significantly cuts embedding and ranking costs |
+| `context_budget` | Directly caps generation token spend per query |
+| `model_tiering` | The cheapest high-impact change: use a fast 8B model for non-critical decisions |
 
-### Cost Optimization Notes
+## Cost-Quality Evaluation
 
-The cost optimization is implemented in the pipeline code itself rather than through configuration flags:
+Run the same evaluation at multiple settings (`candidate_pool_size` × `context_budget`) and plot quality vs estimated cost to identify the operating point meeting your targets. The `EvaluationResult` container (from `vectordb.utils.evaluation`) can store both quality metrics and cost metadata for comparison.
 
-- **Hybrid Search**: Combines dense (API-based) embeddings with BM25 lexical search using Weaviate's native hybrid search
-- **Weaviate Native Hybrid**: Uses Weaviate's built-in BM25 + vector fusion with configurable alpha parameter
-- **Optional RAG**: The `rag.enabled` flag controls whether to invoke the LLM for answer generation
-- **Batch Processing**: Embedding batch sizes are configurable to optimize API throughput
+## Common Pitfalls
 
-## Directory Structure
+- **Optimizing cost before establishing quality**: If the baseline does not achieve acceptable quality, cost optimization only makes it cheaper while remaining inadequate.
+- **Single global settings for heterogeneous query classes**: Simple factual queries tolerate small pools (5–10 candidates); complex multi-hop questions need larger pools (25–50). Consider routing queries to different cost tiers based on complexity indicators.
+- **No monitoring after cost changes**: Cost reductions applied uniformly may work well on the evaluation set but fail on production edge cases. Monitor quality metrics continuously after any change.
 
-```
-cost_optimized_rag/
-├── __init__.py                        # Package exports
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone cost-optimized indexing
-│   ├── weaviate.py                    # Weaviate cost-optimized indexing
-│   ├── chroma.py                      # Chroma cost-optimized indexing
-│   ├── milvus.py                      # Milvus cost-optimized indexing
-│   └── qdrant.py                      # Qdrant cost-optimized indexing
-├── search/                            # Database-specific search pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone cost-optimized search
-│   ├── weaviate.py                    # Weaviate cost-optimized search
-│   ├── chroma.py                      # Chroma cost-optimized search
-│   ├── milvus.py                      # Milvus cost-optimized search
-│   └── qdrant.py                      # Qdrant cost-optimized search
-└── configs/                           # YAML configs organized by database
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── weaviate_triviaqa.yaml
-    └── ...                            # (25+ config files total)
-```
+## Backends Supported
 
-## Related Modules
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
 
-- `src/vectordb/langchain/semantic_search/` - Standard semantic search without cost optimization
-- `src/vectordb/langchain/reranking/` - Dedicated reranking pipelines (optional here)
-- `src/vectordb/langchain/contextual_compression/` - Post-retrieval compression as alternative cost strategy
-- `src/vectordb/langchain/hybrid_indexing/` - Hybrid search for better retrieval quality
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `reranking/` for quality-first improvements before applying cost controls.
+- Use `contextual_compression/` as a standalone feature if token reduction is the primary goal.
+- Use `agentic_rag/` for the highest-quality complex reasoning tasks where cost cannot be the primary concern.

@@ -1,39 +1,118 @@
-# LangChain Components
+# Components (LangChain)
 
-This module provides reusable pipeline components for advanced retrieval and RAG features within the LangChain integration. Each component encapsulates a specific stage of the retrieval pipeline - query expansion, post-retrieval compression, or agentic routing - and can be composed with any LangChain-compatible vector store and language model.
+The components directory contains reusable, self-contained LangChain building blocks that implement specific retrieval and generation sub-tasks. Feature pipelines compose these components rather than reimplementing the same logic.
 
-Compared to the Haystack components module, which includes five components (with additional support for evaluation and result merging as separate components), the LangChain components module provides three focused components. This reflects the imperative nature of LangChain pipelines, where operations like result merging and evaluation are handled directly through the utilities module rather than as discrete pipeline nodes.
+## Components
 
-## Overview
+### `AgenticRouter` (`agentic_router.py`)
 
-- Query expansion with three strategies: multi-query generation, hypothetical document embeddings, and step-back prompting
-- Post-retrieval context compression using cross-encoder reranking or LLM-based passage extraction
-- LLM-based agentic routing that dynamically selects between search, reflect, and generate actions
-- All components work with any LangChain-compatible language model and vector store
-- Stateless design allows concurrent use across multiple conversations
+An LLM-based decision-making component for agentic RAG pipelines. Uses `ChatGroq` and LangChain's `PromptTemplate` for structured decision-making.
 
-## How It Works
+The router implements a three-state state machine:
 
-The query expansion component addresses vocabulary mismatch between user queries and indexed documents by generating multiple query variations. In multi-query mode, it produces up to five alternative phrasings of the original question. In hypothetical document mode (based on the HyDE technique), it generates a hypothetical answer and uses it alongside the original query for retrieval, bridging the distribution gap between short questions and longer documents. In step-back mode, it generates three broader context questions that retrieve background knowledge helpful for answering the specific query, then appends the original query.
+- **`"search"`**: Retrieve more documents from the vector store. Selected when no documents have been retrieved yet or when reflection identified information gaps.
+- **`"reflect"`**: Evaluate and improve the current answer. Selected when documents exist but the answer's quality, completeness, or grounding is uncertain.
+- **`"generate"`**: Produce the final answer. Selected when sufficient information has been gathered or when `max_iterations` is reached (forced fallback).
 
-The context compression component reduces the token count of retrieved documents before they are passed to the generation phase. In reranking mode, it uses a cross-encoder model to score each document against the query and retains only the top-scoring documents, preserving their original text. In LLM extraction mode, it passes all retrieved documents to a language model with instructions to extract only the passages relevant to the query, producing a single compressed document. The two modes offer different trade-offs: reranking preserves exact wording at a coarser granularity, while LLM extraction achieves higher compression ratios but may alter the source text.
+The `ROUTING_TEMPLATE` prompt presents the current state (query, `has_documents`, `current_answer`, iteration number, max iterations) and instructs the LLM to return exactly one JSON object: `{"action": "...", "reasoning": "..."}`.
 
-The agentic routing component implements a decision-making pattern inspired by reasoning-and-acting frameworks. Given the current pipeline state -- including the query, whether documents have been retrieved, and any answer generated so far -- it invokes a language model to choose the next action. The three possible actions are searching for additional documents, reflecting on the current answer to identify gaps or errors, and generating a final answer. An iteration limit prevents infinite loops, and the router falls back to generating an answer when the limit is reached. The router is stateless, with all state passed through method parameters.
+**Error handling**: The `route()` method raises `ValueError` for invalid JSON responses, missing required fields (`action`, `reasoning`), or unrecognized action values. These errors are informative and help debug prompt formatting issues quickly.
 
-## Directory Structure
+**Iteration limiting**: When `iteration >= max_iterations`, the router short-circuits and returns `"generate"` without calling the LLM, preventing runaway loops.
 
+```python
+from langchain_groq import ChatGroq
+from vectordb.langchain.components import AgenticRouter
+
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0)
+router = AgenticRouter(llm)
+
+decision = router.route("What is quantum computing?", has_documents=False)
+# {"action": "search", "reasoning": "No documents retrieved yet"}
+
+decision = router.route(
+    "What is quantum computing?",
+    has_documents=True,
+    current_answer="Quantum computing uses qubits...",
+    iteration=2,
+    max_iterations=3,
+)
+# {"action": "generate", "reasoning": "Sufficient information available"}
 ```
-components/
-    __init__.py              # Package exports for all components
-    query_enhancer.py        # Query expansion (multi-query, HyDE, step-back prompting)
-    context_compressor.py    # Context compression (cross-encoder reranking, LLM extraction)
-    agentic_router.py        # Agentic routing (search, reflect, generate decisions)
+
+---
+
+### `ContextCompressor` (`context_compressor.py`)
+
+LLM-based context compression for reducing retrieved documents to query-relevant fragments. Uses `ChatGroq` for compression inference.
+
+Supports three compression strategies via a unified interface:
+
+- **Abstractive** (`"abstractive"`): The LLM generates a focused summary of the retrieved context relevant to the query.
+- **Extractive** (`"extractive"`): The LLM selects and returns verbatim the most relevant sentences from the context.
+- **Relevance filtering** (`"relevance_filter"`): The LLM evaluates each paragraph for relevance and returns only paragraphs above the threshold.
+
+All methods return the original context unchanged on LLM failure, ensuring pipeline continuity.
+
+```python
+from langchain_groq import ChatGroq
+from vectordb.langchain.components import ContextCompressor
+
+llm = ChatGroq(model="llama-3.3-70b-versatile")
+compressor = ContextCompressor(llm)
+compressed = compressor.compress(context, query, compression_type="extractive", num_sentences=5)
 ```
 
-## Related Modules
+---
 
-- `src/vectordb/haystack/components/` - Haystack components (includes evaluator and result merger in addition to query enhancement, compression, and routing)
-- `src/vectordb/langchain/utils/` - Shared utility helpers consumed by these components
-- `src/vectordb/langchain/agentic_rag/` - Feature module that uses the agentic router in end-to-end pipelines
-- `src/vectordb/langchain/query_enhancement/` - Feature module that uses the query expansion component
-- `src/vectordb/langchain/contextual_compression/` - Feature module that uses the context compression component
+### `QueryEnhancer` (`query_enhancer.py`)
+
+Generates improved retrieval queries from the user's original input using `ChatGroq` and `PromptTemplate`.
+
+Supports three query generation strategies:
+
+- **`"multi_query"`** (`generate_multi_queries`): Generates 5 alternative phrasings. Returns a list of up to 5 query strings. The original query is NOT included (it is the caller's responsibility to add it if needed).
+- **`"hyde"`** (`generate_hyde_queries`): Generates a hypothetical 2–3 sentence document answer. Returns `[original_query, hypothetical_answer]`.
+- **`"step_back"`** (`generate_step_back_queries`): Generates 3 broader context questions. Returns `[step_back_1, step_back_2, step_back_3, original_query]`.
+
+Each strategy uses a distinct prompt template (`MULTI_QUERY_TEMPLATE`, `HYDE_TEMPLATE`, `STEP_BACK_TEMPLATE`) with specific formatting instructions to produce clean, structured outputs.
+
+```python
+from langchain_groq import ChatGroq
+from vectordb.langchain.components import QueryEnhancer
+
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3)
+enhancer = QueryEnhancer(llm)
+
+queries = enhancer.generate_queries("What is photosynthesis?", mode="step_back")
+# ["How do plants convert energy?", "What is the role of chlorophyll?",
+#  "What are plant metabolic processes?", "What is photosynthesis?"]
+```
+
+## LLM Configuration
+
+All LangChain components use `ChatGroq` from `langchain-groq`. Recommended settings:
+
+```python
+from langchain_groq import ChatGroq
+
+# For routing (deterministic)
+routing_llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0)
+
+# For query generation (diverse)
+generation_llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3)
+```
+
+Set the `GROQ_API_KEY` environment variable or pass `api_key` directly to `ChatGroq`.
+
+## When to Use Components Directly
+
+- When building a custom pipeline that does not match the existing feature module templates.
+- When experimenting with one pipeline stage (for example, testing different compression strategies with a fixed retriever).
+- When combining components from different feature modules into a custom pipeline.
+
+## Common Pitfalls
+
+- **Over-composing before baseline validation**: Build and validate the simplest pipeline first, then add components.
+- **Inconsistent LLM temperature**: Use low temperature (0.0) for routing decisions and higher (0.3–0.7) for creative tasks like query generation.
+- **Not logging routing decisions**: All components log at `INFO` level. Set `LOG_LEVEL=DEBUG` to see full prompts and responses for debugging routing and compression behavior.

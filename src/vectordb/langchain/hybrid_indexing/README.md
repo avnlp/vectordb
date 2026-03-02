@@ -1,114 +1,80 @@
 # Hybrid Indexing (LangChain)
 
-Hybrid indexing combines dense vector embeddings with sparse (keyword-based) representations to deliver search results that capture both semantic meaning and exact term matches. By blending these two retrieval signals, hybrid search can outperform either approach alone, particularly on queries that mix conceptual intent with specific terminology.
-
-Each database has a dedicated indexing and search pipeline. At query time, the two result sets are fused using either the database's native hybrid ranking mechanism or a client-side fusion strategy. Fusion strategies vary by database: Qdrant, Milvus, and Pinecone use Reciprocal Rank Fusion (RRF), while Weaviate uses a configurable alpha parameter for weighted blending.
-
-## Overview
-
-- Dual embedding during indexing: dense vectors from sentence-transformers and sparse vectors from SPLADE-based sparse embedder
-- Native hybrid search on databases that support it, with client-side fusion as a fallback
-- Fusion strategies: RRF (Qdrant, Milvus, Pinecone) or alpha-weighted blend (Weaviate)
-- Optional RAG answer generation using an LLM (Groq or OpenAI-compatible endpoints)
-- Configuration-driven through YAML files with environment variable substitution
-- 25 pre-built configuration files covering all database and dataset combinations
+Hybrid retrieval combines dense semantic embeddings with sparse lexical embeddings to improve robustness across both natural-language and keyword-precise queries.
 
 ## How It Works
 
-### Indexing
+1. **Dual indexing**: Each document is embedded twice — once with `HuggingFaceEmbeddings` for the dense semantic vector, and once with a sparse embedding model for the token-weight lexical vector. Both vectors are stored in the backend.
+2. **Dual retrieval**: At query time, the same query is embedded with both the dense and sparse models.
+3. **Score fusion**: Dense and sparse retrieval results are merged using `ResultMerger` from `utils/fusion.py`. The default strategy is Reciprocal Rank Fusion (RRF). A weighted fusion option gives explicit control over dense vs sparse contribution.
+4. **Final ranking**: The fused, deduplicated list (up to `top_k`) is returned.
 
-The indexing pipeline loads a dataset, generates dense embeddings using a sentence-transformer model, and generates sparse embeddings using a SPLADE-based sparse embedder. Both embedding types are stored together in the vector database. For databases with native hybrid support, vectors are stored in backend-specific formats (for example, Pinecone `sparse_values`). In the Milvus pipeline, records are inserted as Haystack `Document` objects and Milvus auto-generates `INT64` primary keys (`auto_id=True`). The Weaviate pipeline indexes both dense vectors and document text, because Weaviate computes BM25 scores internally at query time rather than accepting external sparse embeddings.
+`ResultMerger.fuse_rrf()` combines rankings using `score(d) = Σ 1 / (k + rank)` across all retrieval sources. This is robust to different score scales because it operates on ranks, not raw scores.
 
-### Search
+## When to Use It
 
-The search pipeline embeds the query using both the dense and sparse models. It then issues a hybrid search request to the database, which combines dense nearest-neighbor results with sparse keyword-matching results. Qdrant, Pinecone, and Milvus support native hybrid queries that fuse the results server-side using Reciprocal Rank Fusion (RRF). Weaviate blends its internal BM25 scores with dense vector similarity using a configurable alpha parameter. Chroma does not natively support hybrid search, so the pipeline emulates hybrid behavior through client-side fusion of independent dense and sparse result sets.
+- Mixed query styles where some users phrase naturally and others search with domain terms.
+- Enterprise knowledge bases with exact product names, codes, or identifiers alongside conceptual questions.
+- Any workload where pure semantic search misses documents containing exact query terms.
 
-## Supported Databases
+## When Not to Use It
 
-| Database | Hybrid Type | Notes |
-|----------|-------------|-------|
-| Pinecone | Native hybrid search | Sparse stored in sparse_values format; uses RRF fusion |
-| Weaviate | Native BM25 + vector blend | Alpha parameter controls blend weight; BM25 computed internally |
-| Milvus | Native hybrid search | Stores sparse vectors in dedicated field; uses RRF fusion |
-| Qdrant | Native hybrid search | Uses named sparse vector fields; uses RRF fusion |
-| Chroma | Not natively supported | Emulates hybrid via client-side fusion of dense and sparse results |
+- Small datasets where dual indexing complexity has negligible quality impact.
+- Prototypes where the semantic baseline has not yet been validated.
+- Backends that do not natively support sparse vectors.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Usually improves recall robustness by covering both semantic and lexical intent |
+| Latency | Moderate increase from two embedding models and two retrieval paths |
+| Cost | Higher indexing and query cost from dual embeddings and more complex search |
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file using flat naming. Below is an example showing the key sections:
-
 ```yaml
-dataloader:
-  type: "triviaqa"           # triviaqa, arc, popqa, factscore, earnings_calls
-  split: "test"
-  limit: 100
-  use_text_splitter: false
-
 embeddings:
   model: "sentence-transformers/all-MiniLM-L6-v2"
   device: "cpu"
-  batch_size: 32
 
-pinecone:                     # Database-specific section (one per config)
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "lc-hybrid-triviaqa"
-  namespace: ""
-  dimension: 384
-  metric: "cosine"
-  recreate: false
-  alpha: 0.5
+sparse:
+  model: "naver/splade-cocondenser-ensembledistil"
+
+fusion:
+  strategy: "rrf"    # "rrf" or "weighted"
+  dense_weight: 0.7  # Used only when strategy is "weighted"
+  sparse_weight: 0.3
 
 search:
   top_k: 10
-
-rag:
-  enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  name: "lc_hybrid_indexing_pinecone"
-  level: "INFO"
+  fetch_k: 30        # Candidate pool per retriever before fusion
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-hybrid_indexing/
-├── __init__.py
-├── README.md
-├── indexing/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone hybrid indexing
-│   ├── weaviate.py                    # Weaviate hybrid indexing (dense + BM25 internal)
-│   ├── chroma.py                      # Chroma hybrid indexing
-│   ├── milvus.py                      # Milvus hybrid indexing
-│   └── qdrant.py                      # Qdrant hybrid indexing
-├── search/
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone hybrid search
-│   ├── weaviate.py                    # Weaviate hybrid search (BM25 + vector)
-│   ├── chroma.py                      # Chroma hybrid search with client-side fusion
-│   ├── milvus.py                      # Milvus hybrid search
-│   └── qdrant.py                      # Qdrant hybrid search
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── pinecone_popqa.yaml
-    ├── pinecone_factscore.yaml
-    ├── pinecone_earnings_calls.yaml
-    ├── weaviate_triviaqa.yaml
-    ├── ...
-    ├── chroma_*.yaml
-    ├── milvus_*.yaml
-    └── qdrant_*.yaml
-```
+| Setting | Why It Matters |
+|---|---|
+| `fusion.strategy` | `"rrf"` requires no tuning; `"weighted"` gives explicit control |
+| `sparse.model` | SPLADE model quality directly affects lexical matching coverage |
+| `search.fetch_k` | Each retriever fetches this many candidates before fusion; larger pools improve fusion quality |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/langchain/semantic_search/` - Dense-only semantic search pipelines
-- `src/vectordb/langchain/sparse_indexing/` - Sparse-only keyword search pipelines
-- `src/vectordb/langchain/utils/` - Shared utilities for configuration, embedding, data loading, and fusion
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+- **Unbalanced fusion**: Weight near-zero on either side effectively reverts to single-signal retrieval. Measure both retrieval paths independently first.
+- **Missing sparse model at query time**: Ensure both dense and sparse embedding configs are consistent between indexing and search scripts.
+- **Not validating per-query-class behavior**: Hybrid helps keyword-heavy queries most. If your evaluation set is all natural-language questions, the improvement over semantic search may be modest.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Add `reranking/` after fusion for a further precision improvement on the merged result set.
+- Use `sparse_indexing/` alone if keyword precision is the dominant need.
+- Measure against `semantic_search/` to quantify the hybrid improvement on your evaluation set.

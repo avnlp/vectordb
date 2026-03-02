@@ -1,128 +1,76 @@
-# JSON Indexing
+# JSON Indexing (Haystack)
 
-This module provides structured JSON document indexing and filtered search across all five supported vector databases. It indexes documents with rich JSON metadata and translates user-provided filter expressions into the native query syntax of each database, enabling field-level filtering during vector similarity search.
-
-Each database uses a different filtering mechanism internally: dictionary-based filters for Pinecone, GraphQL expressions for Weaviate, boolean expressions for Milvus, payload filters for Qdrant, and where clauses for Chroma. This module abstracts those differences behind a unified filter specification, so the same logical filter (such as "topic equals AI") is automatically translated to the correct database-specific syntax.
-
-## Overview
-
-- Indexes documents with full JSON metadata preservation across all five databases
-- Translates a common filter operator syntax into database-native query formats
-- Supports eight standard filter operators: equality, inequality, greater than, greater than or equal, less than, less than or equal, inclusion, and exclusion
-- Flattens complex metadata structures into primitive types suitable for vector database storage
-- Normalizes search results into a consistent format regardless of the underlying database
-- All pipelines are configuration-driven through YAML files with environment variable substitution
+JSON indexing is designed for document corpora where content is stored as JSON records with both textual fields (for semantic search) and structured attribute fields (for filter-based retrieval). It combines embedding-based similarity with precise field-level constraints.
 
 ## How It Works
 
-### Indexing
+1. **JSON document ingestion**: Raw JSON records are loaded and parsed. One or more text fields (for example, `"description"`, `"body"`, `"summary"`) are selected for embedding. The remaining structured fields become metadata for filtering.
+2. **Selective embedding**: Only the designated text fields are embedded. Embedding irrelevant fields (like numeric IDs or timestamps) dilutes the embedding signal.
+3. **Metadata preservation**: All structured attributes are stored as metadata alongside the embedding. Field names are normalized to avoid backend-specific conflicts.
+4. **Filter-aware retrieval**: At query time, a filter expression constrains the search to documents matching structural attributes (for example, `{"status": "active", "region": "eu"}`), and similarity ranking operates within the filtered set.
 
-Each database has a dedicated indexer that loads documents from a configured dataset, generates dense embeddings, flattens document metadata into primitive types, and writes the embedded documents with their metadata to the vector database. The metadata flattening step converts non-primitive types to string representations and skips null values, ensuring compatibility with all database backends.
+JSON indexing uses `json_indexing/common/` for shared parsing and normalization logic, and `json_indexing/indexing/` and `json_indexing/search/` for per-backend implementations.
 
-### Filtered Search
+## When to Use It
 
-The search pipeline embeds the query, performs a vector similarity search, and applies metadata filters to narrow results. Filters use a common operator syntax that gets translated to each database's native format:
+- API responses or event streams stored as JSON records.
+- Product catalogs, knowledge bases, or CRMs where each record has structured attributes alongside descriptive text.
+- Mixed-content datasets where semantic search on the text content must be combined with exact matches on metadata attributes.
+- Any corpus where the schema is well-known at indexing time and querying often uses structured constraints.
 
-- **Pinecone**: Dictionary-based metadata filters
-- **Weaviate**: GraphQL where clauses with operand structure
-- **Milvus**: Boolean expression strings (e.g., `field == "value"`)
-- **Qdrant**: Payload filter conditions with must/must_not clauses
-- **Chroma**: Where clauses with operator mappings
+## When Not to Use It
 
-### Filter Specification
+- Pure free-text corpora with no meaningful structured attributes; standard semantic search suffices.
+- Unstable or evolving schemas where the metadata fields change frequently, making filter queries unreliable.
+- Deeply nested JSON with arrays of objects that require complex flattening strategies.
 
-The module defines a set of supported operators that work consistently across all databases. These include equality, inequality, numeric comparisons, and set membership checks. Each database-specific filter translator converts from this common format to the native representation.
+## Tradeoffs
 
-### Result Normalization
-
-Search results from all databases are normalized to a standard format containing document ID, relevance score, content text, and metadata dictionary. This ensures that downstream consumers receive consistent output regardless of which database was queried.
-
-## Supported Databases
-
-| Database | Status | Filter Translation |
-|----------|--------|-------------------|
-| Milvus | Supported | Boolean expression strings |
-| Pinecone | Supported | Dictionary metadata filters |
-| Qdrant | Supported | Payload filter conditions |
-| Weaviate | Supported | GraphQL where operands |
-| Chroma | Supported | Where clause mappings |
+| Dimension | What to Expect |
+|---|---|
+| Quality | Higher precision for queries that combine semantic and structured intent |
+| Latency | Moderate; depends on filter complexity and indexed metadata volume |
+| Cost | Slightly higher ingest complexity for schema parsing; query cost similar to filtered semantic search |
 
 ## Configuration
 
-Configuration is stored in YAML files organized by database and dataset under the `configs/` directory. Below is an example:
-
 ```yaml
-milvus:
-  uri: "${MILVUS_URI:-http://localhost:19530}"
-  token: "${MILVUS_TOKEN:-}"
-
-collection:
-  name: "triviaqa_json_indexed"
-  description: "TriviaQA with JSON metadata"
-
-dataloader:
-  type: "triviaqa"
-  dataset_name: "trivia_qa"
-  config: "rc"
-  split: "test"
-  limit: null
-
-embeddings:
-  model: "Qwen/Qwen3-Embedding-0.6B"
-  batch_size: 32
-
 search:
   top_k: 10
-
-logging:
-  level: "INFO"
-  name: "milvus_triviaqa_json"
+  text_field: "description"     # Primary field to embed
+  metadata_fields:
+    - "category"
+    - "region"
+    - "status"
+  filters:
+    status:
+      "$eq": "active"
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-json_indexing/
-├── __init__.py                  # Package exports (indexers and searchers)
-├── README.md                    # This file
-├── common/                      # Shared utilities
-│   ├── __init__.py
-│   ├── config.py                # YAML config loading with env var resolution
-│   ├── embeddings.py            # Embedding model wrappers
-│   ├── metadata.py              # Metadata flattening utilities
-│   ├── results.py               # Search result normalization
-│   └── filters/                 # Database-specific filter translators
-│       ├── __init__.py
-│       ├── spec.py              # Supported filter operators definition
-│       ├── chroma.py            # Chroma where clause translation
-│       ├── milvus.py            # Milvus boolean expression translation
-│       ├── pinecone.py          # Pinecone dictionary filter translation
-│       ├── qdrant.py            # Qdrant payload filter translation
-│       └── weaviate.py          # Weaviate GraphQL filter translation
-├── indexing/                    # Per-database indexing pipelines
-│   ├── __init__.py
-│   ├── chroma.py
-│   ├── milvus.py
-│   ├── pinecone.py
-│   ├── qdrant.py
-│   └── weaviate.py
-├── search/                      # Per-database search pipelines
-│   ├── __init__.py
-│   ├── chroma.py
-│   ├── milvus.py
-│   ├── pinecone.py
-│   ├── qdrant.py
-│   └── weaviate.py
-└── configs/                     # YAML configuration files
-    ├── chroma/                  # Chroma configs per dataset
-    ├── milvus/                  # Milvus configs per dataset
-    ├── pinecone/                # Pinecone configs per dataset
-    ├── qdrant/                  # Qdrant configs per dataset
-    └── weaviate/                # Weaviate configs per dataset
-```
+| Setting | Why It Matters |
+|---|---|
+| `text_field_selection` | Embedding the right text field is the primary quality lever |
+| `metadata_fields` | Only index fields you plan to filter on; excess fields add noise and storage overhead |
+| `normalization_rules` | Consistent value normalization (lowercase, trim whitespace) ensures filters work reliably |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/dense_indexing/` - Dense embedding indexing without metadata filtering
-- `src/vectordb/haystack/hybrid_indexing/` - Hybrid sparse-dense indexing and search
-- `src/vectordb/utils/converters.py` - Document format converters for each database
+- **Embedding irrelevant JSON fields**: Including numeric IDs, timestamps, or internal codes in the embedded text dilutes the semantic signal and degrades retrieval quality.
+- **Unbounded nested metadata**: Deeply nested JSON fields require flattening strategies. Use dot-notation keys (`"user.address.city"`) or explicitly select which levels to include.
+- **No schema conventions across producers**: If different producers write the same field with different names or value formats, filter expressions become unreliable.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `metadata_filtering/` when documents are already normalized flat records rather than raw JSON.
+- Use `semantic_search/` as a baseline when structured constraints are minimal or the schema is not yet stable.
+- Add `reranking/` after JSON-filtered retrieval for additional precision.

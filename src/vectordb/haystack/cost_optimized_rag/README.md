@@ -1,160 +1,89 @@
-# Cost-Optimized RAG
+# Cost-Optimized RAG (Haystack)
 
-Production retrieval-augmented generation pipelines designed with resource awareness for managed vector database services that charge by request or compute unit. The pipelines apply cost optimization strategies including conditional over-fetching that only retrieves extra candidates when reranking is enabled, lazy initialization of pipeline components to avoid unnecessary resource allocation, and configurable search parameters that control the number of database read units consumed per query.
-
-The module uses Pydantic-validated configuration models to enforce type safety across all pipeline settings, from database connection parameters to quantization and partitioning options. Each database implementation follows a consistent pattern of embedding, optional reranking, and optional LLM-based answer generation, with all behavior controlled through YAML configuration files.
-
-## Overview
-
-- Conditional over-fetching: retrieves 2x candidates only when reranking is active, otherwise fetches exactly the requested count
-- Lazy pipeline initialization: RAG generation components are only created when explicitly enabled in configuration
-- Configurable search parameters to control database read units and query costs
-- Pydantic-validated configuration with environment variable resolution
-- Optional cross-encoder reranking controlled by a configuration flag
-- Optional RAG answer generation using Groq or OpenAI-compatible language models
-- Payload indexing support for efficient metadata filtering
-- Partitioning and quantization options for storage cost optimization
+Cost-optimized RAG balances retrieval and generation quality against compute and token spend. It provides explicit controls over candidate pool sizes, context length passed to the generator, and model tier selection to achieve predictable cost per query.
 
 ## How It Works
 
-### Indexing
+Cost optimization operates across multiple pipeline stages:
 
-The indexing pipeline loads documents from a configured dataset, embeds them using a sentence transformer model, and writes them to the target vector database collection. Collections are created with configurable vector parameters including dimensionality, distance metric, and optional quantization settings. Payload indexes can be defined in configuration to enable efficient metadata filtering at search time, reducing the number of vectors scanned per query. Documents are upserted in configurable batch sizes to manage memory and network overhead.
+1. **Retrieval breadth control**: Rather than retrieving the maximum useful candidate pool, cost-optimized RAG retrieves a smaller, tuned number of documents. This reduces the reranking workload and the number of embeddings computed at query time.
+2. **Selective compression**: Contextual compression is applied only to the retrieved candidates, reducing the token count passed to the generator. This is the primary cost lever for generation — shorter context = fewer tokens = lower LLM cost.
+3. **Model tiering**: The pipeline uses cheaper, faster models for lower-stakes stages (for example, Llama 3.1 8B for reranking decisions) and more capable models only for final answer generation when the query requires it.
+4. **Context budget enforcement**: A `context_budget` parameter caps the maximum number of tokens passed to the generator, regardless of how many documents were retrieved.
 
-### Search
+The `cost_optimized_rag/base/` directory contains base pipeline classes, `cost_optimized_rag/evaluation/` contains cost-quality tradeoff tracking, and `cost_optimized_rag/utils/` contains token counting and budget utilities.
 
-The search pipeline embeds the incoming query and executes a vector search against the database. If reranking is enabled in the configuration, the pipeline over-fetches by 2x and applies a cross-encoder similarity ranker to rescore candidates before truncating to the final count. If reranking is disabled, the pipeline fetches exactly the requested number of results, avoiding unnecessary database read units. When RAG generation is enabled and an API key is configured, the retrieved documents are passed through a prompt template and language model to produce a natural language answer alongside the search results.
+## When to Use It
 
-## Supported Databases
+- Production systems with explicit cost per query targets or monthly budget caps.
+- High-query-volume workloads where small per-query savings multiply to significant monthly savings.
+- Services with latency SLOs where both cost and latency must be controlled simultaneously.
 
-| Database | Indexing Module | Search Module | Notes |
-|----------|----------------|---------------|-------|
-| Pinecone | `indexing/pinecone_indexer.py` | `search/pinecone_searcher.py` | Serverless managed service |
-| Weaviate | `indexing/weaviate_indexer.py` | `search/weaviate_searcher.py` | GraphQL-based queries |
-| Chroma | `indexing/chroma_indexer.py` | `search/chroma_searcher.py` | Local or cloud deployment |
-| Milvus | `indexing/milvus_indexer.py` | `search/milvus_searcher.py` | Distributed vector database |
-| Qdrant | `indexing/qdrant_indexer.py` | `search/qdrant_searcher.py` | Payload filtering support |
+## When Not to Use It
+
+- Research and benchmarking runs where absolute quality matters more than cost.
+- Very small-scale workloads where the optimization effort is not economically justified.
+- Early experimentation phases before a quality baseline has been established — optimize cost only after quality is acceptable.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Near-baseline quality when tuned well; quality degrades if compression is too aggressive or pool too small |
+| Latency | Can improve or worsen depending on whether retrieval breadth reduction or compression overhead dominates |
+| Cost | Primary goal — significant reductions achievable (30–70%) with careful tuning |
 
 ## Configuration
 
-Each database has per-dataset YAML configuration files organized in subdirectories. The configuration uses Pydantic models for validation and supports environment variable substitution. Settings cover database connection, embedding model, chunking, indexing (partitions, quantization, vector config, payload indexes), search behavior, reranking, RAG generation, and logging.
-
 ```yaml
-qdrant:
-  host: ${QDRANT_HOST:-localhost}
-  port: ${QDRANT_PORT:-6333}
-  api_key: ${QDRANT_API_KEY:-}
-  https: false
-
-collection:
-  name: triviaqa_cost_optimized
-  description: TriviaQA with cost-optimized RAG indexing
-
-dataloader:
-  type: triviaqa
-  dataset_name: trivia_qa
-  split: test
-  limit: null
-
-embeddings:
-  model: Qwen/Qwen3-Embedding-0.6B
-  batch_size: 32
-  backend: transformers
-  cache_embeddings: false
-
-chunking:
-  chunk_size: 512
-  overlap: 50
-
-indexing:
-  partitions:
-    enabled: true
-    partition_key: dataset_id
-  quantization:
-    enabled: false
-    method: scalar
-    compression_ratio: 4.0
-  vector_config:
-    size: 1024
-    distance: Cosine
-
 search:
-  top_k: 10
-  hybrid_enabled: false
-  reranking_enabled: false
-  metadata_filtering_enabled: false
+  candidate_pool_size: 15        # First-pass retrieval breadth (smaller = cheaper)
+  top_k: 5                       # Final result count
 
-reranker:
-  use_crossencoder: true
-  model: cross-encoder/ms-marco-MiniLM-L-6-v2
-  top_k: 5
+cost_optimization:
+  context_budget: 2000           # Maximum tokens for the generator context
+  model_tiering:
+    routing: "llama-3.1-8b-instant"     # Fast/cheap model for non-critical decisions
+    generation: "llama-3.3-70b-versatile"  # Capable model for final answer
+  compression:
+    enabled: true
+    strategy: "extractive"
+    num_sentences: 5
 
-generator:
+rag:
   enabled: true
-  provider: groq
-  model: llama-3.3-70b-versatile
-  api_key: ${GROQ_API_KEY}
-  api_base_url: https://api.groq.com/openai/v1
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  level: INFO
-  name: qdrant_triviaqa_rag
+  model: "${cost_optimization.model_tiering.generation}"
+  api_key: "${GROQ_API_KEY}"
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-src/vectordb/haystack/cost_optimized_rag/
-├── __init__.py                        # Module docstring and public API
-├── base/                              # Shared base classes and utilities
-│   ├── __init__.py
-│   ├── chunking.py                    # Text chunking configuration
-│   ├── config.py                      # Pydantic config models and YAML loader
-│   ├── fusion.py                      # Result fusion utilities
-│   ├── metrics.py                     # Cost and quality metrics
-│   └── sparse_indexing.py             # Sparse indexing support
-├── configs/                           # YAML configs organized by database (25 files)
-│   ├── qdrant/
-│   │   ├── triviaqa.yaml
-│   │   ├── arc.yaml
-│   │   ├── popqa.yaml
-│   │   ├── factscore.yaml
-│   │   └── earnings_calls.yaml
-│   ├── pinecone/                      # Same structure per database
-│   ├── milvus/
-│   ├── chroma/
-│   └── weaviate/
-├── evaluation/                        # Quality and cost evaluation
-│   ├── __init__.py
-│   └── evaluator.py                   # Evaluation metrics implementation
-├── examples/                          # Usage examples
-│   └── __init__.py
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── chroma_indexer.py              # Chroma document indexing
-│   ├── milvus_indexer.py              # Milvus document indexing
-│   ├── pinecone_indexer.py            # Pinecone document indexing
-│   ├── qdrant_indexer.py              # Qdrant document indexing
-│   └── weaviate_indexer.py            # Weaviate document indexing
-├── search/                            # Database-specific search pipelines
-│   ├── __init__.py
-│   ├── chroma_searcher.py             # Chroma search with cost optimization
-│   ├── milvus_searcher.py             # Milvus search with cost optimization
-│   ├── pinecone_searcher.py           # Pinecone search with cost optimization
-│   ├── qdrant_searcher.py             # Qdrant search with cost optimization
-│   └── weaviate_searcher.py           # Weaviate search with cost optimization
-├── utils/                             # Shared utility modules
-│   ├── __init__.py
-│   ├── common.py                      # Logger creation and document loading helpers
-│   └── prompt_templates.py            # RAG prompt templates
-└── README.md
-```
+| Setting | Why It Matters |
+|---|---|
+| `candidate_pool_size` | Primary retrieval cost lever; cutting from 50 to 15 significantly reduces embedding and ranking cost |
+| `cost_optimization.context_budget` | Directly caps generation token spend; set based on your LLM's per-token pricing |
+| `model_tiering` | Using a fast 8B model for routing decisions vs a 70B model for generation creates significant cost differentiation |
 
-## Related Modules
+## Cost-Quality Evaluation Pattern
 
-- `src/vectordb/haystack/rag/` - Standard RAG pipelines without cost optimization focus
-- `src/vectordb/haystack/reranking/` - Dedicated reranking pipelines (reranking is optional here)
-- `src/vectordb/haystack/dense_indexing/` - Dense indexing shared across features
-- `src/vectordb/haystack/contextual_compression/` - Post-retrieval compression as alternative cost strategy
+The `evaluation/` subdirectory contains scripts that run retrieval evaluation while tracking cost metrics. This enables explicit cost-quality curves — run the same evaluation at different `candidate_pool_size` and `context_budget` settings and plot quality vs cost to identify the operating point that meets your targets.
+
+## Common Pitfalls
+
+- **Optimizing cost before establishing quality**: If the baseline pipeline does not achieve acceptable quality, cost optimization will only make it cheaper while remaining inadequate. Fix quality first.
+- **Using single global settings for heterogeneous query classes**: Simple factual lookups can tolerate very small pools (5 candidates), while complex multi-hop questions need larger pools (25–50). Consider query routing to different cost tiers.
+- **No monitoring for quality drift after cost cuts**: Token budget reductions may work well on the evaluation set but fail on edge cases that appear in production. Monitor quality metrics continuously after any cost reduction change.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `reranking/` for quality-first ranking improvements before applying cost controls.
+- Use `contextual_compression/` as a standalone feature if token reduction is the only goal.
+- Use `agentic_rag/` for the highest-quality (and highest-cost) complex reasoning tasks where quality cannot be compromised.

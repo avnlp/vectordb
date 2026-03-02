@@ -1,146 +1,95 @@
-# Query Enhancement
+# Query Enhancement (LangChain)
 
-Query rewriting and expansion techniques that improve retrieval quality by generating variations of the original query. These techniques address the vocabulary mismatch problem where user queries use different terminology than the indexed documents, and help retrieve comprehensive results for underspecified or ambiguous queries.
-
-The module implements three established query enhancement strategies: multi-query generation, hypothetical document embeddings (HyDE), and step-back prompting. Each technique addresses different types of retrieval challenges and can be used individually or combined for maximum effectiveness.
-
-## Overview
-
-- Multi-query generation creates variations of the original query to capture different phrasings
-- HyDE generates a hypothetical answer document to bridge vocabulary gaps
-- Step-back prompting abstracts the query to retrieve broader context
-- Query fusion combines results from multiple enhanced queries
-- All techniques work with any embedding model and vector database
-- Configuration-driven through YAML files with environment variable substitution
-- Minimal latency overhead when using efficient LLM providers
+Query enhancement uses a large language model to generate improved or expanded retrieval queries from the user's original input before vector search. This increases recall by addressing vocabulary mismatch and query ambiguity.
 
 ## How It Works
 
-### Multi-Query Enhancement
+The `QueryEnhancer` component (from `components/query_enhancer.py`) supports three strategies, accessed via a unified `generate_queries(query, mode)` interface:
 
-The multi-query strategy generates multiple variations of the original query, each phrased differently but semantically equivalent. Each variation is used to retrieve documents, and the results are merged using fusion algorithms like Reciprocal Rank Fusion (RRF) or weighted averaging.
+### Multi-Query Generation (`mode="multi_query"`)
 
-For example, a query "What is photosynthesis?" might generate variations like:
-- "Explain the process of photosynthesis"
-- "How do plants convert sunlight to energy?"
-- "Describe photosynthesis in plants"
+Generates 5 alternative phrasings of the original query using `ChatGroq` with a structured prompt. Each variation captures a different way the same information could be expressed, addressing vocabulary mismatch between user queries and indexed documents.
 
-Each variation retrieves different documents, and the fusion step combines them into a comprehensive result set that captures documents using different terminology.
+```
+Original: "What is AI?"
+Generated: [
+    "Define artificial intelligence",
+    "Explain what AI means",
+    "What does artificial intelligence refer to",
+    "How is AI defined in computer science?",
+    "What are the core concepts of AI?"
+]
+```
 
-### HyDE (Hypothetical Document Embeddings)
+All generated queries (plus optionally the original) are searched independently and results are merged.
 
-HyDE addresses the vocabulary mismatch problem by asking a language model to write a hypothetical answer to the query. This hypothetical answer uses the same terminology as the knowledge base, bridging the gap between query vocabulary and document vocabulary. The hypothetical document is embedded and used for retrieval instead of the original query.
+### HyDE — Hypothetical Document Embeddings (`mode="hyde"`)
 
-For example, a query "Why is the sky blue?" might generate a hypothetical answer: "The sky appears blue due to Rayleigh scattering, where shorter blue wavelengths of sunlight are scattered in all directions by gas molecules in Earth's atmosphere." This answer contains technical terms like "Rayleigh scattering" that match the terminology in scientific documents.
+Generates a hypothetical 2–3 sentence answer document and returns `[original_query, hypothetical_answer]`. The hypothetical document is embedded and used for retrieval. Because the hypothetical answer is declarative and uses document-like vocabulary, its embedding better matches indexed passages than the short, interrogative original query.
 
-### Step-Back Prompting
+### Step-Back Prompting (`mode="step_back"`)
 
-Step-back prompting abstracts the query to a more general level to retrieve broader context before answering specific questions. This technique is useful when the specific query might miss relevant background information needed for a complete answer.
+Generates 3 broader, foundational questions that provide background context for the original query. Returns up to 4 queries: `[step_back_1, step_back_2, step_back_3, original_query]`. Step-back retrieval fetches broader context that helps contextualize and answer the specific question.
 
-For example, a query "What is the capital of France?" might first generate a step-back query: "Tell me about France, including its geography and major cities." The broader context retrieved helps ground the specific answer with relevant background information.
+```
+Specific: "What is backpropagation?"
+Step-back: ["How do neural networks learn?", "What is gradient descent?", "What is machine learning optimization?"]
+```
 
-### Query Fusion
+## When to Use It
 
-When multiple enhanced queries are generated, the pipeline retrieves documents for each and combines the results. Two fusion strategies are supported:
+- Ambiguous or short user queries where a single embedding may not capture the full intent.
+- Knowledge-intensive QA where recall bottlenecks harm quality more than precision overhead.
+- Corpora with significant vocabulary mismatch between user language and document language.
 
-**Reciprocal Rank Fusion (RRF)** scores documents based on their rank in each result list and combines scores without requiring score normalization. Documents that appear high in multiple result lists receive the best combined scores.
+## When Not to Use It
 
-**Weighted Average Fusion** combines similarity scores from each query, with weights reflecting confidence in each enhanced query. This requires score normalization but can produce more nuanced rankings.
+- Strict latency budgets where extra LLM calls per query are unacceptable.
+- Simple, precise factual lookups where the query is already specific and unambiguous.
 
-## Supported Databases
+## Tradeoffs
 
-All five vector databases are fully supported. Query enhancement is applied before the retrieval step and works with any database backend.
-
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | All enhancement strategies work with Pinecone |
-| Weaviate | Supported | All enhancement strategies work with Weaviate |
-| Chroma | Supported | All enhancement strategies work with Chroma |
-| Milvus | Supported | All enhancement strategies work with Milvus |
-| Qdrant | Supported | All enhancement strategies work with Qdrant |
+| Dimension | What to Expect |
+|---|---|
+| Quality | Higher recall and robustness; each strategy addresses a different recall failure mode |
+| Latency | One additional LLM call per query, plus N retrieval calls (one per generated query) |
+| Cost | Higher LLM inference cost proportional to number of generated queries |
 
 ## Configuration
 
-Configuration is stored in YAML files organized by database and dataset. The configuration specifies which enhancement strategies to enable, how many variations to generate, and fusion settings.
-
 ```yaml
-pinecone:
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "enhanced-index"
-  namespace: ""
-
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  batch_size: 32
-
 query_enhancement:
-  strategies:
-    - "multi_query"
-    - "hyde"
-    # - "step_back"  # Uncomment to enable
+  mode: "multi_query"     # "multi_query", "hyde", or "step_back"
 
-  multi_query:
-    enabled: true
-    num_variations: 3
-    fusion_method: "rrf"  # or "weighted_average"
-    rrf_k: 60  # RRF constant
-
-  hyde:
-    enabled: true
-    model: "llama-3.3-70b-versatile"
-    api_key: "${GROQ_API_KEY}"
-    temperature: 0.7
-    max_tokens: 256
-
-  step_back:
-    enabled: false
-    model: "llama-3.3-70b-versatile"
-    api_key: "${GROQ_API_KEY}"
-    temperature: 0.5
-
-search:
-  top_k: 10
-
-rag:
-  enabled: false
+llm:
   model: "llama-3.3-70b-versatile"
   api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
-
-logging:
-  level: "INFO"
+  temperature: 0.3        # Low for consistent output; higher for more diverse variants
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-query_enhancement/
-├── __init__.py                        # Package exports
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone enhanced indexing
-│   ├── weaviate.py                    # Weaviate enhanced indexing
-│   ├── chroma.py                      # Chroma enhanced indexing
-│   ├── milvus.py                      # Milvus enhanced indexing
-│   └── qdrant.py                      # Qdrant enhanced indexing
-├── search/                            # Database-specific enhanced search
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone enhanced search
-│   ├── weaviate.py                    # Weaviate enhanced search
-│   ├── chroma.py                      # Chroma enhanced search
-│   ├── milvus.py                      # Milvus enhanced search
-│   └── qdrant.py                      # Qdrant enhanced search
-└── configs/                           # YAML configs organized by database
-    ├── pinecone_triviaqa.yaml
-    ├── pinecone_arc.yaml
-    ├── weaviate_triviaqa.yaml
-    └── ...                            # (25+ config files total)
-```
+| Setting | Why It Matters |
+|---|---|
+| `mode` | Multi-query is most general; HyDE is strongest for distribution mismatch; step-back is best for context-dependent questions |
+| LLM temperature | Higher (0.5–0.7) generates more diverse query variants; lower (0.2–0.3) generates more conservative ones |
+| Fusion strategy | How the results from multiple queries are merged affects final recall |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/langchain/semantic_search/` - Standard search without query enhancement
-- `src/vectordb/langchain/hybrid_indexing/` - Hybrid search with query enhancement support
-- `src/vectordb/langchain/components/` - QueryEnhancer component implementation
-- `src/vectordb/langchain/utils/` - Fusion and diversification utilities
+- **Too many low-value query variants**: Generating 10 variants when 5 suffice multiplies retrieval cost. Evaluate the marginal benefit of each additional query.
+- **No deduplication after expansion**: All generated queries retrieve results that must be deduplicated before ranking. Without deduplication, popular documents appear multiple times.
+- **Expecting enhancement to fix poor indexing**: Query expansion increases recall from the existing index but cannot retrieve documents that were never indexed or were indexed with poor embeddings.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `agentic_rag/` when query enhancement is not sufficient and iterative multi-step retrieval is needed.
+- Use `reranking/` after query enhancement to prioritize the best candidates from the merged result set.

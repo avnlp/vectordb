@@ -1,112 +1,83 @@
-# Contextual Compression
+# Contextual Compression (LangChain)
 
-Post-retrieval document compression pipelines that reduce the volume of retrieved content before passing it to a downstream language model. The pipeline retrieves more documents than ultimately needed, then applies a compression step that either filters or summarizes the candidate set down to the most relevant passages. This reduces token consumption during generation while preserving the information most pertinent to the query.
-
-Two compression strategies are available. Reranking uses cross-encoder models to score each retrieved document against the query and retains only the highest-scoring results. LLM extraction uses a language model to read each retrieved document and extract only the passages relevant to the query, producing condensed versions that carry the same information in fewer tokens.
-
-## Overview
-
-- Two compression strategies: cross-encoder reranking and LLM-based passage extraction
-- Over-fetches documents during initial retrieval to ensure sufficient candidates for compression
-- Reranking operates without additional LLM API calls for cost-efficient filtering
-- LLM extraction produces condensed document summaries focused on query-relevant content
-- Pipeline classes for each supported vector database following a consistent pattern
-- Token counting utilities to measure compression ratios and token savings
-- Configuration-driven through YAML files with environment variable substitution
+Contextual compression reduces retrieved documents to their most query-relevant fragments before passing the context to the generator. This improves generation quality by removing noise and reduces token cost by shortening the generator's input.
 
 ## How It Works
 
-### Indexing Phase
+LangChain's `ContextualCompressionRetriever` wraps any base retriever with a compressor that filters or transforms retrieved documents. The compressor processes each retrieved document against the query and returns a compressed or filtered version.
 
-The indexing pipeline loads documents from a configured dataset, generates dense embeddings using a sentence transformer model, and writes the embedded documents to the target vector database collection. Each database has a dedicated indexing implementation that handles collection creation and document upsert according to its specific API. The indexing process is identical regardless of which compression strategy will be used at search time.
+Two main approaches are used in this module:
 
-### Search Phase
+### LLM-Based Extraction
 
-The search pipeline embeds the incoming query and retrieves an initial candidate set from the vector database, typically fetching more documents than ultimately requested. The candidates are then passed through the configured compressor. When using reranking, a cross-encoder model scores each query-document pair and the results are sorted by relevance score, keeping only the top results. When using LLM extraction, a language model processes each document and extracts only the passages relevant to the query, returning condensed versions. The compressed result set is truncated to the final requested count and returned.
+An LLM reads each retrieved document and extracts only the sentences or paragraphs that are relevant to the query. LangChain's `LLMChainExtractor` implements this by prompting an LLM to return a verbatim excerpt from the document. Documents where no relevant content is found are dropped entirely.
 
-### Compression Strategies
+### Embedding-Based Relevance Filtering
 
-**Reranking** uses a cross-encoder model that processes query-document pairs together to produce a relevance score. The pipeline retrieves candidates using vector similarity, then reranks them using the cross-encoder to identify the most relevant documents. This approach is fast and does not require additional LLM calls.
+LangChain's `EmbeddingsFilter` (from `langchain.retrievers.document_compressors`) computes cosine similarity between each retrieved document embedding and the query embedding. Documents (or sentences) below a similarity threshold are dropped. This approach is faster than LLM-based extraction because it requires no additional LLM calls.
 
-**LLM Extraction** uses a language model to read each retrieved document and extract only the sentences or passages relevant to the query. This can significantly reduce token count but adds latency due to the LLM processing step. The extracted passages are concatenated to form a compressed context.
+## When to Use It
 
-## Supported Databases
+- Long source documents where only a fraction of each document is relevant to the query.
+- Token-cost-sensitive pipelines where reducing generator input by 50–80% has meaningful economic impact.
+- Cases where retrieved documents contain relevant facts embedded in large amounts of irrelevant context.
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | Uses namespaces for logical partitioning |
-| Weaviate | Supported | Uses collections for organization |
-| Chroma | Supported | Lightweight local or client-server deployment |
-| Milvus | Supported | Uses collections with configurable metrics |
-| Qdrant | Supported | Supports both local and server deployments |
+## When Not to Use It
+
+- Very short passages (one or two sentences) where compression removes needed nuance.
+- Pipelines with tight latency budgets — each LLM-based compression call adds latency.
+- Pipelines where retrieval quality is the primary problem; fix retrieval before adding compression.
+
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Often improves generation grounding by removing noise; may lose nuance with aggressive settings |
+| Latency | LLM-based compression adds 200–2000 ms; embedding-based is faster |
+| Cost | Can reduce generation cost despite added compression cost if context shrinks significantly |
 
 ## Configuration
 
-Each database has per-dataset YAML configuration files organized by database and dataset, with separate files for each compression strategy. The configuration controls database connection parameters, embedding model selection, retrieval top-k for over-fetching, compression type and model, and optional RAG generation.
-
 ```yaml
-pinecone:
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "compressed-index"
-  namespace: ""
-
-embeddings:
-  model: "Qwen/Qwen3-Embedding-0.6B"
-  batch_size: 32
-
 compression:
-  mode: "reranking"  # or "llm_extraction"
-  reranker:
-    type: "cross_encoder"
-    model: "BAAI/bge-reranker-v2-m3"
-    top_k: 5
-  llm_extraction:
-    model: "llama-3.3-70b-versatile"
-    api_key: "${GROQ_API_KEY}"
-    max_tokens_per_doc: 200
+  type: "llm_extraction"         # "llm_extraction" or "embedding_filter"
+  relevance_threshold: 0.5       # Used for embedding_filter
+  compression_top_k: 3           # Number of retrieved documents to compress
 
-rag:
-  enabled: true
+llm:
   model: "llama-3.3-70b-versatile"
   api_key: "${GROQ_API_KEY}"
-  temperature: 0.7
-  max_tokens: 2048
+  temperature: 0.0
 
-logging:
-  level: "INFO"
+search:
+  top_k: 10
+  candidate_pool_size: 20
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-contextual_compression/
-├── __init__.py                        # Package exports
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone compression indexing
-│   ├── weaviate.py                    # Weaviate compression indexing
-│   ├── chroma.py                      # Chroma compression indexing
-│   ├── milvus.py                      # Milvus compression indexing
-│   └── qdrant.py                      # Qdrant compression indexing
-├── search/                            # Database-specific search with compression
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone compression search
-│   ├── weaviate.py                    # Weaviate compression search
-│   ├── chroma.py                      # Chroma compression search
-│   ├── milvus.py                      # Milvus compression search
-│   └── qdrant.py                      # Qdrant compression search
-└── configs/                           # YAML configs organized by database
-    ├── pinecone_arc.yaml
-    ├── pinecone_triviaqa.yaml
-    ├── weaviate_arc.yaml
-    └── ...                            # (25 config files: 5 databases × 5 datasets)
-```
+| Setting | Why It Matters |
+|---|---|
+| `compression.type` | LLM extraction is more accurate but slower; embedding filter is faster but less nuanced |
+| `compression.relevance_threshold` | For embedding filter: too high drops useful content, too low keeps everything |
+| `compression.compression_top_k` | Controls how many documents are sent to the compressor; balance quality vs latency |
 
-Config files are named as `{database}_{dataset}.yaml`. The compression strategy (reranking or LLM extraction) is specified within each config file under the `compression.mode` field.
+## Common Pitfalls
 
-## Related Modules
+- **Over-aggressive compression**: Setting thresholds too strictly may remove the exact sentence needed to answer the question. Validate compressed context against expected answers.
+- **Compressing before fixing retrieval**: If retrieval rarely returns relevant documents, compression cannot recover missing evidence.
+- **Not auditing faithfulness after compression**: LLM extraction can occasionally paraphrase content in ways that subtly alter factual meaning. Spot-check compressed outputs against source documents.
 
-- `src/vectordb/langchain/reranking/` - Dedicated two-stage reranking pipelines
-- `src/vectordb/langchain/semantic_search/` - Standard semantic search without compression
-- `src/vectordb/langchain/cost_optimized_rag/` - Cost-aware RAG with optional compression
-- `src/vectordb/langchain/components/` - Reusable components including the ContextCompressor
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `reranking/` as an alternative when improving result ordering is the primary goal.
+- Use `cost_optimized_rag/` for a broader budget-control strategy combining compression with retrieval breadth controls.
+- Combine with `parent_document_retrieval/` when returned parent documents are long and need trimming before generation.

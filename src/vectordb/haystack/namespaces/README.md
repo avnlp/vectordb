@@ -1,135 +1,79 @@
-# Namespaces
+# Namespaces (Haystack)
 
-This module provides logical data separation and organization through namespace, collection, and partition management across all five supported vector databases. It enables CRUD operations on namespaces, supports indexing documents into separate namespaces, querying within or across namespaces, and collecting statistics on namespace contents.
-
-Each database uses its native mechanism for data isolation: Pinecone provides native namespace parameters, Weaviate uses multi-tenancy, Milvus uses partition key fields, Qdrant uses payload-based filtering, and Chroma uses separate collections per namespace. The module abstracts these differences behind a unified pipeline interface with consistent configuration, typed results, and shared error handling.
-
-## Overview
-
-- Creates, lists, queries, and deletes namespaces using each database's native isolation mechanism
-- Indexes documents from configurable datasets into separate namespaces (such as training data in one namespace and test data in another)
-- Supports cross-namespace search to compare query results across multiple namespaces side by side
-- Provides namespace statistics including document counts and timing metrics
-- Defines naming conventions and generators for consistent namespace identification
-- Includes typed result objects, custom exceptions, and timing metric collection
-- All behavior is driven by YAML configuration files with environment variable substitution
+Namespaces provide logical segmentation within a shared index or collection, allowing retrieval to be scoped to a subset of data without creating separate indexes or requiring full tenant isolation. They sit between single-index retrieval (no partitioning) and full multi-tenancy (strong lifecycle management and isolation).
 
 ## How It Works
 
-### Namespace Creation and Management
+1. **Namespace assignment at indexing**: Documents are inserted into a named partition (a namespace). The namespace identifier is stored either as a metadata field or through the backend's native partitioning mechanism.
+2. **Scoped retrieval**: At query time, the namespace is specified so only documents in that partition are considered.
+3. **Cross-namespace retrieval** (optional): Some backends allow querying multiple namespaces or all namespaces in a single call.
 
-Each database pipeline provides methods to create, list, check existence of, and delete namespaces. The underlying mechanism differs by database -- Pinecone creates namespaces implicitly on first upsert, Weaviate creates tenants within a collection, Milvus creates partitions, Qdrant tags documents with a namespace payload field, and Chroma creates a separate collection for each namespace.
+### Per-Backend Namespace Implementations
 
-### Multi-Namespace Indexing
+The `namespaces/` directory contains per-backend files that map the namespace concept to each backend's native mechanism:
 
-The module supports indexing different dataset splits into different namespaces within a single pipeline run. For example, a configuration can specify that the training split goes into one namespace while the validation split goes into another. Documents are loaded, embedded, and written to the appropriate namespace based on the configuration.
+| File | Backend | Mechanism |
+|---|---|---|
+| `pinecone_namespaces.py` | Pinecone | Native `namespace` parameter on upsert and query. Pinecone namespaces are first-class index partitions. |
+| `chroma_namespaces.py` | Chroma | Metadata-based soft namespace using `where` filter. |
+| `chroma_collections.py` | Chroma | Collection-per-namespace pattern: each namespace is a separate Chroma collection. |
+| `milvus_namespaces.py` | Milvus | Partition key field routing. Documents are routed to partitions by the namespace field value. |
+| `qdrant_namespaces.py` | Qdrant | Payload filter using the `namespace` metadata field. |
+| `weaviate_namespaces.py` | Weaviate | Tenant-based namespacing using Weaviate's native tenant feature. |
 
-### Cross-Namespace Search
+The `types.py` file defines namespace-related type literals and the `utils/` subdirectory contains shared namespace scope helpers.
 
-When cross-namespace search is enabled, the pipeline runs the same query against multiple namespaces and returns comparative results. This is useful for comparing retrieval quality across dataset splits, evaluating different embedding strategies stored in separate namespaces, or testing against development and production data side by side.
+## When to Use It
 
-### Statistics and Metrics
+- Environment separation: index `"production"`, `"staging"`, and `"test"` data in the same index but query each independently.
+- Versioned document sets: maintain `"v1"` and `"v2"` of a knowledge base in the same collection for A/B testing.
+- Customer group segmentation where groups can share an index but queries should be scoped by group.
 
-The module collects timing metrics for indexing and search operations, tracks document counts per namespace, and supports structured logging of results. Namespace statistics are returned as typed dataclass objects for programmatic use.
+## When Not to Use It
 
-## Supported Databases
+- Hard security isolation requirements where physical separation (separate indexes or infrastructure) is mandated. Namespaces provide logical, not cryptographic, isolation.
+- Small single-domain corpora with no need for any partitioning.
 
-| Database | Isolation Mechanism | Notes |
-|----------|-------------------|-------|
-| Pinecone | Native namespaces | Zero-cost namespace creation within a shared index |
-| Weaviate | Multi-tenancy (tenants within collections) | Schema-based with tenant activation and deactivation |
-| Milvus | Partition key fields | Partitions within a single collection |
-| Qdrant | Payload-based filtering | Namespace identifier stored as a payload field |
-| Chroma | Separate collections | One collection per namespace |
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Higher precision for scoped queries by eliminating irrelevant namespaces |
+| Latency | Often improved for namespace-scoped queries because fewer documents are searched |
+| Cost | Operational complexity increases as the number of namespaces grows |
 
 ## Configuration
 
-Configuration is stored in YAML files under the `configs/` directory, with one file per database-dataset combination. Below is an example:
-
 ```yaml
-pipeline:
-  name: "pinecone_triviaqa_namespaces"
-  description: "Pinecone namespace pipeline for TriviaQA dataset"
-  database: "pinecone"
-  dataset: "triviaqa"
-
-pinecone:
-  api_key: "${PINECONE_API_KEY}"
-  index_name: "triviaqa-namespaces"
-  cloud: "aws"
-  region: "us-east-1"
-  metric: "cosine"
-
-collection:
-  name: "triviaqa_namespaces"
-
-namespaces:
-  strategy: "split"
-  prefix: ""
-  definitions:
-    - name: "triviaqa_train"
-      split: "train"
-      description: "TriviaQA training set"
-    - name: "triviaqa_validation"
-      split: "validation"
-      description: "TriviaQA validation set"
-
-dataloader:
-  type: "haystack"
-  class: "TriviaQADataloader"
-  dataset_name: "trivia_qa"
-  config: "rc"
-  limit: 1000
-
-embeddings:
-  model: "Qwen/Qwen3-Embedding-0.6B"
-  dimension: 1024
-  batch_size: 32
-
-cross_namespace:
-  enabled: true
-  compare_namespaces: ["triviaqa_train", "triviaqa_validation"]
-  top_k: 10
-
-metrics:
-  collect_timing: true
-  collect_stats: true
-  log_results: true
-
-logging:
-  level: "INFO"
-  name: "pinecone_triviaqa_namespaces"
+namespace:
+  name: "production"            # Namespace to index into / query from
+  field: "namespace"            # Metadata field name (for filter-based backends)
+  cross_namespace: false        # Whether to search across all namespaces
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-namespaces/
-├── __init__.py                  # Package exports for pipelines, types, and utilities
-├── README.md                    # This file
-├── types.py                     # Enums, dataclasses, exceptions, and utility classes
-├── chroma_collections.py        # Chroma collection-based namespace helpers
-├── chroma_namespaces.py         # Chroma namespace pipeline
-├── milvus_namespaces.py         # Milvus partition-based namespace pipeline
-├── pinecone_namespaces.py       # Pinecone native namespace pipeline
-├── qdrant_namespaces.py         # Qdrant payload-filtered namespace pipeline
-├── weaviate_namespaces.py       # Weaviate tenant-based namespace pipeline
-├── utils/                       # Shared utilities
-│   ├── __init__.py
-│   ├── config.py                # Configuration loading
-│   ├── data.py                  # Dataset loading utilities
-│   ├── embeddings.py            # Embedding model wrappers
-│   └── timing.py                # Operation timing collection
-└── configs/                     # 25 YAML configs (5 databases x 5 datasets)
-    ├── chroma_arc.yaml
-    ├── chroma_earnings_calls.yaml
-    ├── ...
-    ├── weaviate_popqa.yaml
-    └── weaviate_triviaqa.yaml
-```
+| Setting | Why It Matters |
+|---|---|
+| `namespace_strategy` | How data is partitioned — native (Pinecone) vs filter-based (Chroma, Qdrant) |
+| `cross_namespace_mode` | Single namespace query vs multi-namespace aggregation |
+| `default_namespace` | Safe fallback behavior when namespace context is absent |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/multi_tenancy/` - Full multi-tenancy with tenant lifecycle management and RAG
-- `src/vectordb/haystack/dense_indexing/` - Dense embedding indexing without namespace separation
-- `src/vectordb/dataloaders/haystack/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and Earnings Calls
+- **Inconsistent naming conventions**: `"prod"` and `"production"` treated as different namespaces. Enforce lowercase, normalized namespace identifiers.
+- **Cross-namespace aggregation without deduplication**: If the same document was indexed in multiple namespaces, queries across namespaces may return duplicates.
+- **Confusing logical isolation with hard security boundaries**: Namespaces are a query scoping mechanism, not an access control mechanism. Use separate infrastructure for true security isolation.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `multi_tenancy/` when you need full tenant lifecycle management (creation, deletion, access control).
+- Use `metadata_filtering/` to apply additional constraints within a single namespace.

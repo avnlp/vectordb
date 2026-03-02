@@ -1,120 +1,80 @@
-# Maximal Marginal Relevance
+# MMR (Haystack)
 
-Maximal Marginal Relevance (MMR) is a diversity-aware reranking strategy that reduces redundancy in search results. Standard nearest-neighbor retrieval often returns clusters of nearly identical documents, especially when the corpus contains paraphrased or overlapping content. MMR addresses this by selecting documents that are both relevant to the query and dissimilar to the documents already selected, producing a result set that covers a broader range of information.
-
-The module implements MMR as a post-retrieval step. The pipeline first over-fetches candidate documents from the vector database using standard dense retrieval, then applies the MMR algorithm to rerank and filter those candidates down to the requested number of results. An optional RAG step can generate a natural-language answer from the diverse result set.
-
-## Overview
-
-- Diversity-aware reranking that balances query relevance against inter-document similarity
-- Lambda parameter to control the relevance-diversity tradeoff (1.0 = pure relevance, 0.0 = pure diversity)
-- Over-fetching strategy that retrieves more candidates than needed, then reranks with MMR
-- Optional retrieval-augmented generation using an LLM to synthesize answers from diverse results
-- Configuration-driven through YAML files with environment variable substitution
-- 25 pre-built configuration files covering all database and dataset combinations
+MMR (Maximal Marginal Relevance) is a reranking strategy that selects documents to maximize both relevance to the query and diversity from already-selected documents. It prevents the final context from being dominated by near-duplicate passages.
 
 ## How It Works
 
-### Indexing Phase
+1. **Initial retrieval**: A standard first-pass retrieval returns a candidate pool (typically larger than the final `top_k` to give MMR enough candidates to choose from). This is called `fetch_k` in some configurations.
+2. **Iterative MMR selection**: Documents are selected one at a time using the formula:
+   - `MMR(d) = λ × sim(d, query) − (1 − λ) × max_sim(d, selected)`
+   - The first term rewards relevance (cosine similarity between document embedding and query embedding).
+   - The second term penalizes redundancy (maximum cosine similarity to any already-selected document).
+3. **Result**: A set of documents that balances strong relevance with topical coverage.
 
-The indexing pipeline is identical to standard dense indexing. Documents are loaded from a dataset, embedded using a sentence-transformer model, and stored in the target vector database. No special indexing structure is required for MMR, because the reranking happens entirely at search time.
+In Haystack, MMR is implemented via `SentenceTransformersDiversityRanker` with `strategy="maximum_margin_relevance"`, created and warmed up by `RerankerFactory.create_diversity_ranker(config)`.
 
-### Search Phase
+The `lambda` parameter (also called `lambda_threshold` in some Haystack configs) controls the tradeoff:
+- `lambda = 1.0`: Pure relevance (same as standard ranking).
+- `lambda = 0.5`: Equal weight on relevance and novelty (good starting default).
+- `lambda = 0.0`: Maximum diversity (ignores relevance entirely; rarely useful).
 
-The search pipeline performs three steps. First, it embeds the query and retrieves an over-sized set of candidate documents from the database (for example, 50 candidates when only 10 final results are needed). Second, it applies the MMR algorithm to iteratively select documents. The algorithm scores each remaining candidate using the formula:
+## When to Use It
 
-```
-MMR(d) = lambda * similarity(query, d) - (1 - lambda) * max(similarity(d, d_selected))
-```
+- Open-ended questions that may have multiple relevant subtopics in the corpus.
+- Summarization and synthesis tasks where the generator benefits from diverse source coverage.
+- Dense corpora where many retrieved documents are near-duplicates of the same passage.
+- When the top-1 document is adequate but the remaining context slots tend to repeat the same information.
 
-At each step, the candidate with the highest MMR score is added to the selected set. A lambda value close to 1.0 prioritizes relevance, a value close to 0.0 prioritizes diversity, and 0.5 provides an even balance. Third, if RAG is enabled, the selected documents are passed as context to an LLM to generate a grounded answer.
+## When Not to Use It
 
-## Supported Databases
+- Fact-lookup tasks where the single most precise snippet is what matters and diversity is irrelevant.
+- Very small `top_k` values (less than 3–4) where diversity cannot operate meaningfully over so few candidates.
+- Ultra-low-latency paths where even the moderate overhead of embedding-based MMR selection is unacceptable.
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| Pinecone | Supported | Standard dense retrieval with MMR reranking |
-| Weaviate | Supported | Standard dense retrieval with MMR reranking |
-| Chroma | Supported | Standard dense retrieval with MMR reranking |
-| Milvus | Supported | Standard dense retrieval with MMR reranking |
-| Qdrant | Supported | Standard dense retrieval with MMR reranking |
+## Tradeoffs
+
+| Dimension | What to Expect |
+|---|---|
+| Quality | Better context coverage across subtopics; may slightly lower top-1 precision |
+| Latency | Low-to-moderate overhead compared to pure reranking; requires document embeddings |
+| Cost | Neutral to slightly positive: better context breadth can reduce generator retries |
 
 ## Configuration
 
-Each pipeline is driven by a YAML configuration file. Below is an example showing the key sections:
-
 ```yaml
-dataloader:
-  type: "triviaqa"         # triviaqa, arc, popqa, factscore, earnings_calls
-  split: "test"
-  limit: 1000
-
-embeddings:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  device: "cpu"
-  batch_size: 32
-
 mmr:
-  model: "sentence-transformers/all-MiniLM-L6-v2"
-  top_k: 10                # Final number of results after reranking
-  top_k_candidates: 50     # Number of candidates to over-fetch
-  lambda_threshold: 0.5    # Relevance-diversity tradeoff
-
-qdrant:                    # Database-specific section (one per config)
-  url: "${QDRANT_URL}"
-  api_key: "${QDRANT_API_KEY}"
-  collection_name: "mmr_triviaqa"
-  dimension: 384
-  metric: "Cosine"
+  model: "sentence-transformers/all-MiniLM-L6-v2"  # Required: model for diversity ranker
+  top_k: 10          # Final result count after MMR selection
+  lambda_threshold: 0.5  # Balance between relevance and diversity
 
 search:
-  top_k: 10
-
-rag:
-  enabled: false
-  model: "llama-3.3-70b-versatile"
-  api_key: "${GROQ_API_KEY}"
-  api_base_url: "https://api.groq.com/openai/v1"
-  temperature: 0.7
-  max_tokens: 2048
+  fetch_k: 30        # Candidate pool size fed to MMR (should be larger than top_k)
 ```
 
-## Directory Structure
+## Settings to Tune First
 
-```
-mmr/
-├── __init__.py                        # Package exports for all pipelines
-├── README.md
-├── indexing/                          # Database-specific indexing pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone dense indexing for MMR
-│   ├── weaviate.py                    # Weaviate dense indexing for MMR
-│   ├── chroma.py                      # Chroma dense indexing for MMR
-│   ├── milvus.py                      # Milvus dense indexing for MMR
-│   └── qdrant.py                      # Qdrant dense indexing for MMR
-├── search/                            # Database-specific MMR search pipelines
-│   ├── __init__.py
-│   ├── pinecone.py                    # Pinecone retrieval with MMR reranking
-│   ├── weaviate.py                    # Weaviate retrieval with MMR reranking
-│   ├── chroma.py                      # Chroma retrieval with MMR reranking
-│   ├── milvus.py                      # Milvus retrieval with MMR reranking
-│   └── qdrant.py                      # Qdrant retrieval with MMR reranking
-└── configs/                           # 25 YAML configs (5 databases x 5 datasets)
-    ├── pinecone/
-    │   ├── triviaqa.yaml
-    │   ├── arc.yaml
-    │   ├── popqa.yaml
-    │   ├── factscore.yaml
-    │   └── earnings_calls.yaml
-    ├── weaviate/                       # Same 5 dataset files per database
-    ├── chroma/
-    ├── milvus/
-    └── qdrant/
-```
+| Setting | Why It Matters |
+|---|---|
+| `mmr.lambda_threshold` (or `lambda`) | Higher favors relevance; lower favors novelty. Start at 0.5 and adjust. |
+| `search.fetch_k` | The candidate pool MMR selects from. Larger pools give better diversity opportunities. |
+| `mmr.top_k` | Final selected set size. Should be smaller than `fetch_k`. |
 
-## Related Modules
+## Common Pitfalls
 
-- `src/vectordb/haystack/semantic_search/` - Standard dense semantic search (without diversity reranking)
-- `src/vectordb/haystack/hybrid_indexing/` - Hybrid dense-plus-sparse search pipelines
-- `src/vectordb/haystack/utils/` - Shared utilities for configuration, embedding, data loading, and reranking
-- `src/vectordb/dataloaders/` - Dataset loaders for TriviaQA, ARC, PopQA, FactScore, and EarningsCalls
+- **Confusing `fetch_k` with `top_k`**: `fetch_k` is the number of candidates retrieved for MMR to select from. `top_k` is the final output count. Always set `fetch_k > top_k`.
+- **Using default `lambda` without evaluation**: The default may not match your domain. Evaluate on your query set before accepting the default.
+- **Applying MMR to an already tiny candidate set**: MMR diversity requires enough candidates to choose differently ranked documents. Small pools produce trivially different results from standard ranking.
+
+## Backends Supported
+
+Chroma, Milvus, Pinecone, Qdrant, Weaviate.
+
+## Dataset Configs Provided
+
+ARC, Earnings Calls, FActScore, PopQA, TriviaQA.
+
+## Next Steps
+
+- Use `diversity_filtering/` for a simpler, configurable threshold-based approach to deduplication without global MMR optimization.
+- Use `reranking/` when pure relevance precision is the goal and diversity is not a concern.
+- Use `contextual_compression/` to shorten the final selected context if MMR results are still too long.
