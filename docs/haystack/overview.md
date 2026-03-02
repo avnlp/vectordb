@@ -245,23 +245,23 @@ backend:
 
 | Feature | Pinecone | Weaviate | Chroma | Milvus | Qdrant |
 |---------|----------|----------|--------|--------|--------|
-| **Semantic Search** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Sparse Indexing** | ✅ | ✅ (BM25) | ⚠️ | ✅ | ✅ |
-| **Hybrid Indexing** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Metadata Filtering** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **MMR** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Reranking** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Query Enhancement** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Parent Document Retrieval** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Contextual Compression** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Agentic RAG** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Cost-Optimized RAG** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Diversity Filtering** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **JSON Indexing** | ⚠️ | ✅ | ⚠️ | ✅ | ✅ |
-| **Multi-Tenancy** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Namespaces** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Semantic Search** | Yes | Yes | Yes | Yes | Yes |
+| **Sparse Indexing** | Yes | Yes (BM25) | Partial | Yes | Yes |
+| **Hybrid Indexing** | Yes | Yes | Yes | Yes | Yes |
+| **Metadata Filtering** | Yes | Yes | Yes | Yes | Yes |
+| **MMR** | Yes | Yes | Yes | Yes | Yes |
+| **Reranking** | Yes | Yes | Yes | Yes | Yes |
+| **Query Enhancement** | Yes | Yes | Yes | Yes | Yes |
+| **Parent Document Retrieval** | Yes | Yes | Yes | Yes | Yes |
+| **Contextual Compression** | Yes | Yes | Yes | Yes | Yes |
+| **Agentic RAG** | Yes | Yes | Yes | Yes | Yes |
+| **Cost-Optimized RAG** | Yes | Yes | Yes | Yes | Yes |
+| **Diversity Filtering** | Yes | Yes | Yes | Yes | Yes |
+| **JSON Indexing** | Partial | Yes | Partial | Yes | Yes |
+| **Multi-Tenancy** | Yes | Yes | Yes | Yes | Yes |
+| **Namespaces** | Yes | Yes | Yes | Yes | Yes |
 
-Legend: ✅ Full support | ⚠️ Partial/limited support
+Legend: Yes = Full support | Partial = Partial/limited support
 
 ## 11. Configuration Overview
 

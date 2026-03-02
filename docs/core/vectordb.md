@@ -261,23 +261,23 @@ from vectordb.utils.evaluation import (
 
 | Feature | Pinecone | Weaviate | Chroma | Milvus | Qdrant |
 |---------|----------|----------|--------|--------|--------|
-| **Semantic Search** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Hybrid Search** | ✅ | ✅ | ⚠️ Limited | ✅ | ✅ |
-| **Metadata Filtering** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **MMR Reranking** | ✅ | ✅ | ✅ | ✅ | ✅ (built-in) |
-| **Reranking** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Multi-Tenancy** | ✅ (namespaces) | ✅ (tenants) | ✅ (collections) | ✅ (partitions) | ✅ (payload) |
-| **Namespaces** | ✅ | ⚠️ (tenants) | ✅ | ⚠️ (partitions) | ✅ |
-| **Sparse Indexing** | ✅ | ✅ (BM25) | ⚠️ Experimental | ✅ | ✅ |
-| **Parent Document Retrieval** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Query Enhancement** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Contextual Compression** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Agentic RAG** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Cost-Optimized RAG** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Diversity Filtering** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **JSON Indexing** | ⚠️ (flat) | ✅ | ⚠️ (flat) | ✅ (JSON) | ✅ (payload) |
+| **Semantic Search** | Yes | Yes | Yes | Yes | Yes |
+| **Hybrid Search** | Yes | Yes | Partial (limited) | Yes | Yes |
+| **Metadata Filtering** | Yes | Yes | Yes | Yes | Yes |
+| **MMR Reranking** | Yes | Yes | Yes | Yes | Yes (built-in) |
+| **Reranking** | Yes | Yes | Yes | Yes | Yes |
+| **Multi-Tenancy** | Yes (namespaces) | Yes (tenants) | Yes (collections) | Yes (partitions) | Yes (payload) |
+| **Namespaces** | Yes | Partial (tenants) | Yes | Partial (partitions) | Yes |
+| **Sparse Indexing** | Yes | Yes (BM25) | Partial (experimental) | Yes | Yes |
+| **Parent Document Retrieval** | Yes | Yes | Yes | Yes | Yes |
+| **Query Enhancement** | Yes | Yes | Yes | Yes | Yes |
+| **Contextual Compression** | Yes | Yes | Yes | Yes | Yes |
+| **Agentic RAG** | Yes | Yes | Yes | Yes | Yes |
+| **Cost-Optimized RAG** | Yes | Yes | Yes | Yes | Yes |
+| **Diversity Filtering** | Yes | Yes | Yes | Yes | Yes |
+| **JSON Indexing** | Partial (flat) | Yes | Partial (flat) | Yes (JSON) | Yes (payload) |
 
-Legend: ✅ Full support | ⚠️ Partial/limited support
+Legend: Yes = Full support | Partial = Partial/limited support
 
 ## 10. Configuration Overview
 

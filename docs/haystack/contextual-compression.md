@@ -217,10 +217,10 @@ compressed = compressor.run(query=query, documents=retrieved_docs)
 
 Use contextual compression when:
 
-- ✅ **Retrieval is broad**: Need to fetch many candidates to avoid missed evidence
-- ✅ **Chunks are long/noisy**: Retrieved text inflates generation token costs
-- ✅ **Multiple compressors needed**: Support reranker + LLM extraction behind one interface
-- ✅ **Cross-backend consistency**: Same compression abstraction across all vector DBs
+- **Retrieval is broad**: Need to fetch many candidates to avoid missed evidence
+- **Chunks are long/noisy**: Retrieved text inflates generation token costs
+- **Multiple compressors needed**: Support reranker + LLM extraction behind one interface
+- **Cross-backend consistency**: Same compression abstraction across all vector DBs
 
 ### Ideal Use Cases
 

@@ -469,81 +469,81 @@ diverse = helper.select_diverse(docs, top_k=5)
 
 Use when:
 
-- ✅ Loading pipeline configurations
-- ✅ Need env var resolution
-- ✅ Validating config structure
+- Loading pipeline configurations
+- Need env var resolution
+- Validating config structure
 
 ### EmbedderHelper
 
 Use when:
 
-- ✅ Creating document/query embedders
-- ✅ Need model alias resolution
-- ✅ Consistent embedder initialization
+- Creating document/query embedders
+- Need model alias resolution
+- Consistent embedder initialization
 
 ### SparseEmbedder
 
 Use when:
 
-- ✅ Creating sparse embeddings
-- ✅ Hybrid retrieval needed
-- ✅ SPLADE model required
+- Creating sparse embeddings
+- Hybrid retrieval needed
+- SPLADE model required
 
 ### RerankerHelper
 
 Use when:
 
-- ✅ Creating cross-encoder rerankers
-- ✅ Strategy selection needed
-- ✅ Consistent ranker initialization
+- Creating cross-encoder rerankers
+- Strategy selection needed
+- Consistent ranker initialization
 
 ### MMRHelper
 
 Use when:
 
-- ✅ MMR diversity reranking needed
-- ✅ Pure Python implementation preferred
-- ✅ Lambda parameter tuning required
+- MMR diversity reranking needed
+- Pure Python implementation preferred
+- Lambda parameter tuning required
 
 ### ResultMerger
 
 Use when:
 
-- ✅ Fusing dense+sparse results
-- ✅ Multiple retriever outputs need merging
-- ✅ Deduplication across sources
+- Fusing dense+sparse results
+- Multiple retriever outputs need merging
+- Deduplication across sources
 
 ### RAGHelper
 
 Use when:
 
-- ✅ Generating answers from context
-- ✅ Prompt formatting needed
-- ✅ OpenAI-compatible generation
+- Generating answers from context
+- Prompt formatting needed
+- OpenAI-compatible generation
 
 ### DocumentConverter
 
 Use when:
 
-- ✅ Converting between LangChain and backend formats
-- ✅ Metadata preservation required
-- ✅ Score handling needed
+- Converting between LangChain and backend formats
+- Metadata preservation required
+- Score handling needed
 
 ### FiltersHelper
 
 Use when:
 
-- ✅ Normalizing filter predicates
-- ✅ Backend filter adaptation needed
-- ✅ MongoDB-style filters required
+- Normalizing filter predicates
+- Backend filter adaptation needed
+- MongoDB-style filters required
 
 ### DiversificationHelper
 
 Use when:
 
-- ✅ Controlling result redundancy
-- ✅ Cosine similarity-based diversity needed
-- ✅ Threshold-based filtering required
+- Controlling result redundancy
+- Cosine similarity-based diversity needed
+- Threshold-based filtering required
 
 ## 14. When Not to Use Utilities
 
