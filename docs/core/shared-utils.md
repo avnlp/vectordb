@@ -165,6 +165,31 @@ from vectordb.utils.config import (
 )
 ```
 
+**Environment Variable Resolution**:
+
+```python
+import os
+from vectordb.utils.config import resolve_env_vars
+
+os.environ["HOST"] = "localhost"
+os.environ["PORT"] = "8080"
+
+# Multiple variables in one string are supported
+value = resolve_env_vars("http://${HOST}:${PORT}")
+# Returns: "http://localhost:8080"
+
+# Default values with :- syntax
+value = resolve_env_vars("${MISSING:-default_value}")
+# Returns: "default_value"
+
+# Works recursively on nested structures
+config = resolve_env_vars({
+    "api": {"url": "http://${HOST}:${PORT}/api"},
+    "debug": True,
+})
+# Returns: {"api": {"url": "http://localhost:8080/api"}, "debug": True}
+```
+
 **Embedding Model Aliases**:
 
 ```python
@@ -236,8 +261,8 @@ from vectordb.utils.weaviate_document_converter import WeaviateDocumentConverter
 
 ```python
 from vectordb.utils.ids import (
-    get_doc_id,         # Generate deterministic ID from content hash
-    coerce_id,          # Ensure ID is string, generate if missing
+    get_doc_id,         # Extract ID from Haystack Document
+    coerce_id,          # Convert any value to string ID
     set_doc_id,         # Set ID on document object
 )
 ```
@@ -245,14 +270,17 @@ from vectordb.utils.ids import (
 **Usage**:
 
 ```python
-from vectordb.utils.ids import get_doc_id
+from vectordb.utils.ids import get_doc_id, coerce_id
+from haystack import Document
 
-# Deterministic ID from content
-doc_id = get_doc_id("This is the document content")
-# Returns: SHA-256 hash of content (first 32 chars)
+# Extract ID from Haystack Document (uses doc.id, then meta, then generates UUID)
+doc = Document(content="This is the document content", id="doc-123")
+doc_id = get_doc_id(doc)
+# Returns: "doc-123"
 
-# Coerce to string, generate if None
-doc_id = coerce_id(None, content="fallback content")
+# Coerce to string, generate UUID if None
+doc_id = coerce_id(None)  # Generates UUID
+doc_id = coerce_id(12345)  # Returns: "12345"
 ```
 
 ### Scope Injection (`src/vectordb/utils/scope.py`)

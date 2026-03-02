@@ -505,6 +505,7 @@ results = db.search(
 
 ```python
 from vectordb.databases import WeaviateVectorDB
+from weaviate.classes.config import Configure
 
 db = WeaviateVectorDB(
     cluster_url="https://xxx.weaviate.cloud",

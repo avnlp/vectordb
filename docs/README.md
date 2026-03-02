@@ -192,7 +192,7 @@ source .venv/bin/activate
 
 ```python
 from vectordb.dataloaders import DataloaderCatalog
-from vectordb.haystack.semantic_search import ChromaSemanticSearchPipeline
+from vectordb.haystack.semantic_search import ChromaSemanticSearchPipeline, ChromaSemanticIndexingPipeline
 
 # Load dataset
 loader = DataloaderCatalog.create("triviaqa", split="test", limit=500)

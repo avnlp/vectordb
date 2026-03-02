@@ -325,15 +325,15 @@ logging:
 
 ### Environment Variable Syntax
 
-- `${VAR}`: Required variable (raises error if not set)
-- `${VAR:-default}`: Variable with default value
+- `${VAR}`: Substitute with environment variable, empty string if unset
+- `${VAR:-default}`: Substitute with variable if set, otherwise use default
 
 Example:
 
 ```yaml
 qdrant:
   url: "${QDRANT_URL:-http://localhost:6333}"
-  api_key: "${QDRANT_API_KEY}"  # Required
+  api_key: "${QDRANT_API_KEY}"
 ```
 
 ### Dataset Limits

@@ -196,6 +196,7 @@ merged = ResultMerger.weighted_fusion(
 
 # Deduplication
 deduped = ResultMerger.deduplicate_by_content(merged, similarity_threshold=0.95)
+# Note: Currently performs exact hash-based dedup; threshold parameter is reserved
 ```
 
 ### Key Methods
@@ -206,7 +207,7 @@ deduped = ResultMerger.deduplicate_by_content(merged, similarity_threshold=0.95)
 | **rrf_fusion(dense, sparse, k, top_k)** | Reciprocal Rank Fusion | Default k=60 |
 | **rrf_fusion_many(ranked_lists, k, top_k)** | N-way RRF | For multiple retrievers |
 | **weighted_fusion(dense, sparse, weights, top_k)** | Weighted score fusion | Auto-normalizes weights |
-| **deduplicate_by_content(docs, threshold)** | Exact hash dedup | Not semantic similarity |
+| **deduplicate_by_content(docs, threshold)** | Exact hash dedup | Threshold parameter reserved for future use |
 
 ### Behavior
 
@@ -391,7 +392,7 @@ router = AgenticRouter(
 | **Duplicate content** | Merges via stable IDs | Expected behavior |
 | **top_k=0** | Returns empty list | Use >0 |
 | **Identical scores** | Normalizes to 0.5 | Expected behavior |
-| **deduplicate_by_content** | Exact hash dedup, not semantic | Use different approach for semantic |
+| **deduplicate_by_content** | Exact hash dedup (threshold unused) | Use different approach for semantic |
 
 ### DeepEvalEvaluator
 

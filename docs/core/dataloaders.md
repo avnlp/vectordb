@@ -374,7 +374,7 @@ loader = DataloaderCatalog.create("arc", split="test", limit=1000)
 
 ```python
 from vectordb.dataloaders.catalog import DataloaderCatalog
-from vectordb.haystack.semantic_search import SemanticSearchPipeline
+from vectordb.haystack.semantic_search import ChromaSemanticIndexingPipeline, ChromaSemanticSearchPipeline
 
 # Load dataset
 loader = DataloaderCatalog.create("triviaqa", split="test", limit=500)
@@ -384,16 +384,17 @@ dataset = loader.load()
 docs = dataset.to_haystack()
 
 # Index documents
-indexer = SemanticSearchPipeline(config_path="configs/pinecone_triviaqa.yaml")
+indexer = ChromaSemanticIndexingPipeline(config_path="configs/chroma_triviaqa.yaml")
 indexer.run(documents=docs)
 
 # Extract evaluation queries
 queries = dataset.evaluation_queries(limit=100)
 
 # Benchmark retrieval
+searcher = ChromaSemanticSearchPipeline(config_path="configs/chroma_triviaqa.yaml")
 correct = 0
 for q in queries:
-    results = indexer.search(q.query, top_k=5)
+    results = searcher.search(q.query, top_k=5)
     # Check if any result contains an answer
     for doc in results:
         if any(ans.lower() in doc.content.lower() for ans in q.answers):

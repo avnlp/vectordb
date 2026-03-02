@@ -64,8 +64,8 @@ config = ConfigLoader.load_dict({"key": "value"})
 
 ### Resolution Rules
 
-- **Full-string only**: Only full-string placeholders resolved
-- **Partial strings ignored**: `prefix_${VAR}` not interpolated
+- **Full and partial strings**: Both full-string and inline placeholders resolved (e.g., `${VAR}` and `prefix_${VAR}` both work)
+- **Multiple variables**: Multiple substitutions in one string supported (e.g., `"http://${HOST}:${PORT}"`)
 - **Recursive**: Applied to nested dicts and lists
 
 ### Example
