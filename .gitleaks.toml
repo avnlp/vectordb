@@ -1,0 +1,3 @@
+[allowlist]
+description = "Allowlist for rotated/revoked secrets in old commits"
+commits = ["90964c3"]
