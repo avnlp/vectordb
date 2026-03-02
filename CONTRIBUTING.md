@@ -32,15 +32,15 @@ There are many ways to contribute to VectorDB:
 
 4. Sync the project and install all dependencies:
 
-     ```bash
-     make sync
-     ```
+    ```bash
+    make sync
+    ```
 
-     Then activate the virtual environment:
+    Then activate the virtual environment:
 
-     ```bash
-     source .venv/bin/activate
-     ```
+    ```bash
+    source .venv/bin/activate
+    ```
 
      This creates an isolated virtual environment with project dependencies and the project installed in editable mode.
 
@@ -108,7 +108,7 @@ This command will format code with Ruff, apply auto-fixes with Ruff, and check t
 - `make lint-all` - Run all code quality checks and formatting (format + lint + type check).
 - `make lint-fmt` - Format code and apply auto-fixes (ruff).
 - `make lint-check` - Check formatting and lint without modifying files.
-- `make lint-style` - Lint only (no changes).
+- `make lint-style` - Lint with ruff (check only).
 - `make lint-typing` - Type check only (mypy).
 - `make lint-typos` - Check for typos.
 
