@@ -38,7 +38,7 @@ dependencies = [
     "fastembed-haystack",
     "langchain-text-splitters",
     "datasets<5.1",
-    "fsspec<2026.9",
+    "fsspec<=2026.6.0",
     "pymilvus==2.6.9",
     "qdrant-client==1.16.2",
     "langchain-groq",
